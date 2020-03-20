@@ -112,7 +112,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       hashingParams = makeHashingParams()
     )
 
-    logInfo(s"TextStats for features used in SmartTextVectorizer:")
+    logInfo("TextStats for features used in SmartTextVectorizer:")
     inN.map(_.name).zip(aggregatedStats).zip(vectorizationMethods).foreach { case((name, stats), vecMethod) =>
       logInfo(s"Feature: $name")
       logInfo(s"LengthCounts: ${stats.lengthCounts}")

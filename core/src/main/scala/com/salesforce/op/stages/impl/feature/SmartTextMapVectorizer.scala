@@ -155,7 +155,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       }
     }
 
-    logInfo(s"TextStats for features used in SmartTextMapVectorizer:")
+    logInfo("TextStats for features used in SmartTextMapVectorizer:")
     inN.map(_.name).zip(aggregatedStats).zip(allFeatureInfo).foreach { case ((mapName, mapStats), featInfo) =>
       logInfo(s"FeatureMap: $mapName")
       mapStats.keyValueCounts.zip(featInfo).foreach { case ((name, stats), info) =>
