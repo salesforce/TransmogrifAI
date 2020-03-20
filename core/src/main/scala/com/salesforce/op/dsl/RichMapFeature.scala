@@ -273,6 +273,10 @@ trait RichMapFeature {
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
+     * @param tokenizeForLengths        If true, then the length counts will be lengths of the tokens in the entries.
+     *                                  If false, then the length counts will be the lengths of the entire entries
+     * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
+     *                                  be hashed instead of ignored
      * @param others                    additional text features
      * @return result feature of type Vector
      */
@@ -298,6 +302,8 @@ trait RichMapFeature {
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      tokenizeForLengths: Boolean = SmartTextVectorizer.TokenizeForLengths,
+      minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
       others: Array[FeatureLike[TextMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -322,6 +328,8 @@ trait RichMapFeature {
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
+        .setTokenizeForLengths(tokenizeForLengths)
+        .setMinLengthStdDev(minLengthStdDev)
         .getOutput()
     }
   }
@@ -418,6 +426,10 @@ trait RichMapFeature {
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
+     * @param tokenizeForLengths        If true, then the length counts will be lengths of the tokens in the entries.
+     *                                  If false, then the length counts will be the lengths of the entire entries
+     * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
+     *                                  be hashed instead of ignored
      * @param others                    additional text features
      * @return result feature of type Vector
      */
@@ -443,6 +455,8 @@ trait RichMapFeature {
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      tokenizeForLengths: Boolean = SmartTextVectorizer.TokenizeForLengths,
+      minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -467,6 +481,8 @@ trait RichMapFeature {
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
+        .setTokenizeForLengths(tokenizeForLengths)
+        .setMinLengthStdDev(minLengthStdDev)
         .getOutput()
     }
   }
