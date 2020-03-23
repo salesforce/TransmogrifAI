@@ -31,20 +31,23 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.types._
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.twitter.algebird.Monoid
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
+import org.apache.spark.sql.functions._
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -80,6 +83,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     require(!dataset.isEmpty, "Input dataset cannot be empty")
 
+
     val maxCard = $(maxCardinality)
     val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
@@ -101,6 +105,35 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       (vecMethod, topValues)
     }.unzip
 
+    dataset.map(_.zip(vectorizationMethods).filter(_._2 == TextVectorizationMethod.Hash).map(_._1)).collect()
+      .foreach(println)
+    val hashingParams = makeHashingParams
+    val hasher = hashingTF(hashingParams)
+    implicit val tokenEncoder: org.apache.spark.sql.Encoder[Seq[TextList]] = Encoders.kryo[Seq[TextList]]
+    val tokenized = dataset.map(_.zip(vectorizationMethods).filter(_._2 == TextVectorizationMethod.Hash).map(_._1)
+      .map(t => tokenize(t.toText).tokens))
+    implicit val countHashEncoder: org.apache.spark.sql.Encoder[Seq[Map[Int, Map[String, Int]]]] =
+      Encoders.kryo[Seq[Map[Int, Map[String, Int]]]]
+    val countHash = tokenized.map(in => {
+      prepareTokens(in, inN, hashingParams) match {
+        case Left(shared) => Seq(shared.map(t => hasher.indexOf(t) -> t.toString).groupBy(_._1)
+          .mapValues(_.map(_._2).groupBy(identity).mapValues(_.size)))
+        case Right(sep) => sep.map(_.toSeq.map(t => hasher.indexOf(t) -> t.toString).groupBy(_._1)
+          .mapValues(_.map(_._2).groupBy(identity).mapValues(_.size))).toSeq
+      }
+    })
+    val p = countHash.first().size
+    val sumAggr = SequenceAggregators.SumSeqMapMapInt(size = p)
+    val r = countHash.select(sumAggr.toColumn).first().map(_.mapValues(_.maxBy(_._2)._1))
+    tokenized.collect.foreach(println)
+    println(countHash.select(sumAggr.toColumn).first())
+    println(r)
+
+    /*
+    dataset.map(_.zip(vectorizationMethods).filter(_._2 == TextVectorizationMethod.Hash).map(_._1)
+      .map(t => tokenize(t.toText).tokens.value.map(token => hasher.indexOf(token) -> token).groupBy(_._1)
+        .mapValues(_.map(_._2)))).show()
+     */
     val smartTextParams = SmartTextVectorizerModelArgs(
       vectorizationMethods = vectorizationMethods,
       topValues = topValues,
@@ -109,7 +142,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       hashingParams = makeHashingParams()
     )
 
-    val vecMetadata = makeVectorMetadata(smartTextParams)
+    val vecMetadata = makeVectorMetadata(smartTextParams, r)
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextVectorizerModel[T](args = smartTextParams, operationName = operationName, uid = uid)
@@ -129,7 +162,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     TextStats(valueCounts, lengthCounts)
   }
 
-  private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
+  private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs,
+    mostFrequentTokens: Seq[Map[Int, String]] = Seq.empty): OpVectorMetadata = {
     require(inN.length == smartTextParams.vectorizationMethods.length)
 
     val groups = inN.toArray.zip(smartTextParams.vectorizationMethods).groupBy(_._2)
@@ -149,12 +183,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     val textColumns = if (allTextFeatures.nonEmpty) {
       if (shouldTrackLen) {
-        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams(), mostFrequentTokens) ++
           allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
       else {
-        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams(), mostFrequentTokens) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
@@ -266,8 +300,10 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
       val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
 
+      val hasher = hashingTF(args.hashingParams)
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
       val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
+
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {

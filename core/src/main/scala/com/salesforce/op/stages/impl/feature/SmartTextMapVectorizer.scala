@@ -36,13 +36,13 @@ import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -89,7 +89,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     hashSpaceStrategy = getHashSpaceStrategy
   )
 
-  private def makeVectorMetadata(args: SmartTextMapVectorizerModelArgs): OpVectorMetadata = {
+  private def makeVectorMetadata(args: SmartTextMapVectorizerModelArgs,
+    mostFrequentTokens: Seq[Map[Int, String]] = Seq.empty): OpVectorMetadata = {
     val categoricalColumns = if (args.categoricalFeatureInfo.flatten.nonEmpty) {
       val (mapFeatures, mapFeatureInfo) =
         inN.toSeq.zip(args.categoricalFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
@@ -133,7 +134,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         hashKeys = hashKeys,
         ignoreKeys = ignoreKeys,
         shouldTrackNulls = args.shouldTrackNulls,
-        shouldTrackLen = $(trackTextLen)
+        shouldTrackLen = $(trackTextLen),
+        mostFrequentTokens
       )
     } else Array.empty[OpVectorColumnMetadata]
 
@@ -189,8 +191,30 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
-
-    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs)
+    val hasher = hashingTF(smartTextMapVectorizerModelArgs.hashingParams)
+    implicit val countHashEncoder: org.apache.spark.sql.Encoder[Seq[Map[Int, Map[String, Int]]]] =
+      Encoders.kryo[Seq[Map[Int, Map[String, Int]]]]
+    val countHash = dataset.map(row => {
+      val (rowHashedText, keysHashedText) =
+        row.view.zip(smartTextMapVectorizerModelArgs.hashKeys).collect { case (elements, keys) if keys.nonEmpty =>
+          val filtered = elements.filter { case (k, v) => keys.contains(k) }
+          (TextMap(filtered), keys)
+        }.unzip
+      val rowHashTokenized = rowHashedText.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
+      prepareTokens(inputs = rowHashTokenized.toSeq, allKeys = keysHashedText.toSeq,
+        params = smartTextMapVectorizerModelArgs.hashingParams) match {
+        case Left(shared) => Seq(shared.map(t => hasher.indexOf(t) -> t.toString).groupBy(_._1)
+          .mapValues(_.map(_._2).groupBy(identity).mapValues(_.size)))
+        case Right(sep) => sep.map(_.toSeq.map(t => hasher.indexOf(t) -> t.toString).groupBy(_._1)
+          .mapValues(_.map(_._2).groupBy(identity).mapValues(_.size))).toSeq
+      }
+    })
+    val p = countHash.first().size
+    val sumAggr = SequenceAggregators.SumSeqMapMapInt(size = p)
+    val r = countHash.select(sumAggr.toColumn).first().map(_.mapValues(_.maxBy(_._2)._1))
+    println(countHash.select(sumAggr.toColumn).first())
+    println(r)
+    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, r)
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextMapVectorizerModel[T](args = smartTextMapVectorizerModelArgs, operationName = operationName, uid = uid)

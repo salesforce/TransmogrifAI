@@ -208,7 +208,8 @@ private[op] trait HashingFun {
   }
 
   protected def makeVectorColumnMetadata(
-    features: Array[TransientFeature], params: HashingFunctionParams
+    features: Array[TransientFeature], params: HashingFunctionParams, mostFrequentTokens:
+  Seq[Map[Int, String]]
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
     if (isSharedHashSpace(params)) {
@@ -218,23 +219,31 @@ private[op] trait HashingFun {
           parentFeatureName = features.map(_.name),
           parentFeatureType = features.map(_.typeName),
           grouping = None,
-          indicatorValue = None
+          descriptorValue = mostFrequentTokens.headOption.map(_.get(i)).getOrElse(None)
         )
       }.toArray
     } else {
       for {
         f <- features
         i <- 0 until numFeatures
-      } yield f.toColumnMetaData()
+      } yield {
+        new OpVectorColumnMetadata(
+          parentFeatureName = Seq(f.name),
+          parentFeatureType = Seq(f.typeName),
+          grouping = Some(f.name),
+          descriptorValue = mostFrequentTokens.lift(features.indexOf(f)).map(_.get(i)).getOrElse(None)
+        )
+      }
     }
   }
+
 
   protected def makeVectorMetadata(
     features: Array[TransientFeature],
     params: HashingFunctionParams,
     outputName: String
   ): OpVectorMetadata = {
-    val cols = makeVectorColumnMetadata(features, params)
+    val cols = makeVectorColumnMetadata(features, params, Seq.empty)
     OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(features, stageName))
   }
 
@@ -249,6 +258,17 @@ private[op] trait HashingFun {
     if (in.isEmpty) OPVector.empty
     else {
       val hasher = hashingTF(params)
+
+      val prepared = prepareTokens(in, features, params)
+      prepared match {
+        case Left(shared) => hasher.transform(shared).asML.toOPVector
+        case Right(separated) => {
+          val hashedVecs = separated.map(hasher.transform(_).asML)
+          combine(hashedVecs).toOPVector
+        }
+      }
+      /*
+      val hasher = hashingTF(params)
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
 
       if (isSharedHashSpace(params)) {
@@ -259,6 +279,7 @@ private[op] trait HashingFun {
           p <- prepared
         } allElements.append(p)
 
+        println(s"All elements ${allElements.toSeq}")
         hasher.transform(allElements).asML.toOPVector
       }
       else {
@@ -267,6 +288,38 @@ private[op] trait HashingFun {
             hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
           }
         combine(hashedVecs).toOPVector
+      }
+
+       */
+    }
+  }
+
+
+  protected def prepareTokens[T <: OPCollection](
+    in: Seq[T],
+    features: Array[TransientFeature],
+    params: HashingFunctionParams
+  ): Either[ArrayBuffer[Any], Array[Iterable[Any]]] = {
+    if (in.isEmpty) Left(ArrayBuffer.empty[Any])
+    else {
+      val hasher = hashingTF(params)
+      val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
+
+      if (isSharedHashSpace(params)) {
+        val allElements = ArrayBuffer.empty[Any]
+        for {
+          (featureNameHash, el) <- fNameHashesWithInputs
+          prepared = prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
+          p <- prepared
+        } allElements.append(p)
+        Left(allElements)
+      }
+      else {
+
+          Right(fNameHashesWithInputs.map { case (featureNameHash, el) =>
+            prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
+          })
+
       }
     }
   }
@@ -320,8 +373,10 @@ private[op] trait MapHashingFun extends HashingFun {
     hashKeys: Seq[Seq[String]],
     ignoreKeys: Seq[Seq[String]],
     shouldTrackNulls: Boolean,
-    shouldTrackLen: Boolean
+    shouldTrackLen: Boolean,
+    mostFrequentTokens: Seq[Map[Int, String]]
   ): Array[OpVectorColumnMetadata] = {
+    println(s"Most Frquent Tokens : $mostFrequentTokens")
     val numHashes = params.numFeatures
     val numFeatures = hashKeys.map(_.length).sum
     val hashColumns =
@@ -331,7 +386,7 @@ private[op] trait MapHashingFun extends HashingFun {
             parentFeatureName = hashFeatures.map(_.name),
             parentFeatureType = hashFeatures.map(_.typeName),
             grouping = None,
-            indicatorValue = None
+            indicatorValue = mostFrequentTokens.headOption.map(_.get(i)).getOrElse(None)
           )
         }.toArray
       } else {
@@ -358,7 +413,19 @@ private[op] trait MapHashingFun extends HashingFun {
       for {
         (keys, f) <- allTextKeys.toArray.zip(allTextFeatures)
         key <- keys
-      } yield f.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString).copy(grouping = Option(key))
+      } yield {
+        new OpVectorColumnMetadata(
+          parentFeatureName = Seq(f.name),
+          parentFeatureType = Seq(f.typeName),
+          grouping = Option(key),
+          indicatorValue = None,// mostFrequentTokens.lift(allTextFeatures.indexOf(f)).map(_.get(i)).getOrElse(None),
+          descriptorValue = Option(OpVectorColumnMetadata.TextLenString)
+        )
+      }
+
+
+
+
     } else Array.empty[OpVectorColumnMetadata]
 
     hashColumns ++ lenColumns ++ nullColumns
@@ -371,6 +438,28 @@ private[op] trait MapHashingFun extends HashingFun {
     params: HashingFunctionParams
   ): OPVector = {
     if (inputs.isEmpty) OPVector.empty
+    else {
+
+      val hasher = hashingTF(params)
+
+      prepareTokens(inputs, allKeys, params) match {
+        case Left(shared) => hasher.transform(shared).asML.toOPVector
+        case Right(separated) => {
+          val hashedVecs = separated.map(_.map(it => hasher.transform(it).asML))
+          combine(hashedVecs.flatten).toOPVector
+        }
+      }
+
+    }
+  }
+
+  protected def prepareTokens
+  (
+    inputs: Seq[Map[String, TextList]],
+    allKeys: Seq[Seq[String]],
+    params: HashingFunctionParams
+  ): Either[ArrayBuffer[Any], Seq[Seq[Iterable[Any]]]] = {
+    if (inputs.isEmpty) Left(ArrayBuffer.empty)
     else {
       val hasher = hashingTF(params)
       val fNameHashesWithInputsSeq = allKeys.zip(inputs).map{ case (featureKeys, input) =>
@@ -389,16 +478,13 @@ private[op] trait MapHashingFun extends HashingFun {
           prepared = prepare[TextList](values, params.hashWithIndex, params.prependFeatureName, featureNameHash)
           p <- prepared
         } allElements.append(p)
-
-        hasher.transform(allElements).asML.toOPVector
+        Left(allElements)
       } else {
-        val hashedVecs =
-          fNameHashesWithInputsSeq.map(_.map { case (featureNameHash, el) =>
-            hasher.transform(
-              prepare[TextList](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
-            ).asML
-          })
-        combine(hashedVecs.flatten).toOPVector
+
+        Right(fNameHashesWithInputsSeq.map(_.map { case (featureNameHash, el) =>
+          prepare[TextList](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
+        }))
+
       }
     }
   }

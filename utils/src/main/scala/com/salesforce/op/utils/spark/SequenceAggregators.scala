@@ -222,4 +222,18 @@ object SequenceAggregators {
       def outputEncoder: Encoder[SeqMapLong] = ExpressionEncoder()
     }
   }
+
+  type SeqMapMapInt = Seq[Map[Int, Map[String, Int]]]
+
+  def SumSeqMapMapInt(size: Int): Aggregator[SeqMapMapInt, SeqMapMapInt, SeqMapMapInt] = {
+    new Aggregator[SeqMapMapInt, SeqMapMapInt, SeqMapMapInt] {
+      val zero: SeqMapMapInt = Seq.fill(size)(Map.empty)
+      def reduce(b: SeqMapMapInt, a: SeqMapMapInt): SeqMapMapInt = b.zip(a).map { case (m1, m2) => m1 + m2 }
+      def merge(b: SeqMapMapInt, a: SeqMapMapInt): SeqMapMapInt = reduce(b, a)
+      def finish(reduction: SeqMapMapInt): SeqMapMapInt = reduction
+      def bufferEncoder: Encoder[SeqMapMapInt] = Encoders.kryo[SeqMapMapInt]
+      def outputEncoder: Encoder[SeqMapMapInt] = Encoders.kryo[SeqMapMapInt]
+    }
+  }
+
 }

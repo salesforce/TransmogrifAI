@@ -108,6 +108,7 @@ class SmartTextVectorizerTest
       .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
+    println(transformed.collect(smartVectorized).toSeq)
     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
     val catRes = transformed.collect(categoricalVectorized)
@@ -253,6 +254,7 @@ class SmartTextVectorizerTest
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 9
     meta.columns.foreach { col =>
+      println(col)
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
         col.grouping shouldBe Option(f1.name)
