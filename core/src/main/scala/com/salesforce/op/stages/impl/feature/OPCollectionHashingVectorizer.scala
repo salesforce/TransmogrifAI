@@ -227,12 +227,8 @@ private[op] trait HashingFun {
         f <- features
         i <- 0 until numFeatures
       } yield {
-        new OpVectorColumnMetadata(
-          parentFeatureName = Seq(f.name),
-          parentFeatureType = Seq(f.typeName),
-          grouping = Some(f.name),
-          descriptorValue = mostFrequentTokens.lift(features.indexOf(f)).map(_.get(i)).getOrElse(None)
-        )
+        f.toColumnMetaData().copy(descriptorValue = mostFrequentTokens.lift(features.indexOf(f)).map(_.get(i))
+          .getOrElse(None))
       }
     }
   }
