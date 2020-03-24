@@ -263,30 +263,6 @@ private[op] trait HashingFun {
           combine(hashedVecs).toOPVector
         }
       }
-      /*
-      val hasher = hashingTF(params)
-      val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
-
-      if (isSharedHashSpace(params)) {
-        val allElements = ArrayBuffer.empty[Any]
-        for {
-          (featureNameHash, el) <- fNameHashesWithInputs
-          prepared = prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
-          p <- prepared
-        } allElements.append(p)
-
-        println(s"All elements ${allElements.toSeq}")
-        hasher.transform(allElements).asML.toOPVector
-      }
-      else {
-        val hashedVecs =
-          fNameHashesWithInputs.map { case (featureNameHash, el) =>
-            hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
-          }
-        combine(hashedVecs).toOPVector
-      }
-
-       */
     }
   }
 
@@ -299,7 +275,6 @@ private[op] trait HashingFun {
     if (in.isEmpty) Left(ArrayBuffer.empty[Any])
     else {
       val hasher = hashingTF(params)
-      println(features.toSeq.map(_.name))
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
 
       if (isSharedHashSpace(params)) {
@@ -373,7 +348,6 @@ private[op] trait MapHashingFun extends HashingFun {
     shouldTrackLen: Boolean,
     mostFrequentTokens: Seq[Map[String, Map[Int, String]]]
   ): Array[OpVectorColumnMetadata] = {
-    println(s"Most Frquent Tokens : $mostFrequentTokens")
     val numHashes = params.numFeatures
     val numFeatures = hashKeys.map(_.length).sum
     val hashColumns =
@@ -483,7 +457,6 @@ private[op] trait MapHashingFun extends HashingFun {
         Right(fNameKeyWithInputsSeq.map{_.map {
           case (featureKey, el) => {
             val featureNameHash = hasher.indexOf(featureKey)
-            println(s"hash $featureNameHash")
             featureKey -> prepare[TextList](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
           }
         }.toMap

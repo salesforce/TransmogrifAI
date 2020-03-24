@@ -509,7 +509,6 @@ class SmartTextMapVectorizerTest
     firstRes.v.size shouldBe featureVectorSize
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
-    println(meta.columns.toSeq)
     meta.columns.length shouldBe featureVectorSize
     meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
     meta.columns.slice(5, 10).forall(_.grouping.contains("country"))

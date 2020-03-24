@@ -196,35 +196,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     implicit val countHashEncoder: org.apache.spark.sql.Encoder[SeqMapMapMapInt] =
       Encoders.kryo[SeqMapMapMapInt]
 
-    dataset.foreach(row => {
-      println(row.zip(smartTextMapVectorizerModelArgs.hashKeys).collect { case (elements, keys) if keys.nonEmpty =>
-        val filtered = elements.filter { case (k, v) => keys.contains(k) }
-        (TextMap(filtered), keys)
-      }.unzip)
-    }
-    )
-
-    dataset.foreach(row => {
-      val (rowHashedText, keysHashedText) =
-        row.zip(smartTextMapVectorizerModelArgs.hashKeys).collect { case (elements, keys) if keys.nonEmpty =>
-          val filtered = elements.filter { case (k, v) => keys.contains(k) }
-          (TextMap(filtered), keys)
-        }.unzip
-      val rowHashTokenized = rowHashedText.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
-      println(rowHashTokenized)
-    }
-    )
-
-    dataset.foreach(row => {
-      val (rowHashedText, keysHashedText) =
-        row.zip(smartTextMapVectorizerModelArgs.hashKeys).collect { case (elements, keys) if keys.nonEmpty =>
-          val filtered = elements.filter { case (k, v) => keys.contains(k) }
-          (TextMap(filtered), keys)
-        }.unzip
-      val rowHashTokenized = rowHashedText.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
-      println(prepareTokens(inputs = rowHashTokenized.toSeq, allKeys = keysHashedText.toSeq,
-        params = smartTextMapVectorizerModelArgs.hashingParams))
-    })
     val countHash = dataset.map(row => {
       val (rowHashedText, keysHashedText) =
         row.zip(smartTextMapVectorizerModelArgs.hashKeys).collect { case (elements, keys) if keys.nonEmpty =>
@@ -242,12 +213,9 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
       }
     })
-    countHash.foreach(row => println(row))
     val p = countHash.first().size
     val sumAggr = SequenceAggregators.SumSeqMapMapMapInt(size = p)
     val r = countHash.select(sumAggr.toColumn).first().map(_.mapValues(_.mapValues(_.maxBy(_._2)._1)))
-    println(countHash.select(sumAggr.toColumn).first())
-    println(r)
     val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, r)
     setMetadata(vecMetadata.toMetadata)
 

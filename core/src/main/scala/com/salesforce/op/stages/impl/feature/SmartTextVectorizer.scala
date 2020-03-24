@@ -105,8 +105,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       (vecMethod, topValues)
     }.unzip
 
-    dataset.map(_.zip(vectorizationMethods).filter(_._2 == TextVectorizationMethod.Hash).map(_._1)).collect()
-      .foreach(println)
     val textTransientFeatures: Array[TransientFeature] =
       getTransientFeatures().zip(vectorizationMethods).collect {
         case (tf, method) if method != TextVectorizationMethod.Pivot => tf
@@ -129,9 +127,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val p = countHash.first().size
     val sumAggr = SequenceAggregators.SumSeqMapMapInt(size = p)
     val r = countHash.select(sumAggr.toColumn).first().map(_.mapValues(_.maxBy(_._2)._1))
-    tokenized.collect.foreach(println)
-    println(countHash.select(sumAggr.toColumn).first())
-    println(r)
 
     /*
     dataset.map(_.zip(vectorizationMethods).filter(_._2 == TextVectorizationMethod.Hash).map(_._1)
@@ -308,7 +303,6 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
 
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
-      println(s"textransiant ${getTextTransientFeatures.toSeq.map(_.name)}")
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)
