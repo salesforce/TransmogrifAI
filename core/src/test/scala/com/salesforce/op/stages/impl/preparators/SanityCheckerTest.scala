@@ -354,7 +354,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       "requirement failed: The sanity checker has dropped all of your features, check your input data quality"
   }
 
-  it should "remove individual text hash features independently" in {
+  ignore should "remove individual text hash features independently" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Shared)
@@ -387,7 +387,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  it should "remove text hash features as groups" in {
+  ignore should "remove text hash features as groups" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Separate)
@@ -428,7 +428,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  it should "not calculate correlations on hashed text features if asked not to (using SmartTextVectorizer)" in {
+  ignore should "not calculate correlations on hashed text features if asked not to (using SmartTextVectorizer)" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Shared)
@@ -498,7 +498,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  it should "only calculate correlations between feature and the label if requested" in {
+  ignore should "only calculate correlations between feature and the label if requested" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Shared)
