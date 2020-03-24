@@ -236,4 +236,17 @@ object SequenceAggregators {
     }
   }
 
+  type SeqMapMapMapInt = Seq[Map[String, Map[Int, Map[String, Int]]]]
+
+  def SumSeqMapMapMapInt(size: Int): Aggregator[SeqMapMapMapInt, SeqMapMapMapInt, SeqMapMapMapInt] = {
+    new Aggregator[SeqMapMapMapInt, SeqMapMapMapInt, SeqMapMapMapInt] {
+      val zero: SeqMapMapMapInt = Seq.fill(size)(Map.empty)
+      def reduce(b: SeqMapMapMapInt, a: SeqMapMapMapInt): SeqMapMapMapInt = b.zip(a).map { case (m1, m2) => m1 + m2 }
+      def merge(b: SeqMapMapMapInt, a: SeqMapMapMapInt): SeqMapMapMapInt = reduce(b, a)
+      def finish(reduction: SeqMapMapMapInt): SeqMapMapMapInt = reduction
+      def bufferEncoder: Encoder[SeqMapMapMapInt] = Encoders.kryo[SeqMapMapMapInt]
+      def outputEncoder: Encoder[SeqMapMapMapInt] = Encoders.kryo[SeqMapMapMapInt]
+    }
+  }
+
 }

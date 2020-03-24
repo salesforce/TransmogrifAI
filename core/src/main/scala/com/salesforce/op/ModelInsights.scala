@@ -632,7 +632,7 @@ case object ModelInsights {
               derivedFeatureName = h.columnName,
               stagesApplied = h.parentFeatureStages,
               derivedFeatureGroup = h.grouping,
-              derivedFeatureValue = if(h.descriptorValue.isDefined) h.descriptorValue else h.indicatorValue,
+              derivedFeatureValue = if (h.descriptorValue.isDefined) h.descriptorValue else h.indicatorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
               corr = getCorr(s.correlationsWLabel, h.columnName),
               cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
