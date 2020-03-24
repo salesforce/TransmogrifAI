@@ -248,6 +248,7 @@ class SmartTextMapVectorizerTest
       if (m.index < 4 || m.index == 8) m.grouping shouldBe Option(f1.name)
       else if (m.index < 8 || m.index == 9) m.grouping shouldBe Option(f2.name)
       m.indicatorValue shouldBe f.indicatorValue
+      m.descriptorValue shouldBe f.descriptorValue
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
@@ -285,6 +286,8 @@ class SmartTextMapVectorizerTest
         assert(m.grouping === Option(f2.name), s"second null indicator should be from ${f2.name}")
       }
       m.indicatorValue shouldBe f.indicatorValue
+      m.descriptorValue shouldBe f.descriptorValue
+
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
@@ -324,6 +327,8 @@ class SmartTextMapVectorizerTest
         assert(m.grouping === Option(f2.name), s"second null indicator should be from ${f2.name}")
       }
       m.indicatorValue shouldBe f.indicatorValue
+      m.descriptorValue shouldBe f.descriptorValue
+
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
@@ -360,6 +365,8 @@ class SmartTextMapVectorizerTest
       smart.parentFeatureType shouldBe shortcut.parentFeatureType
       smart.grouping shouldBe shortcut.grouping
       smart.indicatorValue shouldBe shortcut.indicatorValue
+      smart.descriptorValue shouldBe shortcut.descriptorValue
+
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
@@ -432,6 +439,7 @@ class SmartTextMapVectorizerTest
       if (m.index < 4) m.grouping shouldBe f.grouping
       else m.grouping shouldBe Option(f2.name)
       m.indicatorValue shouldBe f.indicatorValue
+      m.descriptorValue shouldBe f.descriptorValue
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
@@ -501,6 +509,7 @@ class SmartTextMapVectorizerTest
     firstRes.v.size shouldBe featureVectorSize
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    println(meta.columns.toSeq)
     meta.columns.length shouldBe featureVectorSize
     meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
     meta.columns.slice(5, 10).forall(_.grouping.contains("country"))

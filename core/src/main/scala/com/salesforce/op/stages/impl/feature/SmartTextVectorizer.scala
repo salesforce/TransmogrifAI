@@ -107,6 +107,10 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     dataset.map(_.zip(vectorizationMethods).filter(_._2 == TextVectorizationMethod.Hash).map(_._1)).collect()
       .foreach(println)
+    val textTransientFeatures: Array[TransientFeature] =
+      getTransientFeatures().zip(vectorizationMethods).collect {
+        case (tf, method) if method != TextVectorizationMethod.Pivot => tf
+      }
     val hashingParams = makeHashingParams
     val hasher = hashingTF(hashingParams)
     implicit val tokenEncoder: org.apache.spark.sql.Encoder[Seq[TextList]] = Encoders.kryo[Seq[TextList]]
@@ -115,7 +119,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     implicit val countHashEncoder: org.apache.spark.sql.Encoder[Seq[Map[Int, Map[String, Int]]]] =
       Encoders.kryo[Seq[Map[Int, Map[String, Int]]]]
     val countHash = tokenized.map(in => {
-      prepareTokens(in, inN, hashingParams) match {
+      prepareTokens(in, textTransientFeatures, hashingParams) match {
         case Left(shared) => Seq(shared.map(t => hasher.indexOf(t) -> t.toString).groupBy(_._1)
           .mapValues(_.map(_._2).groupBy(identity).mapValues(_.size)))
         case Right(sep) => sep.map(_.toSeq.map(t => hasher.indexOf(t) -> t.toString).groupBy(_._1)
@@ -300,11 +304,11 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
       val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
 
-      val hasher = hashingTF(args.hashingParams)
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
       val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
 
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
+      println(s"textransiant ${getTextTransientFeatures.toSeq.map(_.name)}")
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)

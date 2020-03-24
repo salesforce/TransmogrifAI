@@ -299,6 +299,7 @@ private[op] trait HashingFun {
     if (in.isEmpty) Left(ArrayBuffer.empty[Any])
     else {
       val hasher = hashingTF(params)
+      println(features.toSeq.map(_.name))
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
 
       if (isSharedHashSpace(params)) {
@@ -482,6 +483,7 @@ private[op] trait MapHashingFun extends HashingFun {
         Right(fNameKeyWithInputsSeq.map{_.map {
           case (featureKey, el) => {
             val featureNameHash = hasher.indexOf(featureKey)
+            println(s"hash $featureNameHash")
             featureKey -> prepare[TextList](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
           }
         }.toMap
