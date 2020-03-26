@@ -452,7 +452,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(0.5).setTokenizeForLengths(true)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -488,7 +488,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0).setTokenizeForLengths(false)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -524,7 +524,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(0.5).setTokenizeForLengths(true)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
@@ -560,7 +560,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0).setTokenizeForLengths(false)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()

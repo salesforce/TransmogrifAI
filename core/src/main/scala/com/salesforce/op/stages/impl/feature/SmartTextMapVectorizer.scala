@@ -182,7 +182,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val maxCard = $(maxCardinality)
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
-    val shouldTokenize = $(tokenizeForLengths)
+    val shouldTokenize = $(textLengthType) == TextLengthType.Tokens.entryName
 
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(

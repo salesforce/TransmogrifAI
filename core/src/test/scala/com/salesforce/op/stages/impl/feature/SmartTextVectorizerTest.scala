@@ -206,7 +206,7 @@ class SmartTextVectorizerTest
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(0.5).setTokenizeForLengths(true)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawCountry, rawCategorical, rawTextId, rawText).getOutput()
@@ -241,7 +241,7 @@ class SmartTextVectorizerTest
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0).setTokenizeForLengths(false)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawCountry, rawCategorical, rawTextId, rawText).getOutput()

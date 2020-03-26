@@ -83,7 +83,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val maxCard = $(maxCardinality)
     val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
-    val shouldTokenizeForLengths = $(tokenizeForLengths)
+    val shouldTokenizeForLengths = $(textLengthType) == TextLengthType.Tokens.entryName
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(
@@ -171,7 +171,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 object SmartTextVectorizer {
   val MaxCardinality: Int = 100
   val MinTextLengthStdDev: Double = 0
-  val TokenizeForLengths: Boolean = true
+  val LengthType: TextLengthType = TextLengthType.FullEntry
 
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
@@ -378,12 +378,12 @@ trait MinLengthStdDevParams extends Params {
   final def getMinLengthStdDev: Double = $(minLengthStdDev)
   setDefault(minLengthStdDev -> SmartTextVectorizer.MinTextLengthStdDev)
 
-  final val tokenizeForLengths = new BooleanParam(
-    parent = this, name = "tokenizeForLengths",
-    doc = "If true, then the length counts will be lengths of the tokens in the entries. If false, then the length" +
-      "counts will be the lengths of the entire entries"
+  final val textLengthType: Param[String] = new Param[String](this, "textLengthType",
+    "Method to use to construct length distribution from text in TextStats. Current options are" +
+      "FullEntry (lengths are of entire entry) or Tokens (lengths are token lengths).",
+    (value: String) => TextLengthType.withNameInsensitiveOption(value).isDefined
   )
-  final def setTokenizeForLengths(v: Boolean): this.type = set(tokenizeForLengths, v)
-  final def getTokenizeForLengths: Boolean = $(tokenizeForLengths)
-  setDefault(tokenizeForLengths -> SmartTextVectorizer.TokenizeForLengths)
+  def setTextLengthType(v: TextLengthType): this.type = set(textLengthType, v.entryName)
+  def getTextLengthType: TextLengthType = TextLengthType.withNameInsensitive($(textLengthType))
+  setDefault(textLengthType -> TextLengthType.FullEntry.entryName)
 }
