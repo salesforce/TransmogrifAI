@@ -37,6 +37,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
 import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpTransformer}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml._
@@ -108,7 +109,7 @@ private[op] trait OpWorkflowCore {
 
   /**
    * Whether the cross-validation/train-validation-split will be done at workflow level
-   *g c
+   *
    * @return true if the cross-validation  will be done at workflow level, false otherwise
    */
   final def isWorkflowCV: Boolean = isWorkflowCVEnabled
@@ -306,7 +307,9 @@ private[op] trait OpWorkflowCore {
   def computeDataUpTo(feature: OPFeature, path: String)
     (implicit spark: SparkSession): Unit = {
     val df = computeDataUpTo(feature)
-    df.saveAvro(path)
+    JobGroupUtil.withJobGroup(OpStep.ResultsSaving) {
+      df.saveAvro(path)
+    }
   }
 
   /**

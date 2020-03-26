@@ -35,6 +35,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
@@ -91,9 +92,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    require(reader.nonEmpty, "Data reader must be set")
-    checkReadersAndFeatures()
-    reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
+      require(reader.nonEmpty, "Data reader must be set")
+      checkReadersAndFeatures()
+      reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    }
   }
 
   /**
@@ -217,8 +220,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
    */
-  def save(path: String, overwrite: Boolean = true): Unit =
-    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+  def save(path: String, overwrite: Boolean = true)(implicit spark: SparkSession): Unit = {
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
+      OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+    }
+  }
 
   /**
    * Gets the fitted stage that generates the input feature
@@ -416,7 +422,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     if (persistScores) scores.persist()
 
     // Save the scores if a path was provided
-    path.foreach(scores.saveAvro(_))
+    JobGroupUtil.withJobGroup(OpStep.ResultsSaving) {
+      path.foreach(scores.saveAvro(_))
+    }
 
     scores -> metrics
   }
