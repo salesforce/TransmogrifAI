@@ -221,7 +221,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param overwrite should overwrite if the path exists
    */
   def save(path: String, overwrite: Boolean = true): Unit = {
-    new OpWorkflowModelWriter(this).save(path = path, overwrite = overwrite)
+    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
   }
 
   /**
