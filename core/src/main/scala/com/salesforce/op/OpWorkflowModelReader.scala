@@ -38,7 +38,6 @@ import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import org.apache.spark.ml.util.MLReader
-import org.apache.spark.sql.SparkSession
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
@@ -61,13 +60,13 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @return workflow model
    */
   final override def load(path: String): OpWorkflowModel = {
-    JobGroupUtil.withJobGroup(this.sparkSession, OpStep.ModelIO) {
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
       Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString)
         .flatMap(loadJson(_, path = path)) match {
         case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
         case Success(wf) => wf
       }
-    }
+    }(this.sparkSession)
   }
 
   /**

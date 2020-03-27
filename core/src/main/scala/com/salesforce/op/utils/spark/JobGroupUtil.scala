@@ -40,25 +40,14 @@ object JobGroupUtil {
    * Sets the Spark job group name and description for a wrapped code block.
    * The job group is cleared afterwards.
    *
-   * @param spark SparkSession
-   * @param step The OpStep with which to the mark the Spark job group
-   */
-  def withJobGroup[R](spark: SparkSession, step: OpStep)(block: => R): R = {
-    spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
-    val result = block
-    spark.sparkContext.clearJobGroup()
-    result
-  }
-
-  /**
-   * Sets the Spark job group name and description for a wrapped code block.
-   * The job group is cleared afterwards.
-   *
    * @param step The OpStep with which to the mark the Spark job group
    * @param spark SparkSession
    */
   def withJobGroup[R](step: OpStep)(block: => R)(implicit spark: SparkSession): R = {
-    JobGroupUtil.withJobGroup(spark, step)(block)
+    spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
+    val result = block
+    spark.sparkContext.clearJobGroup()
+    result
   }
 
   /**

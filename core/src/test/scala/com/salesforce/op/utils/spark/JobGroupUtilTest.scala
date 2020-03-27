@@ -45,13 +45,6 @@ class JobGroupUtilTest extends FlatSpec with TestCommon with TestSparkContext {
     spark.sparkContext.statusTracker.getJobIdsForGroup("DataReadingAndFiltering") should not be empty
   }
 
-  it should "be able to set a job group ID around a code block using explicit SparkSession argument" in {
-    JobGroupUtil.withJobGroup(spark, OpStep.DataReadingAndFiltering) {
-      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
-    }
-    spark.sparkContext.statusTracker.getJobIdsForGroup("DataReadingAndFiltering") should not be empty
-  }
-
   it should "reset the job group ID after a code block" in {
     JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
