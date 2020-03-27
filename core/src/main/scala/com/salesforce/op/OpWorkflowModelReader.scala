@@ -61,8 +61,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @return workflow model
    */
   final override def load(path: String): OpWorkflowModel = {
-    implicit val spark: SparkSession = this.sparkSession
-    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
+    JobGroupUtil.withJobGroup(this.sparkSession, OpStep.ModelIO) {
       Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString)
         .flatMap(loadJson(_, path = path)) match {
         case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
