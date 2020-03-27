@@ -41,6 +41,7 @@ object JobGroupUtil {
    * The job group is cleared afterwards.
    *
    * @param step The OpStep with which to the mark the Spark job group
+   * @param spark SparkSession
    */
   def withJobGroup[R](step: OpStep)(block: => R)(implicit spark: SparkSession): R = {
     spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
@@ -53,6 +54,7 @@ object JobGroupUtil {
    * Indefinitely sets the Spark job group name and description.
    *
    * @param step The OpStep with which to the mark the Spark job group
+   * @param spark SparkSession
    */
   def setJobGroup(step: OpStep)(implicit spark: SparkSession): Unit = {
     spark.sparkContext.setJobGroup(step.toString, step.entryDescription)

@@ -38,7 +38,6 @@ import enumeratum._
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
-import org.apache.spark.sql.SparkSession
 import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -57,8 +56,10 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   implicit val jsonFormats: Formats = DefaultFormats
 
   override protected def saveImpl(path: String): Unit = {
-    sc.parallelize(Seq(toJsonString(path)), 1)
-      .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
+      sc.parallelize(Seq(toJsonString(path)), 1)
+        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+    }(this.sparkSession)
   }
 
   /**
@@ -144,21 +145,6 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   private def allFeaturesJArray: JArray =
     JArray(model.getAllFeatures().map(FeatureJsonHelper.toJson).toList)
 
-  /**
-   * Save [[OpWorkflowModel]] to path
-   *
-   * @param path      path to save the model and its stages
-   * @param overwrite should overwrite the destination
-   */
-  def save(path: String, overwrite: Boolean = true): Unit = {
-    implicit val spark: SparkSession = this.sparkSession
-    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
-      val w = new OpWorkflowModelWriter(model)
-      val writer = if (overwrite) w.overwrite() else w
-      writer.save(path)
-    }
-  }
-
 }
 
 /**
@@ -196,6 +182,19 @@ private[op] object OpWorkflowModelReadWriteShared {
  * Writes the OpWorkflowModel into a specified path
  */
 object OpWorkflowModelWriter {
+
+  /**
+   * Save [[OpWorkflowModel]] to path
+   *
+   * @param model workflow model instance
+   * @param path      path to save the model and its stages
+   * @param overwrite should overwrite the destination
+   */
+  def save(model: OpWorkflowModel, path: String, overwrite: Boolean = true): Unit = {
+    val w = new OpWorkflowModelWriter(model)
+    val writer = if (overwrite) w.overwrite() else w
+    writer.save(path)
+  }
 
   /**
    * Serialize [[OpWorkflowModel]] to json
