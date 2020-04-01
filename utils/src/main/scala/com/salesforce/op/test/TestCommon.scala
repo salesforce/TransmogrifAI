@@ -130,4 +130,22 @@ trait TestCommon extends Matchers with Assertions {
     if (noSpaces) raw.mkString("").replaceAll("\\s", "") else raw.mkString("\n")
   }
 
+  /**
+   * Compares two real numbers using relative difference with a tolerance.
+   * It uses relative differences unless the expected value is zero, in which case it uses absolute differences.
+   *
+   * @param actual    Actual value produced
+   * @param expected  Expected value
+   * @param tol       Tolerance for comparison. Comparison succeeds if the difference (absolute or relative) is less
+   *                  than tol.
+   * @return          Assertion to check approximate equality between actual and expected
+   */
+  def compareWithTol(actual: Double, expected: Double, tol: Double): Assertion =
+    withClue(s"Real number comparison failure! Actual: $actual, Expected: $expected \n") {
+      if (expected != 0) {
+        math.abs((actual - expected) / expected) should be < tol
+      }
+      else math.abs(actual - expected) should be < tol
+    }
+
 }

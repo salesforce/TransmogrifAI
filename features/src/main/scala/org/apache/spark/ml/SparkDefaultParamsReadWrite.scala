@@ -98,7 +98,7 @@ case object SparkDefaultParamsReadWrite {
     val params = metadata \ ParamMap.entryName
     val defaultParams = metadata \ DefaultParamMap.entryName
     if (expectedClassName.nonEmpty) {
-      require(className == expectedClassName, "Error loading metadata: Expected class name" +
+      require(className == expectedClassName, s"Error loading metadata: Expected class name" +
         s" $expectedClassName but found class name $className")
     }
     // ******************************************************************************************

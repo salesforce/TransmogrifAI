@@ -28,41 +28,26 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.sparkwrappers.specific
+package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
+import enumeratum._
 
-import scala.reflect.runtime.universe._
 
 /**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
+ * Method for computing text lengths
  */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
+sealed trait TextLengthType extends EnumEntry with Serializable
+
+object TextLengthType extends Enum[TextLengthType] {
+  val values: Seq[TextLengthType] = findValues
 
   /**
-   * Predict label for the given features
+   * Use the full entry length for the length distribution in TextStats
    */
-  @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
-    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
-  ).predict(_)
+  case object FullEntry extends TextLengthType
 
   /**
-   * Function used to convert input to output
+   * Use the token lengths for the length distribution in TextStats
    */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) =>
-    Prediction(prediction = predict(features.value))
-
+  case object Tokens extends TextLengthType
 }

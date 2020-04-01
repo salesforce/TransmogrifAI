@@ -28,41 +28,19 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.sparkwrappers.specific
+package com.salesforce.op.utils.spark
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
+import enumeratum.{Enum, EnumEntry}
 
-import scala.reflect.runtime.universe._
+sealed abstract class OpStep(val entryDescription: String)
+  extends EnumEntry with Serializable
 
-/**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
- */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
-
-  /**
-   * Predict label for the given features
-   */
-  @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
-    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
-  ).predict(_)
-
-  /**
-   * Function used to convert input to output
-   */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) =>
-    Prediction(prediction = predict(features.value))
-
+object OpStep extends Enum[OpStep] {
+  val values = findValues
+  case object CrossValidation extends OpStep("Cross-validation")
+  case object DataReadingAndFiltering extends OpStep("Data reading and filtering")
+  case object FeatureEngineering extends OpStep("Feature engineering")
+  case object ModelIO extends OpStep("Model loading / saving")
+  case object Other extends OpStep("Other")
+  case object ResultsSaving extends OpStep("Results saving")
 }

@@ -28,41 +28,35 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.sparkwrappers.specific
+package com.salesforce.op.utils.spark
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
-
-import scala.reflect.runtime.universe._
+import org.apache.spark.sql.SparkSession
 
 /**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
+ * Convenience methods for working with Spark's job groups.
  */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
+object JobGroupUtil {
+  /**
+   * Sets the Spark job group name and description for a wrapped code block.
+   * The job group is cleared afterwards.
+   *
+   * @param step The OpStep with which to the mark the Spark job group
+   * @param spark SparkSession
+   */
+  def withJobGroup[R](step: OpStep)(block: => R)(implicit spark: SparkSession): R = {
+    spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
+    val result = block
+    spark.sparkContext.clearJobGroup()
+    result
+  }
 
   /**
-   * Predict label for the given features
+   * Indefinitely sets the Spark job group name and description.
+   *
+   * @param step The OpStep with which to the mark the Spark job group
+   * @param spark SparkSession
    */
-  @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
-    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
-  ).predict(_)
-
-  /**
-   * Function used to convert input to output
-   */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) =>
-    Prediction(prediction = predict(features.value))
-
+  def setJobGroup(step: OpStep)(implicit spark: SparkSession): Unit = {
+    spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
+  }
 }

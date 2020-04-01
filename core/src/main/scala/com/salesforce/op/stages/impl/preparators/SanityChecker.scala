@@ -42,28 +42,20 @@ import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import enumeratum._
 import org.apache.log4j.{Level, LogManager}
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
 import org.apache.spark.ml.param._
 import org.apache.spark.mllib.linalg.{DenseMatrix, DenseVector => OldDenseVector, SparseVector => OldSparseVector, Vector => OldVector, Vectors => OldVectors}
-import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
+import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.runtime.universe._
 import scala.math.min
-import scala.util.Try
+import scala.reflect.runtime.universe._
 
 
-trait SanityCheckerParams extends Params {
-
-  final val logLevel = new Param[String](
-    parent = this, name = "logLevel",
-    doc = "sets log level (INFO, WARN, ERROR, DEBUG etc.)",
-    isValid = (s: String) => Try(Level.toLevel(s)).isSuccess
-  )
-  private[op] def setLogLevel(level: Level): this.type = set(logLevel, level.toString)
+trait SanityCheckerParams extends DerivedFeatureFilterParams {
 
   final val sampleLowerLimit = new IntParam(
     parent = this, name = "sampleLowerLimit",
@@ -99,13 +91,6 @@ trait SanityCheckerParams extends Params {
   def setSampleSeed(value: Long): this.type = set(sampleSeed, value)
   def getSampleSeed: Long = $(sampleSeed)
 
-  final val removeBadFeatures = new BooleanParam(
-    parent = this, name = "removeBadFeatures",
-    doc = "If set to true, this will automatically remove all the bad features from the feature vector"
-  )
-  def setRemoveBadFeatures(value: Boolean): this.type = set(removeBadFeatures, value)
-  def getRemoveBadFeatures: Boolean = $(removeBadFeatures)
-
   final val maxCorrelation = new DoubleParam(
     parent = this, name = "maxCorrelation",
     doc = "Maximum correlation (absolute value) allowed between a feature in the feature vector and the label",
@@ -128,13 +113,6 @@ trait SanityCheckerParams extends Params {
   )
   def setCorrelationType(value: CorrelationType): this.type = set(correlationType, value.entryName)
   def getCorrelationType: CorrelationType = CorrelationType.withNameInsensitive($(correlationType))
-
-  final val minVariance = new DoubleParam(
-    parent = this, name = "minVariance",
-    doc = "Minimum amount of variance allowed for each feature and label"
-  )
-  def setMinVariance(value: Double): this.type = set(minVariance, value)
-  def getMinVariance: Double = $(minVariance)
 
   final val maxCramersV = new DoubleParam(
     parent = this, name = "maxCramersV",
@@ -241,170 +219,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
   override protected def onSetInput(): Unit = {
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
-  }
-
-  /**
-   * Builds an Array of ColumnStatistics objects containing all the data we calculate for each column (eg. mean,
-   * max, variance, correlation, cramer's V, etc.)
-   *
-   * @param metaCols          Sequence of OpVectorColumnMetadata to use for grouping features
-   * @param labelColumnIndex  Index of the column corresponding to the label
-   * @param corrsWithLabel    Array containing correlations between each feature vector element and the label
-   * @param corrIndices       Indices that we actually compute correlations for (eg. can ignore hashed text features)
-   * @param statsSummary      Multivariate statistics previously computed by Spark
-   * @param categoricalStats  Array of CategoricalGroupStats for each group of feature vector indices corresponding
-   *                          to a categorical feature
-   * @return
-   */
-  private def makeColumnStatistics(
-    metaCols: Seq[OpVectorColumnMetadata],
-    labelColumnIndex: Int,
-    corrsWithLabel: Array[Double],
-    corrIndices: Array[Int],
-    statsSummary: MultivariateStatisticalSummary,
-    categoricalStats: Array[CategoricalGroupStats]
-  ): Array[ColumnStatistics] = {
-    // precompute all statistics to avoid rebuilding the vectors every time
-    val means = statsSummary.mean
-    val maxs = statsSummary.max
-    val mins = statsSummary.min
-    val count = statsSummary.count
-    val variances = statsSummary.variance
-    val cramersVMap = categoricalStats.flatMap(f => f.categoricalFeatures.map(c => c -> f.cramersV))
-      .toMap[String, Double]
-    val numCorrIndices = corrIndices.length
-
-    def maxByParent(seq: Seq[(String, Double)]) = seq.groupBy(_._1).map{ case(k, v) =>
-      // Filter out the NaNs because max(3.4, NaN) = NaN, and we still want the keep the largest correlation
-      k -> v.filterNot(_._2.isNaN).foldLeft(0.0)((a, b) => math.max(a, math.abs(b._2)))
-    }
-
-    def corrParentMap(fn: OpVectorColumnMetadata => Seq[String]) =
-      maxByParent(metaCols.flatMap(c =>
-        // Need to map feature indices to indices in correlation matrix, since we might skip hashed text indices
-        corrIndices.indexOf(c.index) match {
-          case -1 => Seq.empty[(String, Double)]
-          case i => fn(c).map(_ -> corrsWithLabel(i))
-        }
-      ))
-
-    def cramersVParentMap(fn: OpVectorColumnMetadata => Seq[String]) = {
-      val parentMap = metaCols.flatMap{ c => fn(c).map(c.makeColName() -> _) }.toMap
-      maxByParent(cramersVMap.toSeq.map { case (k, v) => parentMap(k) -> v })
-    }
-
-    val corrParent = corrParentMap(_.parentNamesWithMapKeys())
-    val corrParentNoKeys = corrParentMap(_.parentFeatureName)
-
-    val cramersVParent = cramersVParentMap(_.parentNamesWithMapKeys())
-    val cramersVParentNoKeys = cramersVParentMap(_.parentFeatureName)
-
-    // These are the categorical features that are alone in their feature group. This means that they are
-    // null indicator columns coming from non-categorical features, so they correspond to a 2x2 contingency matrix
-    // and thus two support and maxRuleConfidence values
-    val supportMap = categoricalStats.flatMap(f =>
-      if (f.categoricalFeatures.length == 1) Array(f.categoricalFeatures.head -> f.supports.toSeq)
-      else {
-        f.categoricalFeatures.zip(f.supports).map(f => f._1 -> Seq(f._2))
-      }).toMap
-    val maxRuleConfMap = categoricalStats.flatMap(f =>
-      if (f.categoricalFeatures.length == 1) Array(f.categoricalFeatures.head -> f.maxRuleConfidences.toSeq)
-      else {
-        f.categoricalFeatures.zip(f.maxRuleConfidences).map(f => f._1 -> Seq(f._2))
-      }).toMap
-
-    // TODO: For Hashing vectorizers, there is no indicator group, so check for parentNamesWithMapKeys()
-    // inside cramersVParent first and then check without keys for removal. This will over-remove features (eg.
-    // an entire map), but should only affect custom map vectorizers that don't set indicator groups on columns.
-    def getParentValue(col: OpVectorColumnMetadata, check1: Map[String, Double], check2: Map[String, Double]) =
-      col.parentNamesWithMapKeys().flatMap( k => check1.get(k).orElse(check2.get(k)) ).reduceOption(_ max _)
-
-    val featuresStats = metaCols.map {
-      col =>
-        val i = col.index
-        val name = col.makeColName()
-        ColumnStatistics(
-          name = name,
-          column = Some(col),
-          isLabel = false,
-          count = count,
-          mean = means(i),
-          min = mins(i),
-          max = maxs(i),
-          variance = variances(i),
-          // Label index is always the last index, which depends on how many indices we calculate correlations for
-          corrLabel = corrIndices.indexOf(i) match {
-            case -1 => None
-            case ind => Option(corrsWithLabel(ind))
-          },
-          cramersV = cramersVMap.get(name),
-          parentCorr = getParentValue(col, corrParent, corrParentNoKeys),
-          parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys),
-          maxRuleConfidences = maxRuleConfMap.getOrElse(name, Seq.empty),
-          supports = supportMap.getOrElse(name, Seq.empty)
-        )
-    }
-    val labelStats = ColumnStatistics(
-      name = in1.name,
-      column = None,
-      isLabel = true,
-      count = count,
-      mean = means(labelColumnIndex),
-      min = mins(labelColumnIndex),
-      max = maxs(labelColumnIndex),
-      variance = variances(labelColumnIndex),
-      corrLabel = None,
-      cramersV = None,
-      parentCorr = None,
-      parentCramersV = None,
-      maxRuleConfidences = Seq.empty,
-      supports = Seq.empty
-    )
-    (labelStats +: featuresStats).toArray
-  }
-
-  private def getFeaturesToDrop(stats: Array[ColumnStatistics]): Array[ColumnStatistics] = {
-    val minVar = $(minVariance)
-    val minCorr = $(minCorrelation)
-    val maxCorr = $(maxCorrelation)
-    val maxCramV = $(maxCramersV)
-    val maxRuleConf = $(maxRuleConfidence)
-    val minReqRuleSupport = $(minRequiredRuleSupport)
-    val removeFromParent = $(removeFeatureGroup)
-    val textSharedHashProtected = $(protectTextSharedHash)
-
-    // Calculate groups to remove separately. This is for more complicated checks where you can't determine whether
-    // to remove a feature from a single column stats (eg. associate rule confidence/support check)
-    val groupByGroups = stats.groupBy(_.column.flatMap(_.featureGroup()))
-    val ruleConfGroupsToDrop = groupByGroups.toSeq.flatMap{
-      case (Some(group), colStats) =>
-        val colsToRemove = colStats.filter(f =>
-          f.maxRuleConfidences.zip(f.supports).exists{
-            case (maxConf, sup) => (maxConf > maxRuleConf) && (sup > minReqRuleSupport)
-          })
-        if (colsToRemove.nonEmpty) Option(group) else None
-
-      case _ => None
-    }
-
-    for {
-      col <- stats
-      reasons = col.reasonsToRemove(
-        minVariance = minVar,
-        minCorrelation = minCorr,
-        maxCorrelation = maxCorr,
-        maxCramersV = maxCramV,
-        maxRuleConfidence = maxRuleConf,
-        minRequiredRuleSupport = minReqRuleSupport,
-        removeFeatureGroup = removeFromParent,
-        protectTextSharedHash = textSharedHashProtected,
-        removedGroups = ruleConfGroupsToDrop
-      )
-      if reasons.nonEmpty
-    } yield {
-      logWarning(s"Removing ${col.name} due to: ${reasons.mkString(",")}")
-      col
-    }
   }
 
   /**
@@ -647,18 +461,32 @@ class SanityChecker(uid: String = UID[SanityChecker])
       }
 
     logInfo("Logging all statistics")
-    val stats = makeColumnStatistics(
+    val stats = DerivedFeatureFilterUtils.makeColumnStatistics(
       vectorMetaColumns,
-      labelColumnIndex = featureSize, // label column goes at end of vector
+      colStats,
+      Option((in1.name, featureSize)), // label column goes at end of vector
       corrsWithLabel,
       corrIndices,
-      colStats,
       categoricalStats
     )
     stats.foreach { stat => logInfo(stat.toString) }
 
     logInfo("Calculating features to remove")
-    val toDropFeatures = if (removeBad) getFeaturesToDrop(stats) else Array.empty[ColumnStatistics]
+    val (toDropFeatures, warnings) = if (removeBad) {
+      DerivedFeatureFilterUtils.getFeaturesToDrop(
+        stats,
+        $(minVariance),
+        $(minCorrelation),
+        $(maxCorrelation),
+        $(maxCramersV),
+        $(maxRuleConfidence),
+        $(minRequiredRuleSupport),
+        $(removeFeatureGroup),
+        $(protectTextSharedHash)
+      ).unzip
+    } else (Array.empty[ColumnStatistics], Array.empty[String])
+    warnings.foreach { warning => logWarning(warning) }
+
     val toDropSet = toDropFeatures.flatMap(_.column).toSet
     val outputFeatures = vectorMetaColumns.filterNot { col => toDropSet.contains(col) }
     val indicesToKeep = outputFeatures.map(_.index)
@@ -705,15 +533,7 @@ final class SanityCheckerModel private[op]
    * The SanityChecker's core 'transformer' function, which removes the features recommended to be removed.
    */
   def transformFn: (RealNN, OPVector) => OPVector = (label, feature) => {
-    if (!removeBadFeatures) feature
-    else {
-      val vals = new Array[Double](indicesToKeep.length)
-      feature.value.foreachActive((i, v) => {
-        val k = indicesToKeep.indexOf(i)
-        if (k >= 0) vals(k) = v
-      })
-      NewVectors.dense(vals).compressed.toOPVector
-    }
+    DerivedFeatureFilterUtils.removeFeatures(indicesToKeep, removeBadFeatures)(feature)
   }
 }
 
@@ -736,122 +556,6 @@ object SanityChecker {
   val CorrelationExclusionDefault = CorrelationExclusion.NoExclusion
 
   def SampleSeed: Long = util.Random.nextLong() // scalastyle:off method.name
-}
-
-
-
-/**
- * Holds information related to the statistics of a column in the feature vector.
- *
- * [[column]] will always be present if not a label, and will not be present if this is a label.
- */
-private[op] case class ColumnStatistics
-(
-  name: String,
-  column: Option[OpVectorColumnMetadata],
-  isLabel: Boolean,
-  count: Long,
-  mean: Double,
-  min: Double,
-  max: Double,
-  variance: Double,
-  corrLabel: Option[Double],
-  cramersV: Option[Double],
-  parentCorr: Option[Double],
-  parentCramersV: Option[Double],
-  // Need to be able to hold up to two maxRuleConfidences or supports for the case of nullIndicator columns coming
-  // from non-categorical features (since they will correspond to a 2x2 contingency matrix)
-  maxRuleConfidences: Seq[Double],
-  supports: Seq[Double]
-) {
-
-  /**
-   * Given a minimum variance, maximum variance, and maximum correlation, decide if there is a reason to remove
-   * this column. If so, return a list of the reasons why. If not, then return an empty list.
-   *
-   * @param minVariance         Minimum variance
-   * @param maxCorrelation      Maximum correlation
-   * @param minCorrelation      Minimum correlation
-   * @param maxCramersV         Maximum Cramer's V value
-   * @param maxRuleConfidence   Minimum association rule confidence between
-   * @param minRequiredRuleSupport  Minimum required support to throw away a group
-   * @param removeFeatureGroup   Whether to remove entire feature group when any group value is flagged for removal
-   * @param protectTextSharedHash   Whether to protect text shared hash from related null indicator and other hashes
-   * @param removedGroups       Pre-determined feature groups to remove (eg. via maxRuleConfidence)
-   * @return List[String] if reason to remove, nil otherwise
-   */
-  def reasonsToRemove(
-    minVariance: Double,
-    maxCorrelation: Double,
-    minCorrelation: Double,
-    maxCramersV: Double,
-    maxRuleConfidence: Double,
-    minRequiredRuleSupport: Double,
-    removeFeatureGroup: Boolean,
-    protectTextSharedHash: Boolean,
-    removedGroups: Seq[String]
-  ): List[String] = {
-    if (isLabel) List() // never remove the label!
-    else {
-
-      val exclusionReasons = List(
-        Option(variance).filter(_ <= minVariance).map(variance =>
-          s"variance $variance lower than min variance $minVariance"
-        ),
-        corrLabel.filter(Math.abs(_) < minCorrelation).map(corr =>
-          s"correlation $corr lower than min correlation $minCorrelation"
-        ),
-        corrLabel.filter(Math.abs(_) > maxCorrelation).map(corr =>
-          s"correlation $corr higher than max correlation $maxCorrelation"
-        ),
-        cramersV.filter(_ > maxCramersV).map(cv =>
-          s"Cramer's V $cv higher than max Cramer's V $maxCramersV"
-        ),
-        maxRuleConfidences.zip(supports).collectFirst {
-          case (conf, sup) if (conf > maxRuleConfidence && sup > minRequiredRuleSupport) =>
-            s"Max association rule confidence $conf is above threshold of $maxRuleConfidence and support $sup is " +
-              s"above the required support threshold of $minRequiredRuleSupport"
-        },
-        column.flatMap(_.featureGroup()).filter(removedGroups.contains(_)).map(ig =>
-          s"other feature in indicator group $ig flagged for removal via rule confidence checks"
-        )
-      ).flatten
-
-      val parentExclusionReasons =
-        if (removeFeatureGroup && (!column.forall(isTextSharedHash) || !protectTextSharedHash)) {
-          List(
-            parentCramersV.filter(_ > maxCramersV).map(cv =>
-              s"Cramer's V $cv for something in parent feature set higher than max Cramer's V $maxCramersV"),
-            parentCorr.filter(_ > maxCorrelation).map(corr =>
-              s"correlation $corr for something in parent feature set higher than max correlation $maxCorrelation")
-          ).flatten
-        } else List.empty[String]
-
-      exclusionReasons ++ parentExclusionReasons
-    }
-  }
-
-  /**
-   * Is column a shared hash feature that is derived from Text, TextArea, TextMap, or TextAreaMap
-   *
-   * @param metadata     metadata of column
-   * @return
-   */
-  def isTextSharedHash(metadata: OpVectorColumnMetadata): Boolean = {
-    val isDerivedFromText = metadata.hasParentOfType[Text] || metadata.hasParentOfType[TextArea] ||
-      metadata.hasParentOfType[TextMap] || metadata.hasParentOfType[TextAreaMap]
-    isDerivedFromText && metadata.grouping.isEmpty && metadata.indicatorValue.isEmpty
-  }
-
-  override def toString: String = {
-    val description = if (isLabel) "Label" else s"Feature"
-    s"$description $name has: " +
-      s"samples = $count, mean = $mean, min = $min, max = $max, variance = $variance" +
-      corrLabel.fold("") { corr => s"\n$description $name has $corr correlation with label" } +
-      cramersV.fold("") { corr => s"\n$description $name has $corr cramersV with label" } +
-      parentCramersV.fold("") { corr => s"\n$description $name has parent feature $corr cramersV with label" }
-  }
-
 }
 
 /**

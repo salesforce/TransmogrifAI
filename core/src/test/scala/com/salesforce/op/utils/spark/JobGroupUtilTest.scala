@@ -28,41 +28,29 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.sparkwrappers.specific
+package com.salesforce.op.utils.spark
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.test.{TestCommon, TestSparkContext}
 
-import scala.reflect.runtime.universe._
+@RunWith(classOf[JUnitRunner])
+class JobGroupUtilTest extends FlatSpec with TestCommon with TestSparkContext {
 
-/**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
- */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
+  Spec(JobGroupUtil.getClass) should "be able to set a job group ID around a code block" in {
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
+      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
+    }
+    spark.sparkContext.statusTracker.getJobIdsForGroup("DataReadingAndFiltering") should not be empty
+  }
 
-  /**
-   * Predict label for the given features
-   */
-  @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
-    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
-  ).predict(_)
-
-  /**
-   * Function used to convert input to output
-   */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) =>
-    Prediction(prediction = predict(features.value))
-
+  it should "reset the job group ID after a code block" in {
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
+      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
+    }
+    spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
+    // Ensure that the last `.collect()` was not tagged with "DataReadingAndFiltering"
+    spark.sparkContext.statusTracker.getJobIdsForGroup(null) should not be empty
+  }
 }
