@@ -17,9 +17,13 @@ New features / updates:
 - Add support for ignoring text that looks like IDs in SmartTextVectorizer [#448](https://github.com/salesforce/TransmogrifAI/pull/448), [#455](https://github.com/salesforce/TransmogrifAI/pull/455)
 - Add a unary estimator for detecting names in text fields and transforming to likely gender [#445](https://github.com/salesforce/TransmogrifAI/pull/445)
 - Allow result features to be removed by raw feature filter [#458](https://github.com/salesforce/TransmogrifAI/pull/458)
+- Metadata changes for sensitive feature information [#457](https://github.com/salesforce/TransmogrifAI/pull/457)
+- Add MinVarianceFilter which checks that computed features have a minimum variance [#463](https://github.com/salesforce/TransmogrifAI/pull/463), [#465](https://github.com/salesforce/TransmogrifAI/pull/465)
+- Allow TextStats length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
+- Use Spark job grouping to distinguish steps of the machine learning flow [#467](https://github.com/salesforce/TransmogrifAI/pull/467), [#468](https://github.com/salesforce/TransmogrifAI/pull/468), [#470](https://github.com/salesforce/TransmogrifAI/pull/470)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
-- Update Apache Spark version to 2.4.4 
+- Update Apache Spark version to 2.4.5
 - Avro is a built-in data source in Spark 2.4, so no longer using the `spark-avro` package
 - XGBoost to 0.90
 - MLeap to 0.14.0
