@@ -85,6 +85,9 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(4).cardEstimate.get shouldBe TextStats(
       Map("5.0" -> 1, "1.0" -> 1, "3.0" -> 1), Map.empty, TextStats.hllMonoid.zero
     )
+    distribs(2).cardEstimate.get shouldBe TextStats(Map("male" -> 1, "female" -> 1), Map(4 -> 1L, 6 -> 1L))
+    distribs(2).moments.get shouldBe Moments(2, 5.0, 2.0, 0.0, 2.0)
+    distribs(4).cardEstimate.get shouldBe TextStats(Map("5.0" -> 1, "1.0" -> 1, "3.0" -> 1), Map(3 -> 3L))
     distribs(4).moments.get shouldBe Moments(3, 3.0, 8.0, 0.0, 32.0)
   }
 

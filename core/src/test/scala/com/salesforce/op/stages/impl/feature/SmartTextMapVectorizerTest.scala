@@ -40,6 +40,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.RandomText
+import org.scalatest.Assertion
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -111,6 +112,13 @@ class SmartTextMapVectorizerTest
   }
   val (rawDFSeparateMaps, rawTextMap1, rawTextMap2, rawTextMap3) =
     TestFeatureBuilder("textMap1", "textMap2", "textMap3", mapDataSeparate)
+
+  val textMapData = Map(
+    "f1" -> "I have got a lovely bunch of coconuts. Here they are all standing in a row.",
+    "f2" -> "Olly wolly polly woggy ump bump fizz!"
+  )
+  val tokensMap = textMapData.mapValues(s => TextTokenizer.tokenizeString(s).tokens)
+  val tol = 1e-12 // Tolerance for comparing real numbers
 
   /**
    * Estimator instance to be tested
@@ -446,7 +454,43 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance " +
+    "when data is in a single TextMap" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -482,7 +526,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
@@ -511,4 +555,138 @@ class SmartTextMapVectorizerTest
     meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance " +
+    "when data is in many TextMaps" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDFSeparateMaps)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "create a TextStats object from text that makes sense" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
+      textMapData,
+      shouldCleanKeys = false,
+      shouldCleanValues = false,
+      shouldTokenize = true,
+      maxCardinality = 100
+    )
+
+    // Check sizes
+    res.keyValueCounts.size shouldBe 2 // Two keys in textMapData
+    res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
+
+    // Check value counts
+    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts should contain
+      ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.keyValueCounts("f2").valueCounts.size shouldBe 1
+    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+
+    // Check token length counts
+    res.keyValueCounts("f1").lengthCounts.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
+    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (3 -> 2L)
+    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (8 -> 2L)
+    res.keyValueCounts("f2").lengthCounts.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+  }
+
+  it should "create a TextStats with the correct derived quantities" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
+      textMapData,
+      shouldCleanKeys = false,
+      shouldCleanValues = false,
+      shouldTokenize = true,
+      maxCardinality = 100
+    )
+
+    checkDerivedQuantities(res, "f1", Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
+    checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3, 4, 4).map(_.toLong))
+  }
+
+  it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
+      textMapData,
+      shouldCleanKeys = false,
+      shouldCleanValues = false,
+      shouldTokenize = true,
+      maxCardinality = 2
+    )
+
+    // Check lengths
+    res.keyValueCounts.size shouldBe 2 // Two keys in textMapData
+    res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
+
+    // Check value counts
+    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts should contain
+    ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.keyValueCounts("f2").valueCounts.size shouldBe 1
+    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+
+    // Check token length counts
+    res.keyValueCounts("f1").lengthCounts.size shouldBe 3
+    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (3 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    checkDerivedQuantities(res, "f1", Seq(6, 3, 5).map(_.toLong))
+
+    res.keyValueCounts("f2").lengthCounts.size shouldBe 3
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 1L)
+    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+    checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3).map(_.toLong))
+  }
+
+  /**
+   * Set of tests to check that the derived quantities calculated on the length distribution in TextMapStats (for
+   * a single key) match the actual length distributions of the tokens.
+   *
+   * @param res       TextMapStats result to compare
+   * @param key       key to use for comparisons
+   * @param lengthSeq Expected length sequence
+   * @return          Assertions on derived quantities in TextStats
+   */
+  private[op] def checkDerivedQuantities(res: TextMapStats, key: String, lengthSeq: Seq[Long]): Assertion = {
+    val expectedLengthMean = lengthSeq.sum.toDouble / lengthSeq.length
+    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / lengthSeq.length
+    val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
+
+    res.keyValueCounts(key).lengthSize shouldBe lengthSeq.length
+    compareWithTol(res.keyValueCounts(key).lengthMean, expectedLengthMean, tol)
+    compareWithTol(res.keyValueCounts(key).lengthVariance, expectedLengthVariance, tol)
+    compareWithTol(res.keyValueCounts(key).lengthStdDev, expectedLengthStdDev, tol)
+  }
 }
