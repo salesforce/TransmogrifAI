@@ -271,7 +271,7 @@ private[op] object TextStats extends CleanTextFun {
   ): TextStats = {
     text match {
       case Some(v) => textStatsFromString(v, shouldCleanText, shouldTokenize, maxCardinality)
-      case None => TextStats(Map.empty[String, Long], Map.empty[Int, Long])
+      case None => TextStats.empty
     }
   }
 
