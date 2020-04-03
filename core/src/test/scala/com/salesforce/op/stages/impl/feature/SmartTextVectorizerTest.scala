@@ -591,7 +591,7 @@ class SmartTextVectorizerTest
   }
 
   it should "return sane results when entries do not tokenize and result in empty maps" in {
-    val ts = TextStats(Map("the" -> 10, "and" -> 4), Map.empty[Int, Long])
+    val ts = TextStats(Map("the" -> 10, "and" -> 4), Map.empty[Int, Long], TextStats.hllMonoid.zero)
 
     ts.lengthSize shouldBe 0
     ts.lengthMean.isNaN shouldBe true
