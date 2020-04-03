@@ -37,7 +37,6 @@ import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.SmartTextVectorizer.hllBits
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.{HLL, HyperLogLogMonoid, Monoid, Semigroup}
 import com.twitter.algebird.Monoid._
@@ -104,8 +103,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .take($(topK)).map(_._1)
 
       val adaptiveHashSize =
-        if (stats.hll.estimatedSize <= 3000) {
-          stats.hll.estimatedSize.toInt
+        if (stats.tokenCard <= 3000) {
+          stats.tokenCard.toInt
         }
         else {
           math.max((stats.hll.estimatedSize / adaptiveHashCol).toInt, 3000)
@@ -219,6 +218,7 @@ private[op] case class TextStats
     (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
   ) / lengthSize
   val lengthStdDev: Double = math.sqrt(lengthVariance)
+  val tokenCard: Double = hll.estimatedSize
 }
 
 private[op] object TextStats extends CleanTextFun {
@@ -299,7 +299,8 @@ private[op] object TextStats extends CleanTextFun {
           (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
         )
     } else Map(cleanTextFn(textString, shouldCleanText).length -> 1L)
-    TextStats(Map(cleanTextFn(textString, shouldCleanText) -> 1L), lengthsMap)
+    val token = cleanTextFn(textString, shouldCleanText)
+    TextStats(Map(token -> 1L), lengthsMap, TextStats.hllMonoid.create(token.getBytes))
   }
 }
 
