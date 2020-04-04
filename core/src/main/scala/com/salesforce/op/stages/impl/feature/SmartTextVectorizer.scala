@@ -293,14 +293,17 @@ private[op] object TextStats extends CleanTextFun {
     maxCardinality: Int
   ): TextStats = {
     // Go through each token in text and start appending it to a TextStats instance
+    val cleanString = cleanTextFn(textString, shouldCleanText)
     val lengthsMap = if (shouldTokenize) {
       TextTokenizer.tokenizeString(textString).tokens.value
         .foldLeft(Map.empty[Int, Long])(
           (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
         )
-    } else Map(cleanTextFn(textString, shouldCleanText).length -> 1L)
-    val token = cleanTextFn(textString, shouldCleanText)
-    TextStats(Map(token -> 1L), lengthsMap, TextStats.hllMonoid.create(token.getBytes))
+    } else Map(cleanString.length -> 1L)
+    val tokens = TextTokenizer.tokenizeString(textString).tokens.value
+    val bigrams = (tokens zip tokens.drop(1)).map(t => t._1 + " " + t._2)
+    val textHLL = (tokens + bigrams).map(x => TextStats.hllMonoid.create(x.getBytes)).reduce(_ + _)
+    TextStats(Map(cleanTextFn(textString, shouldCleanText) -> 1L), lengthsMap, textHLL)
   }
 }
 
@@ -354,7 +357,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
       val adaptiveHashSizes = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._3)
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
-      val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
+      val textTokens: Seq[TextList] = textToHash.map(x => makeUniAndBigrams(tokenize(x).tokens))
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](
         textTokens, getTextTransientFeatures, args.hashingParams, Some(adaptiveHashSizes)
@@ -366,6 +369,12 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
 
       categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
     }
+  }
+
+  def makeUniAndBigrams(tl: TextList): TextList = {
+    TextList(
+      (tl.value zip tl.value.drop(1)).map(x => x._1 + " " + x._2) + tl.value
+    )
   }
 
   private def getTextTransientFeatures: Array[TransientFeature] =
