@@ -263,6 +263,10 @@ private[op] trait HashingFun {
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
       hashSizes match {
         case Some(arraySizes) =>
+          println(arraySizes.size)
+          println("Hash array ^")
+          println(features.size)
+          println("Feature size ^")
           require(arraySizes.size == features.size)
           val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
           combine(hashers.zip(in).map(

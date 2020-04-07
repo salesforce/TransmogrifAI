@@ -131,6 +131,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       logInfo(s"LengthMean: ${stats.lengthMean}")
       logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
       logInfo(s"Vectorization method: $vecMethod")
+      logInfo(s"Token cardinality: ${stats.tokenCard}")
     }
 
     val vecMetadata = makeVectorMetadata(smartTextParams)
