@@ -40,7 +40,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoders}
-import org.joda.time.{DateTime, DateTimeZone, Days}
+import org.joda.time.{DateTime, DateTimeZone, Days, Duration}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -397,7 +397,7 @@ final class DateMapVectorizerModel[T <: OPMap[Long]] private[op]
   val timeZone: DateTimeZone = DateTimeUtils.DefaultTimeZone
 
   def convertFn: DateMap#Value => RealMap#Value = (dt: DateMap#Value) =>
-    dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), referenceDate).getDays.toDouble)
+    dt.mapValues(v => new Duration(new DateTime(v, timeZone), referenceDate).getStandardDays.toDouble)
 }
 
 final class RealMapVectorizerModel[T <: OPMap[Double]] private[op]

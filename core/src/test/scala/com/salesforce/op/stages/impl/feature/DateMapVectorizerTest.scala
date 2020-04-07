@@ -122,7 +122,7 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "vectorize dates correctly on test date" in {
-    checkAt(new JDateTime(2017, 9, 28, 15, 45, 39, DateTimeUtils.DefaultTimeZone))
+    checkAt(new JDateTime(1901, 1, 1, 0, 0, 0, DateTimeUtils.DefaultTimeZone))
   }
 
   it should "serialize correctly" in new SampleData(DateTimeUtils.now().minusHours(1)) {
