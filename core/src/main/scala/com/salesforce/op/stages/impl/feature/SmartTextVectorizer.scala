@@ -303,7 +303,13 @@ private[op] object TextStats extends CleanTextFun {
     } else Map(cleanString.length -> 1L)
     val tokens = TextTokenizer.tokenizeString(textString).tokens.value
     val bigrams = (tokens zip tokens.drop(1)).map(t => t._1 + " " + t._2)
-    val textHLL = (tokens + bigrams).map(x => TextStats.hllMonoid.create(x.getBytes)).reduce(_ + _)
+    val textHLL = (tokens + bigrams)
+      .map(x => TextStats.hllMonoid.create(x.getBytes))
+      .reduceOption(_ + _) match {
+      case Some(x) => x
+      case _ => TextStats.hllMonoid.zero
+    }
+
     TextStats(Map(cleanTextFn(textString, shouldCleanText) -> 1L), lengthsMap, textHLL)
   }
 }
