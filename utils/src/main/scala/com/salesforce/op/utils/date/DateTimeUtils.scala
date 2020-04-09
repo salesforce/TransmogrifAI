@@ -110,7 +110,7 @@ object DateTimeUtils {
     val start = new DateTime(parse(startDate, DefaultTimeZoneStr), DefaultTimeZone)
     val end = new DateTime(parse(endDate, DefaultTimeZoneStr), DefaultTimeZone)
     val days = new Duration(start, end).getStandardDays
-    (0 to days).map(d => parseUnix(start.plusDays(d.toInt).getMillis))
+    (0 to days.toInt).map(d => parseUnix(start.plusDays(d).getMillis))
   }
 
   /**
