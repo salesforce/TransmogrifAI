@@ -181,7 +181,7 @@ case class FeatureDistribution
   }
 
   override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution,
-    summaryInfo, moments, `type`)
+    summaryInfo, moments, cardEstimate, `type`)
 }
 
 object FeatureDistribution {
