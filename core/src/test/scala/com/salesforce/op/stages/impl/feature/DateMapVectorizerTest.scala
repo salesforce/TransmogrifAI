@@ -38,7 +38,7 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import org.apache.spark.ml.linalg.Vectors
-import org.joda.time.{DateTimeConstants, Days, DateTime => JDateTime}
+import org.joda.time.{DateTimeConstants, Duration, DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -106,9 +106,10 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     val zero = 0
     val threeDaysAgo = moment.minus(3 * DateTimeConstants.MILLIS_PER_DAY).getMillis / DateTimeConstants.MILLIS_PER_DAY
     val defaultTimeAgo = moment.minus(defaultDate).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val hundredDaysAgo = Days
-      .daysBetween(new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone), moment)
-      .getDays
+    val hundredDaysAgo = new Duration(
+      new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone),
+      moment
+    ).getStandardDays
 
     Array(
       Array(nowMinusMilli, defaultTimeAgo, threeDaysAgo),
@@ -122,6 +123,7 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "vectorize dates correctly on test date" in {
+    checkAt(new JDateTime(2017, 9, 28, 15, 45, 39, DateTimeUtils.DefaultTimeZone))
     checkAt(new JDateTime(1901, 1, 1, 0, 0, 0, DateTimeUtils.DefaultTimeZone))
   }
 

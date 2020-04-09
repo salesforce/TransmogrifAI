@@ -33,7 +33,7 @@ package com.salesforce.op.utils.date
 import java.util.TimeZone
 
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter, DateTimeFormatterBuilder, ISODateTimeFormat}
-import org.joda.time.{DateTime, DateTimeZone, Days}
+import org.joda.time.{DateTime, DateTimeZone, Duration}
 
 
 object DateTimeUtils {
@@ -109,8 +109,8 @@ object DateTimeUtils {
   def getRange(startDate: String, endDate: String): Seq[String] = {
     val start = new DateTime(parse(startDate, DefaultTimeZoneStr), DefaultTimeZone)
     val end = new DateTime(parse(endDate, DefaultTimeZoneStr), DefaultTimeZone)
-    val days = Days.daysBetween(start, end).getDays
-    (0 to days).map(d => parseUnix(start.plusDays(d).getMillis))
+    val days = new Duration(start, end).getStandardDays
+    (0 to days).map(d => parseUnix(start.plusDays(d.toInt).getMillis))
   }
 
   /**
