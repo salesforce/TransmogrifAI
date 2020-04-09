@@ -215,6 +215,8 @@ private[op] trait HashingFun {
     val numFeatures = params.numFeatures
     hashSizes match {
       case Some(x) =>
+        println(x.size)
+        println(features.size)
         require(x.size == features.size)
         val featureAndSizes = features.zip(x)
         featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
@@ -267,7 +269,6 @@ private[op] trait HashingFun {
           println("Hash array ^")
           println(features.size)
           println("Feature size ^")
-          require(arraySizes.size == features.size)
           val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
           combine(hashers.zip(in).map(
             x => x._1.transform(
