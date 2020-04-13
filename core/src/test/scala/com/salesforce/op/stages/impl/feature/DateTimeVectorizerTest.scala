@@ -37,7 +37,7 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
-import org.joda.time.{DateTimeConstants, Days, DateTime => JDateTime}
+import org.joda.time.{DateTimeConstants, Days, Duration, DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -56,9 +56,10 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext with Attribu
     val zero = 0
     val threeDaysAgo = moment.minus(3 * DateTimeConstants.MILLIS_PER_DAY).getMillis / DateTimeConstants.MILLIS_PER_DAY
     val defaultTimeAgo = moment.minus(defaultDate).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val hundredDaysAgo = Days
-      .daysBetween(new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone), moment)
-      .getDays
+    val hundredDaysAgo = new Duration(
+      new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone),
+      moment
+    ).getStandardDays
 
     Array(
       Array(nowMinusMilli, zero, now),
