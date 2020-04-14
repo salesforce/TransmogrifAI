@@ -68,17 +68,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
 
-  private def computeTextMapStats
-  (
-    textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean
-  ): TextMapStats = {
-    val keyValueCounts = textMap.map{ case (k, v) =>
-      cleanTextFn(k, shouldCleanKeys) ->
-        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1L), Map(cleanTextFn(v, shouldCleanValues).length -> 1L))
-    }
-    TextMapStats(keyValueCounts)
-  }
-
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),
     prependFeatureName = $(prependFeatureName),
@@ -169,6 +158,18 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       }
     }
 
+    logInfo("TextStats for features used in SmartTextMapVectorizer:")
+    inN.map(_.name).zip(aggregatedStats).zip(allFeatureInfo).foreach { case ((mapName, mapStats), featInfo) =>
+      logInfo(s"FeatureMap: $mapName")
+      mapStats.keyValueCounts.zip(featInfo).foreach { case ((name, stats), info) =>
+        logInfo(s"Key: $name")
+        logInfo(s"LengthCounts: ${stats.lengthCounts}")
+        logInfo(s"LengthMean: ${stats.lengthMean}")
+        logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
+        logInfo(s"Vectorization method: ${info.vectorizationMethod}")
+      }
+    }
+
     SmartTextMapVectorizerModelArgs(
       allFeatureInfo = allFeatureInfo,
       shouldCleanKeys = shouldCleanKeys,
@@ -184,10 +185,12 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val maxCard = $(maxCardinality)
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
+    val shouldTokenize = $(textLengthType) == TextLengthType.Tokens.entryName
 
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
-      _.map(computeTextMapStats(_, shouldCleanKeys, shouldCleanValues)).toArray
+      _.map(TextMapStats.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, shouldTokenize,
+        maxCard)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
@@ -236,11 +239,35 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
  */
 private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) extends JsonLike
 
-private[op] object TextMapStats {
+private[op] object TextMapStats extends CleanTextFun {
 
   def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
     implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
     caseclass.monoid[TextMapStats]
+  }
+
+  /**
+   * Computes a TextMapStats instance from a text map entry
+   *
+   * @param textMap            Text value (eg. entry in a dataframe)
+   * @param shouldCleanKeys    Whether or not the keys (feature names) should be cleaned
+   * @param shouldCleanValues  Whether or not the values (the actual text) should be cleaned
+   * @param shouldTokenize     Whether or not to tokenize the values for the length distribution
+   * @param maxCardinality     Max cardinality to keep track of in maps (relevant for the text length distribution here)
+   * @tparam T                 Feature type that the text map value is coming from
+   * @return                   TextMapStats instance with value and length counts filled out appropriately for each key
+   */
+  private[op] def computeTextMapStats[T <:  OPMap[String]](
+    textMap: T#Value,
+    shouldCleanKeys: Boolean,
+    shouldCleanValues: Boolean,
+    shouldTokenize: Boolean,
+    maxCardinality: Int
+  )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
+    val keyValueCounts = textMap.map { case (k, v) => cleanTextFn(k, shouldCleanKeys) ->
+      TextStats.textStatsFromString(v, shouldCleanValues, shouldTokenize, maxCardinality)
+    }
+    TextMapStats(keyValueCounts)
   }
 
 }

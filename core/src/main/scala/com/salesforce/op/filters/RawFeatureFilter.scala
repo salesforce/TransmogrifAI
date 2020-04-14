@@ -600,7 +600,6 @@ object RawFeatureFilter {
   val minScoringRowsDefault = 500
   val MaxCardinality = 500
 
-
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName
 
   val uid = s"${stageName}_100000000000"

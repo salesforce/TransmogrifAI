@@ -211,6 +211,10 @@ trait RichTextFeature {
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
+     * @param textLengthType            Method to use for constructing text length distribution in TextStats. Current
+     *                                  options are from the full entry or from the tokens
+     * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
+     *                                  be hashed instead of ignored
      * @param others                    additional text features
      * @return result feature of type Vector
      */
@@ -235,6 +239,8 @@ trait RichTextFeature {
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
+      minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -258,6 +264,8 @@ trait RichTextFeature {
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
+        .setTextLengthType(textLengthType)
+        .setMinLengthStdDev(minLengthStdDev)
         .getOutput()
     }
 

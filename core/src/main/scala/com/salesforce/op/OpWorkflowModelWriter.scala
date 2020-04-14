@@ -33,6 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.compress.GzipCodec
@@ -55,8 +56,10 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   implicit val jsonFormats: Formats = DefaultFormats
 
   override protected def saveImpl(path: String): Unit = {
-    sc.parallelize(Seq(toJsonString(path)), 1)
-      .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
+      sc.parallelize(Seq(toJsonString(path)), 1)
+        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+    }(this.sparkSession)
   }
 
   /**
@@ -183,7 +186,7 @@ object OpWorkflowModelWriter {
   /**
    * Save [[OpWorkflowModel]] to path
    *
-   * @param model     workflow model instance
+   * @param model workflow model instance
    * @param path      path to save the model and its stages
    * @param overwrite should overwrite the destination
    */

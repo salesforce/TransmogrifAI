@@ -87,9 +87,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val maxCard = $(maxCardinality)
     val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
+    val shouldTokenizeForLengths = $(textLengthType) == TextLengthType.Tokens.entryName
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
-    val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
+    val valueStats: Dataset[Array[TextStats]] = dataset.map(
+      _.map(TextStats.computeTextStats(_, shouldCleanText, shouldTokenizeForLengths, maxCard)).toArray
+    )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
@@ -141,6 +144,15 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       hashingParams = makeHashingParams()
     )
 
+    logInfo("TextStats for features used in SmartTextVectorizer:")
+    inN.map(_.name).zip(aggregatedStats).zip(vectorizationMethods).foreach { case((name, stats), vecMethod) =>
+      logInfo(s"Feature: $name")
+      logInfo(s"LengthCounts: ${stats.lengthCounts}")
+      logInfo(s"LengthMean: ${stats.lengthMean}")
+      logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
+      logInfo(s"Vectorization method: $vecMethod")
+    }
+
     val vecMetadata = makeVectorMetadata(smartTextParams, r)
     setMetadata(vecMetadata.toMetadata)
 
@@ -163,6 +175,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs,
     mostFrequentTokens: Seq[Map[Int, String]] = Seq.empty): OpVectorMetadata = {
+
     require(inN.length == smartTextParams.vectorizationMethods.length)
 
     val groups = inN.toArray.zip(smartTextParams.vectorizationMethods).groupBy(_._2)
@@ -200,6 +213,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 object SmartTextVectorizer {
   val MaxCardinality: Int = 100
   val MinTextLengthStdDev: Double = 0
+  val LengthType: TextLengthType = TextLengthType.FullEntry
+
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
@@ -222,11 +237,11 @@ private[op] case class TextStats
   val lengthMean: Double = lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
   val lengthVariance: Double = lengthCounts.foldLeft(0.0)(
     (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
-  )
-  val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
+  ) / lengthSize
+  val lengthStdDev: Double = math.sqrt(lengthVariance)
 }
 
-private[op] object TextStats {
+private[op] object TextStats extends CleanTextFun {
   /**
    * Helper function to add two maps subject to a max cardinality restriction on the number of unique values
    *
@@ -253,6 +268,57 @@ private[op] object TextStats {
   }
 
   def empty: TextStats = TextStats(Map.empty, Map.empty)
+
+  /**
+   * Computes a TextStats instance from a Text entry
+   *
+   * @param text            Text value (eg. entry in a dataframe)
+   * @param shouldCleanText Whether or not the text should be cleaned. Note that this only makes sense if tokenization
+   *                        is not employed, since that will already do the cleaning steps (and more!)
+   * @param shouldTokenize  Whether or not the text should be tokenized for length counts. If false, then the length
+   *                        will just be the length of the entire entry
+   * @param maxCardinality  Max cardinality to keep track of in maps (relevant for the text length distribution here)
+   * @tparam T              Feature type that the text value is coming from
+   * @return                TextStats instance with value and length counts filled out appropriately
+   */
+  private[op] def computeTextStats[T <: Text : TypeTag](
+    text: T#Value,
+    shouldCleanText: Boolean,
+    shouldTokenize: Boolean,
+    maxCardinality: Int
+  ): TextStats = {
+    text match {
+      case Some(v) => textStatsFromString(v, shouldCleanText, shouldTokenize, maxCardinality)
+      case None => TextStats(Map.empty[String, Long], Map.empty[Int, Long])
+    }
+  }
+
+  /**
+   * Computes a TextStats instance from a String entry
+   *
+   * @param textString      String to convert to TextStats
+   * @param shouldCleanText Whether or not the text should be cleaned. Note that this only makes sense if tokenization
+   *                        is not employed, since that will already do the cleaning steps (and more!)
+   * @param shouldTokenize  Whether or not the text should be tokenized for length counts. If false, then the length
+   *                        will just be the length of the entire entry
+   * @param maxCardinality  Max cardinality to keep track of in maps (relevant for the text length distribution here)
+   * @return                TextStats instance with value and length counts filled out appropriately
+   */
+  private[op] def textStatsFromString(
+    textString: String,
+    shouldCleanText: Boolean,
+    shouldTokenize: Boolean,
+    maxCardinality: Int
+  ): TextStats = {
+    // Go through each token in text and start appending it to a TextStats instance
+    val lengthsMap = if (shouldTokenize) {
+      TextTokenizer.tokenizeString(textString).tokens.value
+        .foldLeft(Map.empty[Int, Long])(
+          (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
+        )
+    } else Map(cleanTextFn(textString, shouldCleanText).length -> 1L)
+    TextStats(Map(cleanTextFn(textString, shouldCleanText) -> 1L), lengthsMap)
+  }
 }
 
 /**
@@ -354,4 +420,13 @@ trait MinLengthStdDevParams extends Params {
   final def setMinLengthStdDev(v: Double): this.type = set(minLengthStdDev, v)
   final def getMinLengthStdDev: Double = $(minLengthStdDev)
   setDefault(minLengthStdDev -> SmartTextVectorizer.MinTextLengthStdDev)
+
+  final val textLengthType: Param[String] = new Param[String](this, "textLengthType",
+    "Method to use to construct length distribution from text in TextStats. Current options are" +
+      "FullEntry (lengths are of entire entry) or Tokens (lengths are token lengths).",
+    (value: String) => TextLengthType.withNameInsensitiveOption(value).isDefined
+  )
+  def setTextLengthType(v: TextLengthType): this.type = set(textLengthType, v.entryName)
+  def getTextLengthType: TextLengthType = TextLengthType.withNameInsensitive($(textLengthType))
+  setDefault(textLengthType -> TextLengthType.FullEntry.entryName)
 }
