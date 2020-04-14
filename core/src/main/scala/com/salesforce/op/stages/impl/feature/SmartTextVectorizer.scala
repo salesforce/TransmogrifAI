@@ -32,16 +32,15 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.Monoid
+import com.twitter.algebird.{CMS, CMSHasher, Monoid, Semigroup, TopCMS, TopCMSMonoid, TopCMSZero, TopNCMS, TopNCMSMonoid}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -85,20 +84,27 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val shouldCleanText = $(cleanText)
     val shouldTokenizeForLengths = $(textLengthType) == TextLengthType.Tokens.entryName
 
-    implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
+    val DELTA = 1e-8
+    val EPS = 0.005
+    val SEED = 1
+    implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(eps = EPS, delta = DELTA, seed = SEED,
+      maxCard)
+
     val valueStats: Dataset[Array[TextStats]] = dataset.map(
-      _.map(TextStats.computeTextStats(_, shouldCleanText, shouldTokenizeForLengths, maxCard)).toArray
+      _.map(TextStats.computeTextStats(_, shouldCleanText, shouldTokenizeForLengths, EPS, DELTA, SEED, maxCard)).toArray
     )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
+
+      val countMap = stats.valueCounts.heavyHitters.map(v => v -> stats.valueCounts.frequency(v).estimate)
       val vecMethod: TextVectorizationMethod = stats match {
-        case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
+        case _ if stats.valueCounts.heavyHitters.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
         case _ => TextVectorizationMethod.Hash
       }
-      val topValues = stats.valueCounts
-        .filter { case (_, count) => count >= $(minSupport) }
+      val topValues = countMap
+        .filter(_._2 >= $(minSupport))
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
       (vecMethod, topValues)
@@ -187,14 +193,15 @@ object SmartTextVectorizer {
  */
 private[op] case class TextStats
 (
-  valueCounts: Map[String, Long],
-  lengthCounts: Map[Int, Long]
+  valueCounts: TopCMS[String],
+  lengthCounts: TopCMS[Int]
 ) extends JsonLike {
 
-  val lengthSize = lengthCounts.values.sum
-  val lengthMean: Double = lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
-  val lengthVariance: Double = lengthCounts.foldLeft(0.0)(
-    (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
+  val lengthSize = lengthCounts.totalCount
+  val lengthMean: Double = lengthCounts.heavyHitters.foldLeft(0.0)((acc, el) => acc + el * lengthCounts.frequency(el)
+    .estimate) / lengthSize
+  val lengthVariance: Double = lengthCounts.heavyHitters.foldLeft(0.0)(
+    (acc, el) => acc + lengthCounts.frequency(el).estimate * (el - lengthMean) * (el - lengthMean)
   ) / lengthSize
   val lengthStdDev: Double = math.sqrt(lengthVariance)
 }
@@ -205,27 +212,23 @@ private[op] object TextStats extends CleanTextFun {
    *
    * @param totalMap        Current accumulated map
    * @param mapToAdd        Additional map to add the to accumulated one
-   * @param maxCardinality  Maximum number of unique keys to keep track of (stop counting once this is hit)
    * @tparam T              Type parameter for the keys
    * @return                Newly accumulated map subject to the key cardinality constraints
    */
-  def additionHelper[T](totalMap: Map[T, Long], mapToAdd: Map[T, Long], maxCardinality: Int): Map[T, Long] = {
-    if (totalMap.size > maxCardinality) totalMap
-    else if (mapToAdd.size > maxCardinality) mapToAdd
-    else totalMap + mapToAdd
+  def additionHelper[T](totalMap: TopCMS[T], mapToAdd: TopCMS[T]): TopCMS[T] = {
+      totalMap ++ mapToAdd
   }
 
-  def monoid(maxCardinality: Int): Monoid[TextStats] = new Monoid[TextStats] {
+  def monoid(eps: Double, delta: Double, seed: Int, maxCard: Int): Monoid[TextStats] = new Monoid[TextStats] {
     override def plus(l: TextStats, r: TextStats): TextStats = {
-      val newValueCounts = additionHelper(l.valueCounts, r.valueCounts, maxCardinality)
-      val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts, maxCardinality)
+      val newValueCounts = additionHelper(l.valueCounts, r.valueCounts)
+      val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts)
       TextStats(newValueCounts, newLengthCounts)
     }
 
-    override def zero: TextStats = TextStats.empty
+    override def zero: TextStats = TextStats(TopNCMS.monoid[String](eps, delta, seed = seed, maxCard).zero,
+      TopNCMS.monoid[Int](eps, delta = delta, seed = seed, heavyHittersN = maxCard).zero)
   }
-
-  def empty: TextStats = TextStats(Map.empty, Map.empty)
 
   /**
    * Computes a TextStats instance from a Text entry
@@ -243,11 +246,19 @@ private[op] object TextStats extends CleanTextFun {
     text: T#Value,
     shouldCleanText: Boolean,
     shouldTokenize: Boolean,
+    epsilon: Double,
+    delta: Double,
+    seed: Int,
     maxCardinality: Int
   ): TextStats = {
+    val stringCountMonoid = TopNCMS.monoid[String](eps = epsilon, delta = delta, seed = seed,
+      heavyHittersN = maxCardinality)
+    val tokenLengthCountMonoid = TopNCMS.monoid[Int](eps = epsilon, delta = delta, seed = seed,
+      heavyHittersN = maxCardinality)
     text match {
-      case Some(v) => textStatsFromString(v, shouldCleanText, shouldTokenize, maxCardinality)
-      case None => TextStats(Map.empty[String, Long], Map.empty[Int, Long])
+      case Some(v) => textStatsFromString(v, shouldCleanText, shouldTokenize, stringCountMonoid, tokenLengthCountMonoid,
+        maxCardinality)
+      case None => TextStats(stringCountMonoid.zero, tokenLengthCountMonoid.zero)
     }
   }
 
@@ -266,16 +277,17 @@ private[op] object TextStats extends CleanTextFun {
     textString: String,
     shouldCleanText: Boolean,
     shouldTokenize: Boolean,
+    stringCountMonoid: TopNCMSMonoid[String],
+    tokenLengthCountMonoid: TopNCMSMonoid[Int],
     maxCardinality: Int
   ): TextStats = {
     // Go through each token in text and start appending it to a TextStats instance
-    val lengthsMap = if (shouldTokenize) {
-      TextTokenizer.tokenizeString(textString).tokens.value
-        .foldLeft(Map.empty[Int, Long])(
-          (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
-        )
-    } else Map(cleanTextFn(textString, shouldCleanText).length -> 1L)
-    TextStats(Map(cleanTextFn(textString, shouldCleanText) -> 1L), lengthsMap)
+    val lengthsArray = if (shouldTokenize) {
+      TextTokenizer.tokenizeString(textString).tokens.value.map(_.length)
+    } else Seq(textString.length)
+    val tokenLengthCMS = tokenLengthCountMonoid.create(lengthsArray)
+    val stringCMS = stringCountMonoid.create(textString)
+    TextStats(stringCMS, tokenLengthCMS)
   }
 }
 
