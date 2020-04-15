@@ -33,13 +33,14 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.CMSMonoidDefault.{DELTA, EPS, SEED}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.{Monoid, Semigroup}
+import com.twitter.algebird.{Monoid, Semigroup, TopNCMS}
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -141,12 +142,14 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
         val vecMethod: TextVectorizationMethod = textStats match {
-          case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
+          case _ if textStats.valueCounts.heavyHitters.size <= maxCard => TextVectorizationMethod.Pivot
           case _ if textStats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
           case _ => TextVectorizationMethod.Hash
         }
+        val countMap = textStats.valueCounts.heavyHitters.map(v => v -> textStats.valueCounts.frequency(v).estimate)
+
         val topVals = if (vecMethod == TextVectorizationMethod.Pivot) {
-          textStats.valueCounts
+          countMap
             .filter { case (_, count) => count >= minSup }
             .toSeq.sortBy(v => -v._2 -> v._1)
             .take($(topK)).map(_._1).toArray
@@ -187,7 +190,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
       _.map(TextMapStats.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, shouldTokenize,
-        maxCard)).toArray
+        maxCardinality = maxCard)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
@@ -216,7 +219,7 @@ private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) exte
 private[op] object TextMapStats extends CleanTextFun {
 
   def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
-    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCard = maxCardinality)
     caseclass.monoid[TextMapStats]
   }
 
@@ -236,10 +239,19 @@ private[op] object TextMapStats extends CleanTextFun {
     shouldCleanKeys: Boolean,
     shouldCleanValues: Boolean,
     shouldTokenize: Boolean,
+    epsilon: Double = EPS,
+    delta: Double = DELTA,
+    seed: Int = SEED,
     maxCardinality: Int
   )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
-    val keyValueCounts = textMap.map { case (k, v) => cleanTextFn(k, shouldCleanKeys) ->
-      TextStats.textStatsFromString(v, shouldCleanValues, shouldTokenize, maxCardinality)
+    val keyValueCounts = textMap.map { case (k, v) =>
+      val stringCountMonoid = TopNCMS.monoid[String](eps = epsilon, delta = delta, seed = seed,
+        heavyHittersN = maxCardinality)
+      val tokenLengthCountMonoid = TopNCMS.monoid[Int](eps = epsilon, delta = delta, seed = seed,
+        heavyHittersN = maxCardinality)
+      cleanTextFn(k, shouldCleanKeys) ->
+        TextStats.textStatsFromString(v, shouldCleanValues, shouldTokenize, stringCountMonoid, tokenLengthCountMonoid,
+          maxCardinality)
     }
     TextMapStats(keyValueCounts)
   }

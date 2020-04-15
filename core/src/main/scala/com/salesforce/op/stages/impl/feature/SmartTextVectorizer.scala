@@ -36,14 +36,14 @@ import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, T
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.{CMS, CMSHasher, Monoid, Semigroup, TopCMS, TopCMSMonoid, TopCMSZero, TopNCMS, TopNCMSMonoid}
+import com.twitter.algebird._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
+import CMSMonoidDefault._
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -84,14 +84,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val shouldCleanText = $(cleanText)
     val shouldTokenizeForLengths = $(textLengthType) == TextLengthType.Tokens.entryName
 
-    val DELTA = 1e-8
-    val EPS = 0.005
-    val SEED = 1
-    implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(eps = EPS, delta = DELTA, seed = SEED,
-      maxCard)
+    implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard = maxCard)
 
     val valueStats: Dataset[Array[TextStats]] = dataset.map(
-      _.map(TextStats.computeTextStats(_, shouldCleanText, shouldTokenizeForLengths, EPS, DELTA, SEED, maxCard)).toArray
+      _.map(TextStats.computeTextStats(_, shouldCleanText = shouldCleanText, shouldTokenize = shouldTokenizeForLengths,
+        maxCardinality = maxCard)).toArray
     )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
@@ -219,16 +216,20 @@ private[op] object TextStats extends CleanTextFun {
       totalMap ++ mapToAdd
   }
 
-  def monoid(eps: Double, delta: Double, seed: Int, maxCard: Int): Monoid[TextStats] = new Monoid[TextStats] {
-    override def plus(l: TextStats, r: TextStats): TextStats = {
-      val newValueCounts = additionHelper(l.valueCounts, r.valueCounts)
-      val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts)
-      TextStats(newValueCounts, newLengthCounts)
+  def monoid(eps: Double = EPS, delta: Double = DELTA, seed: Int = SEED, maxCard: Int): Monoid[TextStats] =
+    new Monoid[TextStats] {
+      override def plus(l: TextStats, r: TextStats): TextStats = {
+        val newValueCounts = additionHelper(l.valueCounts, r.valueCounts)
+        val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts)
+        TextStats(newValueCounts, newLengthCounts)
+      }
+
+      override def zero: TextStats = TextStats.empty(eps, delta, seed, maxCard)
     }
 
-    override def zero: TextStats = TextStats(TopNCMS.monoid[String](eps, delta, seed = seed, maxCard).zero,
+  def empty(eps: Double = EPS, delta: Double = DELTA, seed: Int = SEED, maxCard: Int): TextStats =
+    TextStats(TopNCMS.monoid[String](eps, delta, seed = seed, maxCard).zero,
       TopNCMS.monoid[Int](eps, delta = delta, seed = seed, heavyHittersN = maxCard).zero)
-  }
 
   /**
    * Computes a TextStats instance from a Text entry
@@ -246,9 +247,9 @@ private[op] object TextStats extends CleanTextFun {
     text: T#Value,
     shouldCleanText: Boolean,
     shouldTokenize: Boolean,
-    epsilon: Double,
-    delta: Double,
-    seed: Int,
+    epsilon: Double = EPS,
+    delta: Double = DELTA,
+    seed: Int = SEED,
     maxCardinality: Int
   ): TextStats = {
     val stringCountMonoid = TopNCMS.monoid[String](eps = epsilon, delta = delta, seed = seed,
@@ -398,4 +399,10 @@ trait MinLengthStdDevParams extends Params {
   def setTextLengthType(v: TextLengthType): this.type = set(textLengthType, v.entryName)
   def getTextLengthType: TextLengthType = TextLengthType.withNameInsensitive($(textLengthType))
   setDefault(textLengthType -> TextLengthType.FullEntry.entryName)
+}
+
+object CMSMonoidDefault{
+  val DELTA = 1e-8
+  val EPS = 0.005
+  val SEED = 1
 }

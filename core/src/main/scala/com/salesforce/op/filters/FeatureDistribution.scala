@@ -41,6 +41,7 @@ import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, FieldSerializer, Formats}
+import com.salesforce.op.stages.impl.feature.CMSMonoidDefault._
 
 import scala.util.Try
 
@@ -102,7 +103,7 @@ case class FeatureDistribution
   def reduce(fd: FeatureDistribution): FeatureDistribution = {
     checkMatch(fd)
     // should move this somewhere else
-    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(RawFeatureFilter.MaxCardinality)
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCard = RawFeatureFilter.MaxCardinality)
     implicit val opMonoid = optionMonoid[TextStats]
 
     val combinedDist = distribution + fd.distribution
@@ -288,17 +289,20 @@ object FeatureDistribution {
    */
   private def cardinalityValues(values: ProcessedSeq, shouldCleanText: Boolean,
     tokenizeForLengths: Boolean): TextStats = {
-    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(RawFeatureFilter.MaxCardinality)
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCard = RawFeatureFilter.MaxCardinality)
 
     val stringVals = values match {
       case Left(stringSeq) => stringSeq
       case Right(doubleSeq) => doubleSeq.map(_.toString)
     }
-    stringVals.foldLeft(TextStats.empty)((acc, el) => acc + TextStats.textStatsFromString(
-      textString = el,
-      shouldCleanText = shouldCleanText,
-      shouldTokenize = tokenizeForLengths,
-      maxCardinality = RawFeatureFilter.MaxCardinality)
+    stringVals.foldLeft(TextStats.empty(maxCard = RawFeatureFilter.MaxCardinality))((acc, el) =>
+      acc + TextStats.textStatsFromString(
+        textString = el,
+        shouldCleanText = shouldCleanText,
+        stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, RawFeatureFilter.MaxCardinality),
+        tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, RawFeatureFilter.MaxCardinality),
+        shouldTokenize = tokenizeForLengths,
+        maxCardinality = RawFeatureFilter.MaxCardinality)
     )
   }
 
