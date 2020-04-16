@@ -129,6 +129,13 @@ object DateTimeUtils {
   }
 
 
+  /**
+   * Days between epoch start and end
+   *
+   * @param startMillis start Unix time in millis
+   * @param endMillis end Unix time in millis
+   * @return Duration in days between start and end Unix times
+   */
   def getStandardDays(startMillis: Long, endMillis: Long): Long = {
     Duration.millis(endMillis - startMillis).getStandardDays
   }
