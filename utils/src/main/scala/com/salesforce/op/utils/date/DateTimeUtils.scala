@@ -107,10 +107,13 @@ object DateTimeUtils {
    * @return sequence of YYYY/MM/dd strings from the start to the end dates inclusive
    */
   def getRange(startDate: String, endDate: String): Seq[String] = {
-    val start = new DateTime(parse(startDate, DefaultTimeZoneStr), DefaultTimeZone)
-    val end = new DateTime(parse(endDate, DefaultTimeZoneStr), DefaultTimeZone)
-    val days = new Duration(start, end).getStandardDays
-    (0 to days.toInt).map(d => parseUnix(start.plusDays(d).getMillis))
+    val start = parse(startDate, DefaultTimeZoneStr)
+    val end = parse(endDate, DefaultTimeZoneStr)
+    val days = getStandardDays(start, end)
+    (0 to days.toInt).map { day =>
+      val dur = Duration.millis(start).plus(Duration.standardDays(day))
+      parseUnix(dur.getMillis)
+    }
   }
 
   /**
@@ -123,5 +126,10 @@ object DateTimeUtils {
   def getDatePlusDays(startDate: String, difference: Int): String = {
     val start = new DateTime(parse(startDate, DefaultTimeZoneStr), DefaultTimeZone)
     parseUnix(start.plusDays(difference).getMillis)
+  }
+
+
+  def getStandardDays(startMillis: Long, endMillis: Long): Long = {
+    Duration.millis(endMillis - startMillis).getStandardDays
   }
 }

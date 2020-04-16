@@ -30,15 +30,14 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op._
+import com.salesforce.op.{OpWorkflow, _}
 import com.salesforce.op.features.types._
-import com.salesforce.op.OpWorkflow
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.date.DateTimeUtils
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
-import org.joda.time.{DateTimeConstants, Duration, DateTime => JDateTime}
+import org.joda.time.{DateTimeConstants, DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -106,10 +105,8 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     val zero = 0
     val threeDaysAgo = moment.minus(3 * DateTimeConstants.MILLIS_PER_DAY).getMillis / DateTimeConstants.MILLIS_PER_DAY
     val defaultTimeAgo = moment.minus(defaultDate).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val hundredDaysAgo = new Duration(
-      new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone),
-      moment
-    ).getStandardDays
+    val hundredDaysAgo = DateTimeUtils
+      .getStandardDays(moment.plusDays(100).getMillis, moment.getMillis)
 
     Array(
       Array(nowMinusMilli, defaultTimeAgo, threeDaysAgo),
