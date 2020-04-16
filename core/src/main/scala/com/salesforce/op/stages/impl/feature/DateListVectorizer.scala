@@ -41,7 +41,7 @@ import com.salesforce.op.utils.spark.OpVectorColumnMetadata
 import enumeratum._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, LongParam, ParamValidators}
-import org.joda.time.{DateTime, DateTimeConstants, Days}
+import org.joda.time.{DateTime, DateTimeConstants}
 
 import scala.reflect.runtime.universe._
 
@@ -203,7 +203,7 @@ class DateListVectorizer[T <: OPList[Long]]
       if (dt.isEmpty) Seq($(fillValue))
       else {
         val compareDate = if ($(first)) dt.v.min else dt.v.max
-        Seq(Days.daysBetween(new DateTime(compareDate, DateTimeUtils.DefaultTimeZone), getReferenceDate()).getDays)
+        Seq(DateTimeUtils.getStandardDays(startMillis = compareDate, endMillis = $(referenceDate)))
       }
     if ($(trackNulls)) days :+ (dt.isEmpty : Double) else days
   }
