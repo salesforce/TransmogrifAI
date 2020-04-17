@@ -42,7 +42,7 @@ import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 import CMSMonoidDefault._
 
 import scala.reflect.ClassTag
@@ -63,7 +63,10 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams with MinLengthStdDevParams {
 
-  private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
+
+  private implicit val textStatsSeq: Encoder[Array[TextStats]] = Encoders.kryo[Array[TextStats]]
+
+  private implicit val textStats: Encoder[TextStats] = Encoders.kryo[TextStats]
 
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),
@@ -91,6 +94,18 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         maxCardinality = maxCard)).toArray
     )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
+
+    println(s"Aggregated stats")
+
+    aggregatedStats.foreach { case ts =>
+      println("Value Count")
+      println(ts.valueCounts)
+      println(toMap(ts.valueCounts))
+      println("Lenght Count")
+      println(ts.lengthCounts)
+      println(toMap(ts.lengthCounts))
+
+    }
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
 
@@ -287,7 +302,7 @@ private[op] object TextStats extends CleanTextFun {
       TextTokenizer.tokenizeString(textString).tokens.value.map(_.length)
     } else Seq(textString.length)
     val tokenLengthCMS = tokenLengthCountMonoid.create(lengthsArray)
-    val stringCMS = stringCountMonoid.create(textString)
+    val stringCMS = stringCountMonoid.create(cleanTextFn(textString, shouldCleanText))
     TextStats(stringCMS, tokenLengthCMS)
   }
 }
@@ -405,4 +420,14 @@ object CMSMonoidDefault{
   val DELTA = 1e-8
   val EPS = 0.005
   val SEED = 1
+
+  private[op] def toCMS[K: CMSHasher](m: Map[K, Long], epsilon: Double = EPS, delta: Double = DELTA,
+    seed: Int = SEED, maxCard: Int = SmartTextVectorizer.MaxCardinality): TopCMS[K] = {
+    val input = m.flatMap { case (k, v) => Seq.fill(v.toInt)(k) }.toSeq
+    TopNCMS.monoid[K](eps = epsilon, delta = delta, seed = seed, heavyHittersN = maxCard).create(input)
+  }
+
+  private[op] def toMap[K: CMSHasher](cms: TopCMS[K]): Map[K, Long] = {
+    cms.heavyHitters.map(h => h -> cms.frequency(h).estimate).toMap
+  }
 }

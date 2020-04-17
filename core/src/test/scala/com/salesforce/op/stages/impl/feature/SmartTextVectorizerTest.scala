@@ -41,6 +41,8 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.Assertion
 import org.scalatest.junit.JUnitRunner
+import CMSMonoidDefault._
+import com.twitter.algebird.TopNCMS
 
 
 @RunWith(classOf[JUnitRunner])
@@ -480,35 +482,41 @@ class SmartTextVectorizerTest
   }
 
   it should "turn a string into a corresponding TextStats instance with cleaning" in {
-    val res = TextStats.textStatsFromString(stringData, shouldCleanText = true, shouldTokenize = true,
+    val res = TextStats.textStatsFromString(stringData,
+      stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 50),
+      tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 50),
+      shouldCleanText = true, shouldTokenize = true,
       maxCardinality = 50)
     val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
-    res.valueCounts.size shouldBe 1
-    res.valueCounts should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
+    res.valueCounts.heavyHitters.size shouldBe 1
+    toMap(res.valueCounts) should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
 
-    res.lengthCounts.size shouldBe tokens.value.map(_.length).distinct.length
-    res.lengthCounts should contain (6 -> 1L)
-    res.lengthCounts should contain (3 -> 2L)
-    res.lengthCounts should contain (5 -> 1L)
-    res.lengthCounts should contain (8 -> 2L)
+    res.lengthCounts.heavyHitters.size shouldBe tokens.value.map(_.length).distinct.length
+    toMap(res.lengthCounts) should contain (6 -> 1L)
+    toMap(res.lengthCounts) should contain (3 -> 2L)
+    toMap(res.lengthCounts) should contain (5 -> 1L)
+    toMap(res.lengthCounts) should contain (8 -> 2L)
 
     checkDerivedQuantities(res, Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
   }
 
   it should "turn a string into a corresponding TextStats instance without cleaning" in {
     val res = TextStats.textStatsFromString(stringData, shouldCleanText = false, shouldTokenize = true,
+      stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 50),
+      tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 50),
       maxCardinality = 50)
     val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
-    res.valueCounts.size shouldBe 1
-    res.valueCounts should contain ("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row." -> 1)
+    res.valueCounts.heavyHitters.size shouldBe 1
+    toMap(res.valueCounts) should contain("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row."
+      -> 1)
 
-    res.lengthCounts.size shouldBe tokens.value.map(_.length).distinct.length
-    res.lengthCounts should contain (6 -> 1L)
-    res.lengthCounts should contain (3 -> 2L)
-    res.lengthCounts should contain (5 -> 1L)
-    res.lengthCounts should contain (8 -> 2L)
+    res.lengthCounts.heavyHitters.size shouldBe tokens.value.map(_.length).distinct.length
+    toMap(res.lengthCounts) should contain (6 -> 1L)
+    toMap(res.lengthCounts) should contain (3 -> 2L)
+    toMap(res.lengthCounts) should contain (5 -> 1L)
+    toMap(res.lengthCounts) should contain (8 -> 2L)
 
     checkDerivedQuantities(res, Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
   }
@@ -516,30 +524,35 @@ class SmartTextVectorizerTest
   it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
     val tinyCard = 2
     val res = TextStats.textStatsFromString(stringData, shouldCleanText = false, shouldTokenize = true,
+      stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 2),
+      tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 2),
       maxCardinality = 2)
 
-    res.valueCounts.size shouldBe 1
-    res.valueCounts should contain ("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row." -> 1)
+    res.valueCounts.heavyHitters.size shouldBe 1
+    toMap(res.valueCounts) should contain
+    ("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row." -> 1)
 
     // MaxCardinality will stop counting as soon as the lengths are > maxCardinality, so the length counts will
     // have maxCardinality + 1 elements, however they will stop being appended to even if future elements have
     // the same key.
-    res.lengthCounts.size shouldBe tinyCard + 1
-    res.lengthCounts should contain (6 -> 1L)
-    res.lengthCounts should contain (3 -> 1L)
-    res.lengthCounts should contain (5 -> 1L)
+    res.lengthCounts.heavyHitters.size shouldBe tinyCard + 1
+    toMap(res.lengthCounts) should contain (6 -> 1L)
+    toMap(res.lengthCounts) should contain (3 -> 1L)
+    toMap(res.lengthCounts) should contain (5 -> 1L)
 
     checkDerivedQuantities(res, Seq(6, 3, 5).map(_.toLong))
   }
 
   it should "allow toggling of tokenization for calculating the length distribution" in {
     val res = TextStats.textStatsFromString(stringData, shouldCleanText = true, shouldTokenize = false,
+      stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 50),
+      tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 50),
       maxCardinality = 50)
 
-    res.valueCounts.size shouldBe 1
-    res.valueCounts should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
-    res.lengthCounts.size shouldBe 1
-    res.lengthCounts should contain (58 -> 1L)
+    res.valueCounts.heavyHitters.size shouldBe 1
+    toMap(res.valueCounts) should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
+    res.lengthCounts.heavyHitters.size shouldBe 1
+    toMap(res.lengthCounts) should contain (58 -> 1L)
 
     checkDerivedQuantities(res, Seq(58).map(_.toLong))
   }
@@ -563,20 +576,21 @@ class SmartTextVectorizerTest
   }
 
   Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(Map("hello" -> 1, "world" -> 2), Map(5 -> 3))
-    val r1 = TextStats(Map("hello" -> 1, "world" -> 1), Map(5 -> 2))
-    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3), Map(5 -> 5))
+    val l1 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2)), toCMS(Map(5 -> 3)))
+    val r1 = TextStats(toCMS(Map("hello" -> 1, "world" -> 1)), toCMS(Map(5 -> 2)))
+    val expected1 = TextStats(toCMS(Map("hello" -> 2, "world" -> 3)), toCMS(Map(5 -> 5)))
 
-    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6))
-    val r2 = TextStats(Map("hello" -> 1), Map(5 -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7))
+    val l2 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2, "ocean" -> 3)), toCMS(Map(5 -> 6)))
+    val r2 = TextStats(toCMS(Map("hello" -> 1)), toCMS(Map(5 -> 1)))
+    val expected2 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2, "ocean" -> 3)), toCMS(Map(5 -> 7)))
 
-    TextStats.monoid(2).plus(l1, r1) shouldBe expected1
-    TextStats.monoid(2).plus(l2, r2) shouldBe expected2
+    TextStats.monoid(maxCard = 2).plus(l1, r1) shouldBe expected1
+    TextStats.monoid(maxCard = 2).plus(l2, r2) shouldBe expected2
   }
 
   it should "compute correct statistics on the length distributions" in {
-    val ts = TextStats(Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2))
+    val ts = TextStats(toCMS(Map("hello" -> 2, "joe" -> 2, "woof" -> 1)),
+      toCMS(Map(3 -> 2, 4 -> 1, 5 -> 2)))
 
     ts.lengthSize shouldBe 5
     ts.lengthMean shouldBe 4.0
@@ -585,7 +599,7 @@ class SmartTextVectorizerTest
   }
 
   it should "return sane results when entries do not tokenize and result in empty maps" in {
-    val ts = TextStats(Map("the" -> 10, "and" -> 4), Map.empty[Int, Long])
+    val ts = TextStats(toCMS(Map("the" -> 10, "and" -> 4)), toCMS(Map.empty[Int, Long]))
 
     ts.lengthSize shouldBe 0
     ts.lengthMean.isNaN shouldBe true

@@ -41,6 +41,7 @@ import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.RandomText
 import org.scalatest.Assertion
+import CMSMonoidDefault._
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -141,22 +142,22 @@ class SmartTextMapVectorizerTest
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
       TextMapStats(Map(
-        "f1" -> TextStats(Map("hello" -> 2, "world" -> 1), Map(5 -> 3)),
-        "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 2), Map(5 -> 4)),
-        "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
+        "f1" -> TextStats(toCMS(Map("hello" -> 2, "world" -> 1)) , toCMS(Map(5 -> 3))),
+        "f2" -> TextStats(toCMS(Map("hello" -> 2, "ocean" -> 2)), toCMS(Map(5 -> 4))),
+        "f3" -> TextStats(toCMS(Map("foo" -> 1)), toCMS(Map(3 -> 1)))
       )),
       TextMapStats(Map(
-        "f1" -> TextStats(Map("hello" -> 1), Map(5 -> 1)),
-        "f2" -> TextStats(Map("ocean" -> 1, "other" -> 5), Map(5 -> 6))
+        "f1" -> TextStats(toCMS(Map("hello" -> 1)), toCMS(Map(5 -> 1))),
+        "f2" -> TextStats(toCMS(Map("ocean" -> 1, "other" -> 5)), toCMS(Map(5 -> 6)))
       )),
       TextMapStats(Map(
-        "f2" -> TextStats(Map("other" -> 1), Map(5 -> 1))
+        "f2" -> TextStats(toCMS(Map("other" -> 1)), toCMS(Map(5 -> 1)))
       ))
     )
     TextMapStats.monoid(2).sumOption(data) shouldBe Some(TextMapStats(Map(
-      "f1" -> TextStats(Map("hello" -> 3, "world" -> 1), Map(5 -> 4)),
-      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5), Map(5 -> 11)),
-      "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
+      "f1" -> TextStats(toCMS(Map("hello" -> 3, "world" -> 1)), toCMS(Map(5 -> 4))),
+      "f2" -> TextStats(toCMS(Map("hello" -> 2, "ocean" -> 3, "other" -> 5)), toCMS(Map(5 -> 11))),
+      "f3" -> TextStats(toCMS(Map("foo" -> 1)), toCMS(Map(3 -> 1)))
     )))
   }
 
@@ -603,22 +604,22 @@ class SmartTextMapVectorizerTest
     res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
 
     // Check value counts
-    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts.heavyHitters.size shouldBe 1
     res.keyValueCounts("f1").valueCounts should contain
       ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
-    res.keyValueCounts("f2").valueCounts.size shouldBe 1
-    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+    res.keyValueCounts("f2").valueCounts.heavyHitters.size shouldBe 1
+    toMap(res.keyValueCounts("f2").valueCounts) should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
 
     // Check token length counts
-    res.keyValueCounts("f1").lengthCounts.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
-    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
-    res.keyValueCounts("f1").lengthCounts should contain (3 -> 2L)
-    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
-    res.keyValueCounts("f1").lengthCounts should contain (8 -> 2L)
-    res.keyValueCounts("f2").lengthCounts.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
-    res.keyValueCounts("f2").lengthCounts should contain (4 -> 3L)
-    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
-    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+    res.keyValueCounts("f1").lengthCounts.heavyHitters.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (6 -> 1L)
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (3 -> 2L)
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (5 -> 1L)
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (8 -> 2L)
+    res.keyValueCounts("f2").lengthCounts.heavyHitters.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
+    toMap(res.keyValueCounts("f2").lengthCounts) should contain (4 -> 3L)
+    toMap(res.keyValueCounts("f2").lengthCounts) should contain (5 -> 3L)
+    toMap(res.keyValueCounts("f2").lengthCounts) should contain (3 -> 1L)
   }
 
   it should "create a TextStats with the correct derived quantities" in {
@@ -648,23 +649,23 @@ class SmartTextMapVectorizerTest
     res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
 
     // Check value counts
-    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts.heavyHitters.size shouldBe 1
     res.keyValueCounts("f1").valueCounts should contain
     ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
-    res.keyValueCounts("f2").valueCounts.size shouldBe 1
-    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+    res.keyValueCounts("f2").valueCounts.heavyHitters.size shouldBe 1
+    toMap(res.keyValueCounts("f2").valueCounts) should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
 
     // Check token length counts
-    res.keyValueCounts("f1").lengthCounts.size shouldBe 3
-    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
-    res.keyValueCounts("f1").lengthCounts should contain (3 -> 1L)
-    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    res.keyValueCounts("f1").lengthCounts.heavyHitters.size shouldBe 3
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (6 -> 1L)
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (3 -> 1L)
+    toMap(res.keyValueCounts("f1").lengthCounts) should contain (5 -> 1L)
     checkDerivedQuantities(res, "f1", Seq(6, 3, 5).map(_.toLong))
 
-    res.keyValueCounts("f2").lengthCounts.size shouldBe 3
-    res.keyValueCounts("f2").lengthCounts should contain (4 -> 1L)
-    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
-    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+    res.keyValueCounts("f2").lengthCounts.heavyHitters.size shouldBe 3
+    toMap(res.keyValueCounts("f2").lengthCounts) should contain (4 -> 1L)
+    toMap(res.keyValueCounts("f2").lengthCounts) should contain (5 -> 3L)
+    toMap(res.keyValueCounts("f2").lengthCounts) should contain (3 -> 1L)
     checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3).map(_.toLong))
   }
 

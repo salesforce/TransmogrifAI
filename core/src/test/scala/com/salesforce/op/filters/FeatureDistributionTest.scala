@@ -31,11 +31,12 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
+import com.salesforce.op.stages.impl.feature.CMSMonoidDefault._
 import com.salesforce.op.stages.impl.feature.TextStats
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.json.EnumEntrySerializer
-import com.twitter.algebird.Moments
+import com.twitter.algebird.{Moments, TopNCMS}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
@@ -78,9 +79,21 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(3).distribution.sum shouldBe 0
     distribs(4).distribution.sum shouldBe 3
     distribs(4).summaryInfo.length shouldBe bins
-    distribs(2).cardEstimate.get shouldBe TextStats(Map("male" -> 1, "female" -> 1), Map(4 -> 1L, 6 -> 1L))
+    val textStats = distribs(2).cardEstimate.get
+    Map("male" -> 1, "female" -> 1).foreach { case (k, v) =>
+      textStats.valueCounts.frequency(k).estimate.toInt shouldBe v
+    }
+    Map(4 -> 1L, 6 -> 1L).foreach { case (k, v) =>
+      textStats.lengthCounts.frequency(k).estimate.toInt shouldBe v
+    }
     distribs(2).moments.get shouldBe Moments(2, 5.0, 2.0, 0.0, 2.0)
-    distribs(4).cardEstimate.get shouldBe TextStats(Map("5.0" -> 1, "1.0" -> 1, "3.0" -> 1), Map(3 -> 3L))
+    val textStats2 = distribs(2).cardEstimate.get
+    Map("5.0" -> 1, "1.0" -> 1, "3.0" -> 1).foreach { case (k, v) =>
+      textStats.valueCounts.frequency(k).estimate.toInt shouldBe v
+    }
+    Map(3 -> 3L).foreach { case (k, v) =>
+      textStats.lengthCounts.frequency(k).estimate.toInt shouldBe v
+    }
     distribs(4).moments.get shouldBe Moments(3, 3.0, 8.0, 0.0, 32.0)
   }
 
@@ -247,8 +260,11 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
 
   it should "not serialize cardEstimate field" in {
     val cardEstimate = "cardEstimate"
+
+    val valueCount = TopNCMS.monoid[String](EPS, DELTA, SEED, 1000).create(Seq("foo", "foo", "bar"))
+    val lengthCount = TopNCMS.monoid[Int](EPS, DELTA, SEED, 1000).zero
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
-      Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2), Map.empty)),
+      Array.empty, Some(Moments(1.0)), Some(TextStats(valueCount, lengthCount)),
       FeatureDistributionType.Scoring)
     val featureDistributions = Seq(fd1, fd1.copy(cardEstimate = None))
 
