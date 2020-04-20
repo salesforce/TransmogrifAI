@@ -41,7 +41,6 @@ import com.twitter.algebird._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 import CMSMonoidDefault._
 
@@ -101,18 +100,29 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       println("Value Count")
       println(ts.valueCounts)
       println(toMap(ts.valueCounts))
-      println("Lenght Count")
+      println("Length Count")
       println(ts.lengthCounts)
       println(toMap(ts.lengthCounts))
+      println("Unique Count")
+      println(ts.uniqueCounts)
+      println(ts.uniqueCounts.size)
+      println(s"Total count ${ts.valueCounts.totalCount}")
 
     }
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
 
-      val countMap = stats.valueCounts.heavyHitters.map(v => v -> stats.valueCounts.frequency(v).estimate)
+      val countMap = toMap(stats.valueCounts)
       val vecMethod: TextVectorizationMethod = stats match {
-        case _ if stats.valueCounts.heavyHitters.size <= maxCard => TextVectorizationMethod.Pivot
-        case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
+        case _ if new HyperLogLogMonoid(BITS).sizeOf(stats.uniqueCounts).estimate <= maxCard => {
+          println(s"Pivot for ${toMap(stats.valueCounts)} with count ${toMap(stats.valueCounts).size} and maxCard" +
+            s" $maxCard")
+          TextVectorizationMethod.Pivot
+        }
+        case _ if stats.lengthStdDev < minLenStdDev => {
+          println(s"Ignore for ${toMap(stats.lengthCounts)} with stdev ${stats.lengthStdDev}")
+          TextVectorizationMethod.Ignore
+        }
         case _ => TextVectorizationMethod.Hash
       }
       val topValues = countMap
@@ -197,6 +207,7 @@ object SmartTextVectorizer {
   }
 }
 
+case class TextStatsParams(epsilon: Double = EPS, delta: Double = DELTA, seed: Int = SEED, bits: Int = BITS)
 /**
  * Summary statistics of a text feature
  *
@@ -206,14 +217,16 @@ object SmartTextVectorizer {
 private[op] case class TextStats
 (
   valueCounts: TopCMS[String],
-  lengthCounts: TopCMS[Int]
+  lengthCounts: TopCMS[Int],
+  uniqueCounts: DenseHLL
 ) extends JsonLike {
 
   val lengthSize = lengthCounts.totalCount
-  val lengthMean: Double = lengthCounts.heavyHitters.foldLeft(0.0)((acc, el) => acc + el * lengthCounts.frequency(el)
-    .estimate) / lengthSize
-  val lengthVariance: Double = lengthCounts.heavyHitters.foldLeft(0.0)(
-    (acc, el) => acc + lengthCounts.frequency(el).estimate * (el - lengthMean) * (el - lengthMean)
+  val lenghtMap = toMap(lengthCounts)
+
+  val lengthMean: Double = lenghtMap.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
+  val lengthVariance: Double = lenghtMap.foldLeft(0.0)(
+    (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
   ) / lengthSize
   val lengthStdDev: Double = math.sqrt(lengthVariance)
 }
@@ -236,15 +249,18 @@ private[op] object TextStats extends CleanTextFun {
       override def plus(l: TextStats, r: TextStats): TextStats = {
         val newValueCounts = additionHelper(l.valueCounts, r.valueCounts)
         val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts)
-        TextStats(newValueCounts, newLengthCounts)
+        val newHLL = (l.uniqueCounts + r.uniqueCounts).toDenseHLL
+        TextStats(newValueCounts, newLengthCounts, newHLL)
       }
 
       override def zero: TextStats = TextStats.empty(eps, delta, seed, maxCard)
     }
 
-  def empty(eps: Double = EPS, delta: Double = DELTA, seed: Int = SEED, maxCard: Int): TextStats =
+  def empty(eps: Double = EPS, delta: Double = DELTA, seed: Int = SEED, maxCard: Int, bits: Int = BITS): TextStats =
     TextStats(TopNCMS.monoid[String](eps, delta, seed = seed, maxCard).zero,
-      TopNCMS.monoid[Int](eps, delta = delta, seed = seed, heavyHittersN = maxCard).zero)
+      TopNCMS.monoid[Int](eps, delta = delta, seed = seed, heavyHittersN = maxCard).zero,
+      new HyperLogLogMonoid(bits).zero.toDenseHLL
+    )
 
   /**
    * Computes a TextStats instance from a Text entry
@@ -262,19 +278,20 @@ private[op] object TextStats extends CleanTextFun {
     text: T#Value,
     shouldCleanText: Boolean,
     shouldTokenize: Boolean,
-    epsilon: Double = EPS,
-    delta: Double = DELTA,
-    seed: Int = SEED,
+    textStatsParams: TextStatsParams = TextStatsParams(),
     maxCardinality: Int
   ): TextStats = {
+    val TextStatsParams(epsilon, delta, seed, bits) = textStatsParams
     val stringCountMonoid = TopNCMS.monoid[String](eps = epsilon, delta = delta, seed = seed,
       heavyHittersN = maxCardinality)
     val tokenLengthCountMonoid = TopNCMS.monoid[Int](eps = epsilon, delta = delta, seed = seed,
       heavyHittersN = maxCardinality)
+    val hllMonoid = new HyperLogLogMonoid(bits)
     text match {
       case Some(v) => textStatsFromString(v, shouldCleanText, shouldTokenize, stringCountMonoid, tokenLengthCountMonoid,
-        maxCardinality)
-      case None => TextStats(stringCountMonoid.zero, tokenLengthCountMonoid.zero)
+        hllMonoid, maxCardinality)
+      case None => TextStats(stringCountMonoid.zero, tokenLengthCountMonoid.zero, new HyperLogLogMonoid(bits).zero
+        .toDenseHLL)
     }
   }
 
@@ -295,15 +312,17 @@ private[op] object TextStats extends CleanTextFun {
     shouldTokenize: Boolean,
     stringCountMonoid: TopNCMSMonoid[String],
     tokenLengthCountMonoid: TopNCMSMonoid[Int],
+    hllMonoid: HyperLogLogMonoid,
     maxCardinality: Int
   ): TextStats = {
     // Go through each token in text and start appending it to a TextStats instance
-    val lengthsArray = if (shouldTokenize) {
+    val lengthsSeq = if (shouldTokenize) {
       TextTokenizer.tokenizeString(textString).tokens.value.map(_.length)
-    } else Seq(textString.length)
-    val tokenLengthCMS = tokenLengthCountMonoid.create(lengthsArray)
+    } else Seq(cleanTextFn(textString, shouldCleanText).length)
+    val tokenLengthCMS = tokenLengthCountMonoid.create(lengthsSeq)
     val stringCMS = stringCountMonoid.create(cleanTextFn(textString, shouldCleanText))
-    TextStats(stringCMS, tokenLengthCMS)
+    val hll = hllMonoid.create(cleanTextFn(textString, shouldCleanText).getBytes)
+    TextStats(stringCMS, tokenLengthCMS, hll.toDenseHLL)
   }
 }
 
@@ -420,6 +439,7 @@ object CMSMonoidDefault{
   val DELTA = 1e-8
   val EPS = 0.005
   val SEED = 1
+  val BITS = 12
 
   private[op] def toCMS[K: CMSHasher](m: Map[K, Long], epsilon: Double = EPS, delta: Double = DELTA,
     seed: Int = SEED, maxCard: Int = SmartTextVectorizer.MaxCardinality): TopCMS[K] = {
@@ -428,6 +448,23 @@ object CMSMonoidDefault{
   }
 
   private[op] def toMap[K: CMSHasher](cms: TopCMS[K]): Map[K, Long] = {
-    cms.heavyHitters.map(h => h -> cms.frequency(h).estimate).toMap
+    cms match {
+      case zero: TopCMSZero[K] => Map.empty[K, Long]
+      case item: TopCMSItem[K] => Map(item.item -> 1L)
+      case instance: TopCMSInstance[K] =>
+        instance.cms match {
+        case sparse: SparseCMS[K] => sparse.exactCountTable
+        case c => cms.heavyHitters.map(h => h -> instance.frequency(h).estimate).toMap
+      }
+    }
+  }
+  private[op] def toHLL(seq: Seq[String], bits: Int = BITS): DenseHLL = {
+    val hllMonoid = new HyperLogLogMonoid(bits)
+    val hlls = seq.map(s => hllMonoid.create(s.getBytes))
+    hllMonoid.sum(hlls).toDenseHLL
+  }
+
+  private[op] def getCardinality(hll: HLL): Long = {
+    new HyperLogLogMonoid(hll.bits).sizeOf(hll).estimate
   }
 }

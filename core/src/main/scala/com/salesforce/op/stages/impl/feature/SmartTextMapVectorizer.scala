@@ -33,14 +33,13 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
-import com.salesforce.op.stages.impl.feature.CMSMonoidDefault.{DELTA, EPS, SEED}
+import com.salesforce.op.stages.impl.feature.CMSMonoidDefault.{BITS, DELTA, EPS, SEED}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.{Monoid, Semigroup, TopNCMS}
+import com.twitter.algebird.{HyperLogLogMonoid, Monoid, TopNCMS}
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -239,19 +238,19 @@ private[op] object TextMapStats extends CleanTextFun {
     shouldCleanKeys: Boolean,
     shouldCleanValues: Boolean,
     shouldTokenize: Boolean,
-    epsilon: Double = EPS,
-    delta: Double = DELTA,
-    seed: Int = SEED,
+    textStatsParams: TextStatsParams = TextStatsParams(),
     maxCardinality: Int
   )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
+    val TextStatsParams(epsilon, delta, seed, bits) = textStatsParams
     val keyValueCounts = textMap.map { case (k, v) =>
       val stringCountMonoid = TopNCMS.monoid[String](eps = epsilon, delta = delta, seed = seed,
         heavyHittersN = maxCardinality)
       val tokenLengthCountMonoid = TopNCMS.monoid[Int](eps = epsilon, delta = delta, seed = seed,
         heavyHittersN = maxCardinality)
+      val hllMonoid = new HyperLogLogMonoid(bits)
       cleanTextFn(k, shouldCleanKeys) ->
         TextStats.textStatsFromString(v, shouldCleanValues, shouldTokenize, stringCountMonoid, tokenLengthCountMonoid,
-          maxCardinality)
+          hllMonoid, maxCardinality)
     }
     TextMapStats(keyValueCounts)
   }

@@ -301,6 +301,7 @@ object FeatureDistribution {
         shouldCleanText = shouldCleanText,
         stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, RawFeatureFilter.MaxCardinality),
         tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, RawFeatureFilter.MaxCardinality),
+        hllMonoid = new HyperLogLogMonoid(bits = BITS),
         shouldTokenize = tokenizeForLengths,
         maxCardinality = RawFeatureFilter.MaxCardinality)
     )

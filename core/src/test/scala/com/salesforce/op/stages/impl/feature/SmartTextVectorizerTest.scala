@@ -42,7 +42,7 @@ import org.junit.runner.RunWith
 import org.scalatest.Assertion
 import org.scalatest.junit.JUnitRunner
 import CMSMonoidDefault._
-import com.twitter.algebird.TopNCMS
+import com.twitter.algebird.{HyperLogLogMonoid, TopNCMS}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -226,6 +226,7 @@ class SmartTextVectorizerTest
      */
     val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
     val firstRes = result.head
+    println(firstRes)
     firstRes.v.size shouldBe featureVectorSize
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -486,6 +487,7 @@ class SmartTextVectorizerTest
       stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 50),
       tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 50),
       shouldCleanText = true, shouldTokenize = true,
+      hllMonoid = new HyperLogLogMonoid(BITS),
       maxCardinality = 50)
     val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
@@ -497,6 +499,7 @@ class SmartTextVectorizerTest
     toMap(res.lengthCounts) should contain (3 -> 2L)
     toMap(res.lengthCounts) should contain (5 -> 1L)
     toMap(res.lengthCounts) should contain (8 -> 2L)
+    println(toMap(res.lengthCounts))
 
     checkDerivedQuantities(res, Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
   }
@@ -505,6 +508,7 @@ class SmartTextVectorizerTest
     val res = TextStats.textStatsFromString(stringData, shouldCleanText = false, shouldTokenize = true,
       stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 50),
       tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 50),
+      hllMonoid = new HyperLogLogMonoid(BITS),
       maxCardinality = 50)
     val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
@@ -526,32 +530,33 @@ class SmartTextVectorizerTest
     val res = TextStats.textStatsFromString(stringData, shouldCleanText = false, shouldTokenize = true,
       stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 2),
       tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 2),
+      hllMonoid = new HyperLogLogMonoid(BITS),
       maxCardinality = 2)
 
     res.valueCounts.heavyHitters.size shouldBe 1
     toMap(res.valueCounts) should contain
     ("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row." -> 1)
 
-    // MaxCardinality will stop counting as soon as the lengths are > maxCardinality, so the length counts will
-    // have maxCardinality + 1 elements, however they will stop being appended to even if future elements have
-    // the same key.
-    res.lengthCounts.heavyHitters.size shouldBe tinyCard + 1
+
+    res.lengthCounts.heavyHitters.size shouldBe tinyCard
     toMap(res.lengthCounts) should contain (6 -> 1L)
-    toMap(res.lengthCounts) should contain (3 -> 1L)
+    toMap(res.lengthCounts) should contain (3 -> 2L)
     toMap(res.lengthCounts) should contain (5 -> 1L)
 
-    checkDerivedQuantities(res, Seq(6, 3, 5).map(_.toLong))
+    checkDerivedQuantities(res, Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
   }
 
   it should "allow toggling of tokenization for calculating the length distribution" in {
     val res = TextStats.textStatsFromString(stringData, shouldCleanText = true, shouldTokenize = false,
       stringCountMonoid = TopNCMS.monoid[String](EPS, DELTA, SEED, 50),
       tokenLengthCountMonoid = TopNCMS.monoid[Int](EPS, DELTA, SEED, 50),
+      hllMonoid = new HyperLogLogMonoid(BITS),
       maxCardinality = 50)
 
-    res.valueCounts.heavyHitters.size shouldBe 1
+    getCardinality(res.uniqueCounts) shouldBe 1
     toMap(res.valueCounts) should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
-    res.lengthCounts.heavyHitters.size shouldBe 1
+    toMap(res.lengthCounts).size shouldBe 1
+    println(toMap(res.lengthCounts))
     toMap(res.lengthCounts) should contain (58 -> 1L)
 
     checkDerivedQuantities(res, Seq(58).map(_.toLong))
@@ -576,13 +581,15 @@ class SmartTextVectorizerTest
   }
 
   Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2)), toCMS(Map(5 -> 3)))
-    val r1 = TextStats(toCMS(Map("hello" -> 1, "world" -> 1)), toCMS(Map(5 -> 2)))
-    val expected1 = TextStats(toCMS(Map("hello" -> 2, "world" -> 3)), toCMS(Map(5 -> 5)))
+    val l1 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2)), toCMS(Map(5 -> 3)), toHLL(Seq("hello", "world")))
+    val r1 = TextStats(toCMS(Map("hello" -> 1, "world" -> 1)), toCMS(Map(5 -> 2)), toHLL(Seq("hello", "world")))
+    val expected1 = TextStats(toCMS(Map("hello" -> 2, "world" -> 3)), toCMS(Map(5 -> 5)), toHLL(Seq("hello", "world")))
 
-    val l2 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2, "ocean" -> 3)), toCMS(Map(5 -> 6)))
-    val r2 = TextStats(toCMS(Map("hello" -> 1)), toCMS(Map(5 -> 1)))
-    val expected2 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2, "ocean" -> 3)), toCMS(Map(5 -> 7)))
+    val l2 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2, "ocean" -> 3)), toCMS(Map(5 -> 6)),
+      toHLL(Seq("hello", "world", "ocean")))
+    val r2 = TextStats(toCMS(Map("hello" -> 1)), toCMS(Map(5 -> 1)), toHLL(Seq("hello")))
+    val expected2 = TextStats(toCMS(Map("hello" -> 1, "world" -> 2, "ocean" -> 3)), toCMS(Map(5 -> 7)),
+      toHLL(Seq("hello", "world", "ocean")))
 
     TextStats.monoid(maxCard = 2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(maxCard = 2).plus(l2, r2) shouldBe expected2
@@ -590,7 +597,7 @@ class SmartTextVectorizerTest
 
   it should "compute correct statistics on the length distributions" in {
     val ts = TextStats(toCMS(Map("hello" -> 2, "joe" -> 2, "woof" -> 1)),
-      toCMS(Map(3 -> 2, 4 -> 1, 5 -> 2)))
+      toCMS(Map(3 -> 2, 4 -> 1, 5 -> 2)), toHLL(Seq("hello", "joe", "woof")))
 
     ts.lengthSize shouldBe 5
     ts.lengthMean shouldBe 4.0
@@ -599,7 +606,8 @@ class SmartTextVectorizerTest
   }
 
   it should "return sane results when entries do not tokenize and result in empty maps" in {
-    val ts = TextStats(toCMS(Map("the" -> 10, "and" -> 4)), toCMS(Map.empty[Int, Long]))
+    val ts = TextStats(toCMS(Map("the" -> 10, "and" -> 4)), toCMS(Map.empty[Int, Long]),
+      toHLL(Seq("the", "and")))
 
     ts.lengthSize shouldBe 0
     ts.lengthMean.isNaN shouldBe true

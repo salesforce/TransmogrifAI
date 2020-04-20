@@ -36,7 +36,7 @@ import com.salesforce.op.stages.impl.feature.TextStats
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.json.EnumEntrySerializer
-import com.twitter.algebird.{Moments, TopNCMS}
+import com.twitter.algebird.{HyperLogLogMonoid, Moments, TopNCMS}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
@@ -263,8 +263,10 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
 
     val valueCount = TopNCMS.monoid[String](EPS, DELTA, SEED, 1000).create(Seq("foo", "foo", "bar"))
     val lengthCount = TopNCMS.monoid[Int](EPS, DELTA, SEED, 1000).zero
+    val uniqueCount = toHLL(Seq("foo", "foo", "bar"))
+
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
-      Array.empty, Some(Moments(1.0)), Some(TextStats(valueCount, lengthCount)),
+      Array.empty, Some(Moments(1.0)), Some(TextStats(valueCount, lengthCount, uniqueCount)),
       FeatureDistributionType.Scoring)
     val featureDistributions = Seq(fd1, fd1.copy(cardEstimate = None))
 

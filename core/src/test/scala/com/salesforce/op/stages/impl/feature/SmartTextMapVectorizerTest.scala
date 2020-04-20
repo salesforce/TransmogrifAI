@@ -41,7 +41,8 @@ import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.RandomText
 import org.scalatest.Assertion
-import CMSMonoidDefault._
+import CMSMonoidDefault.{toHLL, _}
+import com.twitter.algebird.HLL
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -142,23 +143,24 @@ class SmartTextMapVectorizerTest
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
       TextMapStats(Map(
-        "f1" -> TextStats(toCMS(Map("hello" -> 2, "world" -> 1)) , toCMS(Map(5 -> 3))),
-        "f2" -> TextStats(toCMS(Map("hello" -> 2, "ocean" -> 2)), toCMS(Map(5 -> 4))),
-        "f3" -> TextStats(toCMS(Map("foo" -> 1)), toCMS(Map(3 -> 1)))
+        "f1" -> TextStats(toCMS(Map("hello" -> 2, "world" -> 1)) , toCMS(Map(5 -> 3)), toHLL(Seq("hello", "world"))),
+        "f2" -> TextStats(toCMS(Map("hello" -> 2, "ocean" -> 2)), toCMS(Map(5 -> 4)), toHLL(Seq("hello", "ocean"))),
+        "f3" -> TextStats(toCMS(Map("foo" -> 1)), toCMS(Map(3 -> 1)), toHLL(Seq("foo")))
       )),
       TextMapStats(Map(
-        "f1" -> TextStats(toCMS(Map("hello" -> 1)), toCMS(Map(5 -> 1))),
-        "f2" -> TextStats(toCMS(Map("ocean" -> 1, "other" -> 5)), toCMS(Map(5 -> 6)))
+        "f1" -> TextStats(toCMS(Map("hello" -> 1)), toCMS(Map(5 -> 1)), toHLL(Seq("hello"))),
+        "f2" -> TextStats(toCMS(Map("ocean" -> 1, "other" -> 5)), toCMS(Map(5 -> 6)), toHLL(Seq("other", "ocean")))
       )),
       TextMapStats(Map(
-        "f2" -> TextStats(toCMS(Map("other" -> 1)), toCMS(Map(5 -> 1)))
+        "f2" -> TextStats(toCMS(Map("other" -> 1)), toCMS(Map(5 -> 1)), toHLL(Seq("other")))
       ))
     )
     TextMapStats.monoid(2).sumOption(data) shouldBe Some(TextMapStats(Map(
-      "f1" -> TextStats(toCMS(Map("hello" -> 3, "world" -> 1)), toCMS(Map(5 -> 4))),
-      "f2" -> TextStats(toCMS(Map("hello" -> 2, "ocean" -> 3, "other" -> 5)), toCMS(Map(5 -> 11))),
-      "f3" -> TextStats(toCMS(Map("foo" -> 1)), toCMS(Map(3 -> 1)))
-    )))
+      "f1" -> TextStats(toCMS(Map("hello" -> 3, "world" -> 1)), toCMS(Map(5 -> 4)), toHLL(Seq("hello", "world"))),
+      "f2" -> TextStats(toCMS(Map("hello" -> 2, "ocean" -> 3, "other" -> 5)), toCMS(Map(5 -> 11)),
+        toHLL(Seq("hello", "ocean", "other"))),
+      "f3" -> TextStats(toCMS(Map("foo" -> 1)), toCMS(Map(3 -> 1)), toHLL(Seq("foo"))))
+    ))
   }
 
   it should "detect one categorical and one non-categorical text feature" in {
