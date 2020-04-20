@@ -92,8 +92,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
+      val totalCount = stats.valueCounts.values.sum
+      val top100 = stats.valueCounts.toSeq.sortBy(- _._2).take(100).toMap
+
       val vecMethod: TextVectorizationMethod = stats match {
-        case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
+        case _ if top100.size < 100 && stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
+        case _ if top100.size >= 100 && top100.values.sum * 1.0 / totalCount >= 0.9 => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
         case _ => TextVectorizationMethod.Hash
       }
@@ -169,7 +173,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 }
 
 object SmartTextVectorizer {
-  val MaxCardinality: Int = 100
+  val MaxCardinality: Int = 200
   val MinTextLengthStdDev: Double = 0
   val LengthType: TextLengthType = TextLengthType.FullEntry
 
