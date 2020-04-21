@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -39,8 +40,12 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
 import com.salesforce.op.testkit.RandomText
+import org.apache.spark.sql.{DataFrame, Encoder, Encoders}
 import org.scalatest.Assertion
+
+import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -120,6 +125,12 @@ class SmartTextMapVectorizerTest
   val tokensMap = textMapData.mapValues(s => TextTokenizer.tokenizeString(s).tokens)
   val tol = 1e-12 // Tolerance for comparing real numbers
 
+  val oneCountryData: Seq[Text] = Seq.fill(1000)(Text("United States"))
+  val categoricalCountryData = Random.shuffle(oneCountryData ++ countryData)
+  val countryMapData = categoricalCountryData.map { case country => mapifyText(Seq(country)) }
+  val (countryMapDF, rawCatCountryMap) = TestFeatureBuilder("rawCatCountryMap", countryMapData)
+  countryMapDF.show()
+
   /**
    * Estimator instance to be tested
    */
@@ -137,6 +148,7 @@ class SmartTextMapVectorizerTest
     Vectors.dense(Array(0.0, 1.0, 0.0, 1.0))
   ).map(_.toOPVector)
 
+  import spark.sqlContext.implicits._
 
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
@@ -589,6 +601,101 @@ class SmartTextMapVectorizerTest
     meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
+  it should "treat the edge case of coverage being 0" in {
+    val maxCard = 100
+    val vectorizer = new SmartTextMapVectorizer().setCoveragePct(0.0).setMaxCardinality(maxCard).setMinSupport(1)
+      .setTrackTextLen(true).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.TopK + 2, Pivot)
+  }
+  it should "treat the edge case of coverage being 1" in {
+    val maxCard = 100
+    val vectorizer = new SmartTextMapVectorizer().setCoveragePct(1.0).setMaxCardinality(maxCard).setMinSupport(1)
+      .setTrackTextLen(true).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.DefaultNumOfFeatures + 2, Hash)
+  }
+
+  it should "detect one categorical with high cardinality using the coverage" in {
+    val maxCard = 100
+    val topK = 10
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
+      .setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, topK + 2, Pivot)
+  }
+
+  it should "not pivot using the coverage because of a high minimum support" in {
+    val maxCard = 100
+    val topK = 10
+    val minSupport = 99999
+    val numHashes = 5
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(minSupport).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, numHashes + 2, Hash)
+  }
+
+  it should "still pivot using the coverage despite a high minimum support" in {
+    val maxCard = 100
+    val topK = 10
+    val minSupport = 100
+    val numHashes = 5
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(minSupport).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, 3, Pivot)
+  }
+
+  it should "not pivot using the coverage because top K is too high" in {
+    val maxCard = 100
+    val topK = 1000000
+    val numHashes = 5
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be <= topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, numHashes + 2, Hash)
+  }
+
+  it should "still transform country into text, despite the coverage" in {
+    val maxCard = 100
+    val topK = 10
+    val numHashes = 5
+    val cardinality = rawDFSeparateMaps.select(rawTextMap1).as[TextMap#Value].map(_.get("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val coverageHashed = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
+      .setTrackTextLen(true).setNumFeatures(numHashes).setInput(rawTextMap1).getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(coverageHashed).transform(rawDFSeparateMaps)
+    println(categoricalTextData.toSet.toSeq.length)
+    println(categoricalTextData.toSet.toSeq)
+    val expectedLength = numHashes + 2 + categoricalTextData.toSet.filter(!_.isEmpty).toSeq.length + 2
+    assertVectorLength(transformed, coverageHashed, expectedLength , Hash)
+  }
+
   it should "create a TextStats object from text that makes sense" in {
     val res = TextMapStats.computeTextMapStats[TextMap](
       textMapData,
@@ -666,6 +773,25 @@ class SmartTextMapVectorizerTest
     res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
     res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
     checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3).map(_.toLong))
+  }
+
+  private[op] def assertVectorLength(df: DataFrame, output: FeatureLike[OPVector],
+    expectedLength: Int, textVectorizationMethod: TextVectorizationMethod): Unit = {
+    val result = df.collect(output)
+    val firstRes = result.head
+    val metaColumns = OpVectorMetadata(df.schema(output.name)).columns
+
+    metaColumns.foreach(println(_))
+    metaColumns.length shouldBe expectedLength
+    firstRes.v.size shouldBe expectedLength
+
+    textVectorizationMethod match {
+      case Pivot => assert(metaColumns(expectedLength - 2).indicatorValue.contains(OpVectorColumnMetadata.OtherString))
+      case Hash => assert(metaColumns(expectedLength - 2).descriptorValue
+        .contains(OpVectorColumnMetadata.TextLenString))
+      case other => throw new Error(s"Only Pivoting or Hashing possible, got ${other} instead")
+    }
+    assert(metaColumns(expectedLength - 1).indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
   /**

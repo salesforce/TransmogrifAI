@@ -138,20 +138,22 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanValues = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
 
+    val topKValue = $(topK)
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
         val totalCount = textStats.valueCounts.values.sum
-        val sorted = textStats.valueCounts.toSeq.sortBy(- _._2)
+        val filteredStats = textStats.valueCounts.filter { case (_, count) => count >= $(minSupport) }
+        val sorted = filteredStats.toSeq.sortBy(- _._2)
         val sortedValues = sorted.map(_._2)
-        val cumSum = sortedValues.tail.scanLeft(sortedValues.head)(_ + _)
-        println(sorted)
-        println(sorted.map(_._1).zip(cumSum))
-        println(cumSum.filter(_ <= 0.9 * totalCount).last)
-
+        val cumSum = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
+          .getOrElse(Seq.empty)
+        val coverage = cumSum.lift(math.min(topKValue, cumSum.length - 1)).getOrElse(0L) * 1.0 / totalCount
         val vecMethod: TextVectorizationMethod = textStats match {
-          case _ if totalCount > $(topK) && cumSum.filter(_ <= 0.9 * totalCount).size <= $(topK) =>
+          case _ if textStats.valueCounts.size > maxCard && textStats.valueCounts.size > topKValue && coverage > 0 &&
+            coverage >= $(coveragePct) =>
             println(s"Pivot ${textStats.valueCounts}")
             TextVectorizationMethod.Pivot
+          case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
           case _ if textStats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
           case _ => TextVectorizationMethod.Hash
         }
