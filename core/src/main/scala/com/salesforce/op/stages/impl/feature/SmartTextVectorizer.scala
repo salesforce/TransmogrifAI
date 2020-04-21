@@ -32,11 +32,10 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid
 import com.twitter.algebird.Monoid._
@@ -91,20 +90,31 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
+    val topKValue = $(topK)
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
       val totalCount = stats.valueCounts.values.sum
-      val top100 = stats.valueCounts.toSeq.sortBy(- _._2).take(100).toMap
+      val filteredStats = stats.valueCounts.filter { case (_, count) => count >= $(minSupport) }
+      val sorted = filteredStats.toSeq.sortBy(- _._2)
+      val sortedValues = sorted.map(_._2)
+      val cumSum = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
+        .getOrElse(Seq.empty)
+      val coverage = cumSum.lift(math.min(topKValue, cumSum.length - 1)).getOrElse(0L) * 1.0 / totalCount
+      println(sorted)
+      println(sorted.map(_._1).zip(cumSum))
+      println(coverage)
 
       val vecMethod: TextVectorizationMethod = stats match {
-        case _ if top100.size < 100 && stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
-        case _ if top100.size >= 100 && top100.values.sum * 1.0 / totalCount >= 0.9 => TextVectorizationMethod.Pivot
+        case _ if stats.valueCounts.size > maxCard && stats.valueCounts.size > topKValue && coverage > 0 &&
+          coverage >= $(coveragePct) =>
+          println(s"Pivot ${stats.valueCounts}")
+          TextVectorizationMethod.Pivot
+        case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
         case _ => TextVectorizationMethod.Hash
       }
-      val topValues = stats.valueCounts
-        .filter { case (_, count) => count >= $(minSupport) }
+      val topValues = filteredStats
         .toSeq.sortBy(v => -v._2 -> v._1)
-        .take($(topK)).map(_._1)
+        .take(topKValue).map(_._1)
       (vecMethod, topValues)
     }.unzip
 
@@ -173,9 +183,10 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 }
 
 object SmartTextVectorizer {
-  val MaxCardinality: Int = 200
+  val MaxCardinality: Int = 1000
   val MinTextLengthStdDev: Double = 0
   val LengthType: TextLengthType = TextLengthType.FullEntry
+  val CoveragePct: Double = 0.90
 
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
@@ -369,6 +380,16 @@ trait MaxCardinalityParams extends Params {
   final def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
   final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> SmartTextVectorizer.MaxCardinality)
+
+  final val coveragePct = new DoubleParam(
+    parent = this, name = "coveragePct",
+    doc = "Threshold of percentage of the entries. If the topK entries make up for more than this pecentage," +
+      " the feature is treated as a categorical",
+    isValid = ParamValidators.inRange(lowerBound = 0, upperBound = 1)
+  )
+  final def setCoveragePct(v: Double): this.type = set(coveragePct, v)
+  final def getCoveragePct: Double = $(coveragePct)
+  setDefault(coveragePct -> SmartTextVectorizer.CoveragePct)
 }
 
 trait MinLengthStdDevParams extends Params {

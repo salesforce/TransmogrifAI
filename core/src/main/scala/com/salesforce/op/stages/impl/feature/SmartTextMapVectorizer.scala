@@ -141,11 +141,17 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
         val totalCount = textStats.valueCounts.values.sum
-        val top100 = textStats.valueCounts.toSeq.sortBy(- _._2).take(100).toMap
+        val sorted = textStats.valueCounts.toSeq.sortBy(- _._2)
+        val sortedValues = sorted.map(_._2)
+        val cumSum = sortedValues.tail.scanLeft(sortedValues.head)(_ + _)
+        println(sorted)
+        println(sorted.map(_._1).zip(cumSum))
+        println(cumSum.filter(_ <= 0.9 * totalCount).last)
 
         val vecMethod: TextVectorizationMethod = textStats match {
-          case _ if top100.size < 100 && textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
-          case _ if top100.size >= 100 && top100.values.sum * 1.0 / totalCount >= 0.9 => TextVectorizationMethod.Pivot
+          case _ if totalCount > $(topK) && cumSum.filter(_ <= 0.9 * totalCount).size <= $(topK) =>
+            println(s"Pivot ${textStats.valueCounts}")
+            TextVectorizationMethod.Pivot
           case _ if textStats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
           case _ => TextVectorizationMethod.Hash
         }
