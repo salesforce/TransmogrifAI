@@ -99,15 +99,9 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       val cumSum = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
         .getOrElse(Seq.empty)
       val coverage = cumSum.lift(math.min(topKValue, cumSum.length - 1)).getOrElse(0L) * 1.0 / totalCount
-      println(sorted)
-      println(sorted.map(_._1).zip(cumSum))
-      println(coverage)
-
       val vecMethod: TextVectorizationMethod = stats match {
         case _ if stats.valueCounts.size > maxCard && stats.valueCounts.size > topKValue && coverage > 0 &&
-          coverage >= $(coveragePct) =>
-          println(s"Pivot ${stats.valueCounts}")
-          TextVectorizationMethod.Pivot
+          coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
         case _ => TextVectorizationMethod.Hash

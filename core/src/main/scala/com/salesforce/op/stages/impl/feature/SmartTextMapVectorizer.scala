@@ -150,9 +150,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         val coverage = cumSum.lift(math.min(topKValue, cumSum.length - 1)).getOrElse(0L) * 1.0 / totalCount
         val vecMethod: TextVectorizationMethod = textStats match {
           case _ if textStats.valueCounts.size > maxCard && textStats.valueCounts.size > topKValue && coverage > 0 &&
-            coverage >= $(coveragePct) =>
-            println(s"Pivot ${textStats.valueCounts}")
-            TextVectorizationMethod.Pivot
+            coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
           case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
           case _ if textStats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
           case _ => TextVectorizationMethod.Hash

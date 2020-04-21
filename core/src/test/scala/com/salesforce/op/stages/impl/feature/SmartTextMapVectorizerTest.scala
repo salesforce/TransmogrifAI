@@ -129,7 +129,6 @@ class SmartTextMapVectorizerTest
   val categoricalCountryData = Random.shuffle(oneCountryData ++ countryData)
   val countryMapData = categoricalCountryData.map { case country => mapifyText(Seq(country)) }
   val (countryMapDF, rawCatCountryMap) = TestFeatureBuilder("rawCatCountryMap", countryMapData)
-  countryMapDF.show()
 
   /**
    * Estimator instance to be tested
@@ -690,8 +689,6 @@ class SmartTextMapVectorizerTest
       .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
       .setTrackTextLen(true).setNumFeatures(numHashes).setInput(rawTextMap1).getOutput()
     val transformed = new OpWorkflow().setResultFeatures(coverageHashed).transform(rawDFSeparateMaps)
-    println(categoricalTextData.toSet.toSeq.length)
-    println(categoricalTextData.toSet.toSeq)
     val expectedLength = numHashes + 2 + categoricalTextData.toSet.filter(!_.isEmpty).toSeq.length + 2
     assertVectorLength(transformed, coverageHashed, expectedLength , Hash)
   }
@@ -781,9 +778,8 @@ class SmartTextMapVectorizerTest
     val firstRes = result.head
     val metaColumns = OpVectorMetadata(df.schema(output.name)).columns
 
-    metaColumns.foreach(println(_))
-    metaColumns.length shouldBe expectedLength
     firstRes.v.size shouldBe expectedLength
+    metaColumns.length shouldBe expectedLength
 
     textVectorizationMethod match {
       case Pivot => assert(metaColumns(expectedLength - 2).indicatorValue.contains(OpVectorColumnMetadata.OtherString))
