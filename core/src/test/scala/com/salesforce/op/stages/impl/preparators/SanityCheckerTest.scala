@@ -392,6 +392,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Separate)
+      .setCoveragePct(1.0)
       .setInput(textMap).getOutput()
 
     val checkedFeatures = new SanityChecker()
@@ -433,6 +434,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setCoveragePct(1.0)
       .setInput(textMap).getOutput()
 
     val checkedFeatures = new SanityChecker()
@@ -503,6 +505,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setCoveragePct(1.0)
       .setInput(textMap).getOutput()
 
     val checkedFeatures = new SanityChecker()
