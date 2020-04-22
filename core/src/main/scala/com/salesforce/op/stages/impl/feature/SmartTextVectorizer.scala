@@ -92,14 +92,18 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     val topKValue = $(topK)
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
-      val totalCount = stats.valueCounts.values.sum
+      // Estimate the coverage of the top K values
+      val totalCount = stats.valueCounts.values.sum // total count
+      // Filter by minimum support
       val filteredStats = stats.valueCounts.filter { case (_, count) => count >= $(minSupport) }
       val sorted = filteredStats.toSeq.sortBy(- _._2)
       val sortedValues = sorted.map(_._2)
-      val cumSum = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
+      // Cumulative Count
+      val cumCount = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
         .getOrElse(Seq.empty)
-      val coverage = cumSum.lift(math.min(topKValue, cumSum.length) - 1).getOrElse(0L) * 1.0 / totalCount
+      val coverage = cumCount.lift(math.min(topKValue, cumCount.length) - 1).getOrElse(0L) * 1.0 / totalCount
       val vecMethod: TextVectorizationMethod = stats match {
+        // If cardinality not respect, but coverage is, then pivot the feature
         case _ if stats.valueCounts.size > maxCard && stats.valueCounts.size > topKValue && coverage > 0 &&
           coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot

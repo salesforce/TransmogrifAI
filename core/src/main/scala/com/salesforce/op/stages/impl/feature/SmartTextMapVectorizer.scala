@@ -35,11 +35,10 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.{Monoid, Semigroup}
+import com.twitter.algebird.Monoid
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -141,14 +140,18 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val topKValue = $(topK)
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
-        val totalCount = textStats.valueCounts.values.sum
+        // Estimate the coverage of the top K values
+        val totalCount = textStats.valueCounts.values.sum // total count
+        // Filter by minimum support
         val filteredStats = textStats.valueCounts.filter { case (_, count) => count >= $(minSupport) }
         val sorted = filteredStats.toSeq.sortBy(- _._2)
         val sortedValues = sorted.map(_._2)
-        val cumSum = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
+        // Cumulative Count
+        val cumCount = sortedValues.headOption.map(_ => sortedValues.tail.scanLeft(sortedValues.head)(_ + _))
           .getOrElse(Seq.empty)
-        val coverage = cumSum.lift(math.min(topKValue, cumSum.length) - 1).getOrElse(0L) * 1.0 / totalCount
+        val coverage = cumCount.lift(math.min(topKValue, cumCount.length) - 1).getOrElse(0L) * 1.0 / totalCount
         val vecMethod: TextVectorizationMethod = textStats match {
+          // If cardinality not respect, but coverage is, then pivot the feature
           case _ if textStats.valueCounts.size > maxCard && textStats.valueCounts.size > topKValue && coverage > 0 &&
             coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
           case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
