@@ -44,7 +44,6 @@ import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivo
 import com.salesforce.op.testkit.RandomText
 import org.apache.spark.sql.{DataFrame, Encoder, Encoders}
 import org.scalatest.Assertion
-
 import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
