@@ -109,7 +109,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
           stats.tokenCard.toInt
         }
         else {
-          math.max((stats.hll.estimatedSize / adaptiveHashCol).toInt, maxHashNum)
+          (stats.hll.estimatedSize / adaptiveHashCol).toInt
         }
       (vecMethod, topValues, adaptiveHashSize)
 
@@ -134,6 +134,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
       logInfo(s"Vectorization method: $vecMethod")
       logInfo(s"Token cardinality: ${stats.tokenCard}")
+      logInfo(s"Adaptive hash: " + (stats.tokenCard / adaptiveHashCol).toString)
     }
 
     val vecMetadata = makeVectorMetadata(smartTextParams)
