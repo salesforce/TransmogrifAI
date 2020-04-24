@@ -87,6 +87,7 @@ private[op] trait TransmogrifierDefaults {
   val ToLowercase: Boolean = TextTokenizer.ToLowercase
   val AdaptiveHash: Boolean = SmartTextVectorizer.AdaptiveHash
   val AdaptiveHashCollision: Int = SmartTextVectorizer.AdaptiveHashCollision
+  val MaxHash: Int = SmartTextVectorizer.MaxHash
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults

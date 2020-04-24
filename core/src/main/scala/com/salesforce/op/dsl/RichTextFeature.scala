@@ -241,6 +241,7 @@ trait RichTextFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       adaptiveHash: Boolean = TransmogrifierDefaults.AdaptiveHash,
       adaptiveHashCollision: Int = TransmogrifierDefaults.AdaptiveHashCollision,
+      maxHash: Int = TransmogrifierDefaults.MaxHash,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
       others: Array[FeatureLike[T]] = Array.empty
@@ -268,6 +269,7 @@ trait RichTextFeature {
         .setBinaryFreq(binaryFreq)
         .setAdaptiveHash(adaptiveHash)
         .setAdaptiveHashCollision(adaptiveHashCollision)
+        .setMaxHash(maxHash)
         .setTextLengthType(textLengthType)
         .setMinLengthStdDev(minLengthStdDev)
         .getOutput()

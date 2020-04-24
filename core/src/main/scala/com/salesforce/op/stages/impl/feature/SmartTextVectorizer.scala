@@ -61,7 +61,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
-    with MinLengthStdDevParams with AdaptiveHashParams with AdaptiveHashCollisionParams {
+    with MinLengthStdDevParams with AdaptiveHashParams
+    with AdaptiveHashCollisionParams with MaxHashParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = Encoders.kryo[Array[TextStats]]
   private def makeHashingParams() = HashingFunctionParams(
@@ -84,6 +85,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val shouldAdaptiveHash = $(adaptiveHash)
     val adaptiveHashCol = $(adaptiveHashCollision)
     val shouldTokenizeForLengths = $(textLengthType) == TextLengthType.Tokens.entryName
+    val maxHashNum = $(maxHash)
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(
@@ -103,11 +105,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .take($(topK)).map(_._1)
 
       val adaptiveHashSize =
-        if (stats.tokenCard <= 3000) {
+        if (stats.tokenCard <= maxHashNum) {
           stats.tokenCard.toInt
         }
         else {
-          math.max((stats.hll.estimatedSize / adaptiveHashCol).toInt, 3000)
+          math.max((stats.hll.estimatedSize / adaptiveHashCol).toInt, maxHashNum)
         }
       (vecMethod, topValues, adaptiveHashSize)
 
@@ -193,7 +195,7 @@ object SmartTextVectorizer {
   val AdaptiveHash: Boolean = false
   val AdaptiveHashCollision: Int = 20
   val LengthType: TextLengthType = TextLengthType.FullEntry
-
+  val MaxHash: Int = 3000
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
@@ -454,4 +456,14 @@ trait AdaptiveHashCollisionParams extends Params {
   final def setAdaptiveHashCollision(v: Int): this.type = set(adaptiveHashCollision, v)
   final def getAdaptiveHashCollision: Int = $(adaptiveHashCollision)
   setDefault(adaptiveHashCollision -> SmartTextVectorizer.AdaptiveHashCollision)
+}
+
+trait MaxHashParams extends Params {
+  final val maxHash = new IntParam(
+    parent = this, name = "maxHash",
+    doc = "Max # of hash buckets"
+  )
+  final def setMaxHash(v: Int): this.type = set(maxHash, v)
+  final def getMaxHash: Int = $(maxHash)
+  setDefault(maxHash -> SmartTextVectorizer.MaxHash)
 }
