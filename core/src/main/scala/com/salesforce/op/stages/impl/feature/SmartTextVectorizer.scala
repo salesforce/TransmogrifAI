@@ -304,8 +304,7 @@ private[op] object TextStats extends CleanTextFun {
         )
     } else Map(cleanString.length -> 1L)
     val tokens = TextTokenizer.tokenizeString(textString).tokens.value
-    val bigrams = (tokens zip tokens.drop(1)).map(t => t._1 + " " + t._2)
-    val textHLL = (tokens + bigrams)
+    val textHLL = (tokens)
       .map(x => TextStats.hllMonoid.create(x.getBytes))
       .reduceOption(_ + _) match {
       case Some(x) => x
@@ -382,7 +381,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
 
   def makeUniAndBigrams(tl: TextList): TextList = {
     TextList(
-      (tl.value zip tl.value.drop(1)).map(x => x._1 + " " + x._2) + tl.value
+       tl.value
     )
   }
 
