@@ -456,6 +456,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
+            o.distributions.foreach { o => o.cardEstimate shouldEqual None}
             RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
             RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
             RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
@@ -968,4 +969,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       "second" -> classOf[SingleMetric]
     )
   }
+
+  it should ""
 }
