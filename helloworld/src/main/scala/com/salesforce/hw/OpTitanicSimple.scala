@@ -100,7 +100,7 @@ object OpTitanicSimple {
     // Define features using the OP types based on the data
     val survived = FeatureBuilder.RealNN[Passenger].extract(_.survived.toRealNN).asResponse
     val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
-    val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
+    val name = FeatureBuilder.Text[Passenger].extract(_.name.toPickList).asPredictor
     val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
     val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
     val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
@@ -119,22 +119,22 @@ object OpTitanicSimple {
     val estimatedCostOfTickets = familySize * fare
     val pivotedSex = sex.pivot()
     val normedAge = age.fillMissingWithMean().zNormalize()
-    val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
+   // val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
 
     // Define a feature of type vector containing all the predictors you'd like to use
     val passengerFeatures = Seq(
       pClass, name, age, sibSp, parCh, ticket,
       cabin, embarked, familySize, estimatedCostOfTickets,
-      pivotedSex, ageGroup, normedAge
+      pivotedSex, normedAge // ,ageGroup,
     ).transmogrify()
 
     // Optionally check the features with a sanity checker
-    val checkedFeatures = survived.sanityCheck(passengerFeatures, removeBadFeatures = true)
+    // val checkedFeatures = survived.sanityCheck(passengerFeatures, removeBadFeatures = true)
 
     // Define the model we want to use (here a simple logistic regression) and get the resulting output
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
       modelTypesToUse = Seq(OpLogisticRegression)
-    ).setInput(survived, checkedFeatures).getOutput()
+    ).setInput(survived, passengerFeatures).getOutput()
 
     val evaluator = Evaluators.BinaryClassification().setLabelCol(survived).setPredictionCol(prediction)
 
@@ -150,6 +150,7 @@ object OpTitanicSimple {
 
     // Fit the workflow to the data
     val model = workflow.train()
+    model.save("/tmp/model4", true)
     println(s"Model summary:\n${model.summaryPretty()}")
 
     // Extract information (i.e. feature importance) via model insights
