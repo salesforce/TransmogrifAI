@@ -32,7 +32,7 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.hadoop.fs.Path
-import org.apache.spark.ml.PipelineStage
+import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
 import org.apache.spark.util.SparkUtils
@@ -40,6 +40,13 @@ import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
 import org.json4s.{DefaultFormats, Formats, JString}
+import ml.combust.bundle.BundleFile
+import ml.combust.bundle.serializer.SerializationFormat
+import org.apache.spark.ml.bundle.SparkBundleContext
+import ml.combust.mleap.spark.SparkSupport._
+import resource._
+
+import scala.util.{Failure, Success}
 
 class SparkStageParam[S <: PipelineStage with Params]
 (
@@ -55,6 +62,7 @@ class SparkStageParam[S <: PipelineStage with Params]
    * Spark stage saving path
    */
   var savePath: Option[String] = None
+  @transient var sbc: Option[SparkBundleContext] = None
 
   def this(parent: String, name: String, doc: String) =
     this(parent, name, doc, (v: Option[S]) => true)
@@ -75,12 +83,17 @@ class SparkStageParam[S <: PipelineStage with Params]
    */
   override def jsonEncode(sparkStage: Option[S]): String = {
     def json(className: String, uid: String) = compact(render(("className" -> className) ~ ("uid" -> uid)))
-    sparkStage -> savePath match {
-      case (Some(stage), Some(p)) =>
+    (sparkStage, savePath, sbc) match {
+      case (Some(stage), Some(p), Some(c)) =>
+        for {bundle <- managed(BundleFile(s"file:$p/${stage.uid}"))} {
+          stage.asInstanceOf[Transformer].writeBundle.format(SerializationFormat.Json).save(bundle)(c)
+        }
+        json(className = stage.getClass.getName, uid = stage.uid)
+      case (Some(stage), Some(p), None) =>
         val stagePath = new Path(p, stage.uid).toString
         stage.asInstanceOf[MLWritable].write.save(stagePath)
         json(className = stage.getClass.getName, uid = stage.uid)
-      case (Some(s), None) =>
+      case (Some(s), None, _) =>
         throw new RuntimeException(s"Path must be set before Spark stage '${s.uid}' can be saved")
       case _ =>
         json(className = NoClass, uid = NoUID)
@@ -102,11 +115,23 @@ class SparkStageParam[S <: PipelineStage with Params]
         None
       case (Some(p), Some(stageUid)) =>
         savePath = Option(p)
-        val stagePath = new Path(p, stageUid).toString
-        val className = (json \ "className").extract[String]
-        val cls = SparkUtils.classForName(className)
-        val stage = cls.getMethod("read").invoke(null).asInstanceOf[MLReader[PipelineStage]].load(stagePath)
-        Option(stage).map(_.asInstanceOf[S])
+        val dirBundle = {
+          for {bundle <- managed(BundleFile(s"file:$p/${stageUid}"))} yield {
+            bundle.loadSparkBundle() match {
+              case Failure(exception) => throw new Exception(s"Failed to load model from path $p" +
+                s" because of: $exception")
+              case Success(mod) => mod
+            }
+          }
+          }.opt
+       // println("loaded value is", dirBundle.get)
+        dirBundle.map(_.root.asInstanceOf[S]).orElse{
+          val stagePath = new Path(p, stageUid).toString
+          val className = (json \ "className").extract[String]
+          val cls = SparkUtils.classForName(className)
+          val stage = cls.getMethod("read").invoke(null).asInstanceOf[MLReader[PipelineStage]].load(stagePath)
+          Option(stage).map(_.asInstanceOf[S])
+        }
     }
   }
 }

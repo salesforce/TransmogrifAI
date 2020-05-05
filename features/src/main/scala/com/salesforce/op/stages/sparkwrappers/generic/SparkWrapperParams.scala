@@ -30,9 +30,15 @@
 
 package com.salesforce.op.stages.sparkwrappers.generic
 
-import com.salesforce.op.stages.SparkStageParam
-import org.apache.spark.ml.PipelineStage
+import com.salesforce.op.features.FeatureSparkTypes
+import com.salesforce.op.stages.{OpPipelineStage, OpPipelineStageBase, OpTransformer, SparkStageParam}
+import org.apache.spark
+import org.apache.spark.SparkContext
+import org.apache.spark.ml.bundle.SparkBundleContext
+import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.ml.param.{Params, StringArrayParam}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 
 /**
@@ -41,7 +47,7 @@ import org.apache.spark.ml.param.{Params, StringArrayParam}
  * @tparam S type of Spark stage to wrap
  */
 trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
-  self: PipelineStage =>
+  self: OpPipelineStageBase =>
 
   final val sparkInputColParamNames = new StringArrayParam(
     parent = this,
@@ -81,7 +87,15 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
    */
   def setStageSavePath(path: String): this.type = {
     sparkMlStage.savePath = Option(path)
+    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(getEmptyDF))
     this
+  }
+
+  private def getEmptyDF: DataFrame = {
+    val rawSchema = FeatureSparkTypes.toStructType(getInputFeatures(): _*)
+    val spark = SparkSession.active
+    val df = spark.emptyDataset[Row](RowEncoder(rawSchema))
+    getSparkMlStage().collect { case t: Transformer => t }.foldLeft(df) { case (d, t) => t.transform(d) }
   }
 
   /**

@@ -279,10 +279,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "find the sanity checker metadata even if the model has been serialized" in {
-    val path = tempDir.toString + "/model-insights-test-" + System.currentTimeMillis()
-    val json = OpWorkflowModelWriter.toJson(workflowModel, path)
-    val loadedModel = new OpWorkflowModelReader(Some(workflow)).loadJson(json, path)
-    val insights = loadedModel.get.modelInsights(checked)
+    // val path = tempDir.toString + "/model-insights-test-" + System.currentTimeMillis()
+    val path = "/Users/lmcguire/Desktop/tmp"
+   // val json = OpWorkflowModelWriter.toJson(workflowModel, path)
+   // val loadedModel = new OpWorkflowModelReader(Some(workflow)).loadJson(json, path)
+    OpWorkflowModelWriter.save(workflowModel, path)
+    val loadedModel = new OpWorkflowModelReader(Some(workflow)).load(path)
+    val insights = loadedModel.modelInsights(checked)
     val ageInsights = insights.features.filter(_.featureName == age.name).head
     val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
     ageInsights.derivedFeatures.foreach { f =>
