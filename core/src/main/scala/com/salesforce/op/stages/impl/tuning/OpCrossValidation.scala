@@ -65,16 +65,16 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   ): ValidatedModel[E] = {
 
     val gridCounts = folds.flatMap(_.grids.map(_ -> 1)).sumByKey
-    val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
-    val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
+    val (_, maxFolds) = gridCounts.maxBy { case (_, count) => count }
+    val gridsIn = gridCounts.filter { case (_, foldCount) => foldCount == maxFolds }.keySet
 
-    val gridMetrics = folds.flatMap{
+    val gridMetrics = folds.flatMap {
       f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
     }.sumByKey
 
     val ((bestGrid, bestMetric), bestIndex) =
-      if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
-      else gridMetrics.zipWithIndex.minBy{ case ((_, metric), _) => metric}
+      if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy { case ((_, metric), _) => metric }
+      else gridMetrics.zipWithIndex.minBy { case ((_, metric), _) => metric }
 
     val ValidatedModel(est, _, _, _) = folds.head
     log.info(s"Average cross-validation for $est metrics: {}", gridMetrics.mkString(","))
@@ -92,7 +92,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     dag: Option[StagesDAG] = None,
     splitter: Option[Splitter] = None,
     stratifyCondition: Boolean = isClassification && stratify
-  )(implicit spark: SparkSession): BestEstimator[E] = {
+  )(implicit spark: SparkSession): Array[ValidatedModel[E]] = {
 
     dataset.persist()
     val schema = dataset.schema
@@ -125,7 +125,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
               dag = d, training = training, validation = validation,
               label = label, features = features, splitter = splitter
             )
-          ).getOrElse{
+          ).getOrElse {
             splitter.map(s => (s.validationPrepare(training), validation))
               .getOrElse((training, validation))
           }
@@ -138,11 +138,14 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 
     // Find the best model & return it
     val groupedSummary = modelSummaries.flatten.groupBy(_.model).map { case (_, folds) => findBestModel(folds) }.toArray
-    val model = getValidatedModel(groupedSummary)
+    groupedSummary
+  }
+
+  override def getBestFromVal(summary: Array[ValidatedModel[E]]): BestEstimator[E] = {
+    val model = getValidatedModel(summary)
     val bestEstimator = wrapBestEstimator(
-      groupedSummary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$numFolds folds"
+      summary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$numFolds folds"
     )
-    dataset.unpersist()
     bestEstimator
   }
 

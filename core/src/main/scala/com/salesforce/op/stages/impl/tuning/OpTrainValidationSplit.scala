@@ -55,7 +55,7 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
     dag: Option[StagesDAG] = None,
     splitter: Option[Splitter] = None,
     stratifyCondition: Boolean = isClassification && stratify
-  )(implicit spark: SparkSession): BestEstimator[E] = {
+  )(implicit spark: SparkSession): Array[ValidatedModel[E]] = {
 
     dataset.persist()
     val schema = dataset.schema
@@ -88,8 +88,13 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
     val modelSummaries = getSummary(modelInfo, label = label, features = features, train = newTrain, test = newTest)
     dataset.unpersist()
 
-    val model = getValidatedModel(modelSummaries)
-    wrapBestEstimator(modelSummaries, model.model.copy(model.bestGrid).asInstanceOf[E], s"$trainRatio training split")
+    modelSummaries
+  }
+
+  override def getBestFromVal(summary: Array[ValidatedModel[E]]): BestEstimator[E] = {
+    val model = getValidatedModel(summary)
+    wrapBestEstimator(summary, model.model.copy(model.bestGrid).asInstanceOf[E],
+      s"$trainRatio training split")
   }
 
   /**

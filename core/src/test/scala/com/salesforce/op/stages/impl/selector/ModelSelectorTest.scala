@@ -148,9 +148,9 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
-    model.modelStageIn.isInstanceOf[OpLogisticRegressionModel] shouldBe true
+    model.modelStageIn(0).isInstanceOf[OpLogisticRegressionModel] shouldBe true
 
-    val bestEstimator = model.modelStageIn.parent
+    val bestEstimator = model.modelStageIn(0).parent
     bestEstimator.extractParamMap()(bestEstimator.getParam("regParam")) shouldBe 0.1
 
     log.info(model.getMetadata().toString)
@@ -189,9 +189,10 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
-    model.modelStageIn.isInstanceOf[OpLinearRegressionModel] shouldBe true
+    println(model.weights)
+    model.modelStageIn(0).isInstanceOf[OpLinearRegressionModel] shouldBe true
 
-    val bestEstimator = model.modelStageIn.parent
+    val bestEstimator = model.modelStageIn(0).parent
     bestEstimator.extractParamMap()(bestEstimator.getParam("regParam")) shouldBe 0.1
 
     log.info(model.getMetadata().toString)
@@ -233,7 +234,7 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
-    model.modelStageIn.isInstanceOf[TestModel] shouldBe true
+    model.modelStageIn(0).isInstanceOf[TestModel] shouldBe true
 
     log.info(model.getMetadata().toString)
     // Evaluation from train data should be there

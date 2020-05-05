@@ -69,7 +69,7 @@ case class BestEstimator[E <: Estimator[_]](name: String, estimator: E, summary:
  * @param metrics   all computed metrics
  * @param grids     all param grids
  */
-private[tuning] case class ValidatedModel[E <: Estimator[_]]
+private[op] case class ValidatedModel[E <: Estimator[_]]
 (
   model: E,
   bestIndex: Int,
@@ -136,7 +136,9 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     dag: Option[StagesDAG] = None,
     splitter: Option[Splitter] = None,
     stratifyCondition: Boolean = isClassification && stratify
-  )(implicit spark: SparkSession): BestEstimator[E]
+  )(implicit spark: SparkSession): Array[ValidatedModel[E]]
+
+  private[op] def getBestFromVal(summary: Array[ValidatedModel[E]]): BestEstimator[E]
 
   /**
    * Get the best model and the metadata with with the validator params

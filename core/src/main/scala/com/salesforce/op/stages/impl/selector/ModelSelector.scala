@@ -32,6 +32,7 @@ package com.salesforce.op.stages.impl.selector
 
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators.{EvaluationMetrics, _}
+import com.salesforce.op.features.types.Prediction.Keys._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.base.binary.OpTransformer2
@@ -47,7 +48,6 @@ import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, PredictionModel}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-
 import scala.reflect.runtime.universe._
 
 
@@ -118,14 +118,30 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val PrevalidationVal(splitterSummary, dataOpt) = prepareForValidation(data, labelColName)
     val dataUse = dataOpt.getOrElse(data)
 
-    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataUse,
+    val summary = validator.validate(modelInfo = modelsUse, dataset = dataUse,
       label = labelColName, features = in2.name, dag = dag, splitter = splitter
     )
+    dataUse.unpersist()
+
+    val theBestEstimator = validator.getBestFromVal(summary)
 
     bestEstimator = Option(theBestEstimator)
     (theBestEstimator, splitterSummary, dataUse)
   }
 
+  protected[op] def findSummary(data: DataFrame, dag: Option[StagesDAG] = None)
+    (implicit spark: SparkSession): Array[ValidatedModel[E]] = {
+
+    val PrevalidationVal(_, dataOpt) = prepareForValidation(data, labelColName)
+    val dataUse = dataOpt.getOrElse(data)
+
+    val summary = validator.validate(modelInfo = modelsUse, dataset = dataUse,
+      label = labelColName, features = in2.name, dag = dag, splitter = splitter
+    )
+    dataUse.unpersist()
+
+    summary
+  }
 
   private def prepareForValidation(data: DataFrame, labelColName: String): PrevalidationVal = {
     splitter
@@ -155,12 +171,24 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
-    val bestEst = bestModel.parent
-    log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
-    log.info(s"With parameters : ${bestEst.extractParamMap()}")
+//    val bestEst = bestModel.parent
+//    log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
+//    log.info(s"With parameters : ${bestEst.extractParamMap()}")
+
+    val modelSummary = findSummary(data.toDF())
+    val metricsSum = modelSummary.flatMap{ _.metrics}.sum
+
+    val all = modelSummary.flatMap { case ValidatedModel(model, _, metrics, grids) =>
+      grids.zip(metrics).map { case (grid, metric) => {
+        val e = model.copy(grid)
+        e.fit(preparedData).asInstanceOf[M].asInstanceOf[ModelType] -> metric / metricsSum
+      }
+      }
+    }.sortBy { case (_, m) => if (validator.evaluator.isLargerBetter) -m else m }
+    val (allModels, allWeights) = all.unzip[ModelType, Double]
 
     // set input and output params
-    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
+    outputsColNamesMap.foreach { case (pname, pvalue) => estimator.set(bestModel.getParam(pname), pvalue) }
 
     // get eval results for metadata
     val trainingEval = evaluate(bestModel.transform(preparedData))
@@ -186,7 +214,8 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     setMetadata(meta.toSummaryMetadata())
 
     val selectedModel = new SelectedModel(
-      bestModel.asInstanceOf[ModelType],
+      allModels.indices.zip(allModels).toMap,
+      allWeights,
       outputsColNamesMap,
       uid = uid,
       operationName = operationName
@@ -206,6 +235,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 /**
  * Returned wrapped best model from model selector estimator
  * @param modelStageIn the best model from those tried in the estimator
+ * @param weights Weights
  * @param outputsColNamesMap a map of the output names for the estimator
  * @param uid uid of the stage
  * @param operationName name of stage
@@ -216,7 +246,8 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
  */
 final class SelectedModel private[op]
 (
-  val modelStageIn: ModelType,
+  val modelStageIn: Map[Int, ModelType],
+  val weights: Seq[Double] = Seq(1.0),
   val outputsColNamesMap: Map[String, String],
   val uid: String,
   val operationName: String
@@ -228,19 +259,54 @@ final class SelectedModel private[op]
 ) extends Model[SelectedModel] with SparkWrapperParams[Model[_]]
   with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval {
 
-  modelStageIn match {
+  modelStageIn.map { case (_, model) => model match {
     case m: OpPredictorWrapperModel[_] => setDefault(sparkMlStage, m.getSparkMlStage())
     case m => setDefault(sparkMlStage, Option(m))
   }
-
-  @transient private lazy val recoveredStage: ModelType = getSparkMlStage() match {
-    case Some(m: PredictionModel[_, _]) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
-    case Some(m: ModelType@unchecked) => m
-    case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
-      s" type ${m.getClass.getName}")
   }
 
-  override def transformFn: (RealNN, OPVector) => Prediction = recoveredStage.transformFn
+//  @transient private lazy val recoveredStages: Array[ModelType] = getSparkMlStage() match {
+//    case Some(m: PredictionModel[_, _]) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
+//    case Some(m: ModelType@unchecked) => m
+//    case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
+//      s" type ${m.getClass.getName}")
+//  }
+  def combine(x: Map[String, Double], y: Map[String, Double]): Map[String, Double] = {
+    val keys = x.keys.toSet.union(y.keys.toSet)
+  keys.map { case k =>
+    val v = x.getOrElse(k, 0.0) + y.getOrElse(k, 0.0)
+    k -> v
+  }.toMap
+  }
+  override def transformFn: (RealNN, OPVector) => Prediction = (r, v) => {
+    val values = modelStageIn.map { case (i, m) => i -> m.transformFn(r, v) }.zip(weights).map { case ((i, pred), w) =>
+      println(s"$v $i $w $pred")
+      println(s"Value for $v $i $w  ${pred.value.mapValues(_ * w)}")
+      pred.value.mapValues(_ * w)
+    }.reduce[Map[String, Double]] {
+      case (m1, m2) =>
+        println(s"${m1.get("prediction")} ${m2.get("prediction")} ${(combine(m1, m2)).get("prediction")}")
+        combine(m1, m2)
+    }
+    println(s"Values $values")
+    val firstPrediction = new Prediction(values)
+    val rawPrediction = firstPrediction.rawPrediction
+    val probability = firstPrediction.probability
+
+    val newPrediction = if (rawPrediction.length != 0) {
+      rawPrediction.zipWithIndex.maxBy(_._1)._2.toDouble
+    } else {
+      firstPrediction.prediction
+    }
+    val p = if (rawPrediction.length != 0) {
+      Prediction(prediction = newPrediction, rawPrediction = rawPrediction, probability = probability)
+    } else {
+      Prediction(newPrediction)
+    }
+    println(s"Final pred for $v ${p}")
+    p
+  }
+    // recoveredStage.transformFn
 
   lazy val labelColName: String = in1.name
 
