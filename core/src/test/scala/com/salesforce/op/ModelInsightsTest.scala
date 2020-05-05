@@ -970,5 +970,4 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     )
   }
 
-  it should ""
 }
