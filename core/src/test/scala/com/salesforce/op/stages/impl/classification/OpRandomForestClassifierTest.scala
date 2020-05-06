@@ -73,10 +73,10 @@ class OpRandomForestClassifierTest extends
     Prediction(2.0, Array(1.0, 0.0, 19.0), Array(0.05, 0.0, 0.95)),
     Prediction(1.0, Array(0.0, 18.0, 2.0), Array(0.0, 0.9, 0.1)),
     Prediction(0.0, Array(11.0, 1.0, 8.0), Array(0.55, 0.05, 0.4)),
-    Prediction(1.0, Array(1.0, 15.0, 4.0), Array(0.05, 0.75, 0.2)),
-    Prediction(0.0, Array(17.0, 0.0, 3.0), Array(0.85, 0.0, 0.15)),
+    Prediction(1.0, Array(1.0, 17.0, 2.0), Array(0.05, 0.85, 0.1)),
+    Prediction(0.0, Array(15.0, 0.0, 5.0), Array(0.75, 0.0, 0.25)),
     Prediction(2.0, Array(1.0, 1.0, 18.0), Array(0.05, 0.05, 0.9)),
-    Prediction(2.0, Array(1.0, 1.0, 18.0), Array(0.05, 0.05, 0.9))
+    Prediction(2.0, Array(1.0, 2.0, 17.0), Array(0.05, 0.1, 0.85))
   )
 
   it should "allow the user to set the desired spark parameters" in {
