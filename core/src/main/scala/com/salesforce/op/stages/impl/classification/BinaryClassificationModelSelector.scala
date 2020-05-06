@@ -56,10 +56,11 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
     /**
      * Subset of models to use in model selector
      *
-     * Note: [[OpNaiveBayes]], [[OpDecisionTreeClassifier]] and [[OpXGBoostClassifier]] are off by default
+     * Note: [[OpNaiveBayes]], [[OpDecisionTreeClassifier]], [[OpLinearSVC]], and [[OpXGBoostClassifier]] are
+     * off by default
      */
     val modelTypesToUse: Seq[BinaryClassificationModelsToTry] = Seq(
-      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC
+      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpGBTClassifier
     )
 
     /**

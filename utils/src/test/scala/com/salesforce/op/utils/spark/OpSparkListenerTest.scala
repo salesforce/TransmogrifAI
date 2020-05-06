@@ -95,8 +95,9 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     val messages = Table("Spark Log Messages",
       "Instantiated spark listener: %s. Log Prefix %s".format(classOf[OpSparkListener].getName, logPrefix),
       "%s,APP_TIME_MS:%s".format(logPrefix, listener.metrics.appEndTime - listener.metrics.appStartTime),
-      "%s,STAGE:%s,MEMORY_SPILLED_BYTES:%s,GC_TIME_MS:%s,STAGE_TIME_MS:%s".format(
-        logPrefix, firstStage.name, firstStage.memoryBytesSpilled, firstStage.jvmGCTime, firstStage.executorRunTime
+      "%s,STAGE:%s,MEMORY_SPILLED_BYTES:%s,GC_TIME_MS:%s,STAGE_TIME_MS:%s,JOB_GROUP:%s".format(
+        logPrefix, firstStage.name, firstStage.memoryBytesSpilled, firstStage.jvmGCTime, firstStage.executorRunTime,
+        OpStep.Other.toString
       )
     )
     forAll(messages) { m => logs.contains(m) shouldBe true }

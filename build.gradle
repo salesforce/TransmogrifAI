@@ -68,7 +68,7 @@ configure(allProjs) {
         scalaCheckVersion = '1.14.0'
         junitVersion = '4.12'
         avroVersion = '1.8.2'
-        sparkVersion = '2.4.4'
+        sparkVersion = '2.4.5'
         scalaGraphVersion = '1.12.5'
         scalafmtVersion = '1.5.1'
         hadoopVersion = 'hadoop2'
