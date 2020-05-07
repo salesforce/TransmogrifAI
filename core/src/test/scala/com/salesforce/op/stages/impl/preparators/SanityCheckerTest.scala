@@ -158,7 +158,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformedData = model.transform(testData)
     val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames,
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
@@ -209,7 +209,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     outputColumns.columns.length + summary.dropped.length shouldEqual testMetadata.columns.length
 
     val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames,
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
@@ -228,7 +228,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val transformedData = model.transform(testData)
 
     val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames,
       Seq(), expectedCorrFeatNamesIsNan)
   }
 
@@ -318,9 +318,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
       val summaryMeta = model.getMetadata().getSummaryMetadata()
       val correlations = summaryMeta
-        .getMetadata(SanityCheckerNames.CorrelationsWLabel)
-        .getDoubleArray(SanityCheckerNames.Values)
-      correlations(0)
+        .getMetadata(SanityCheckerNames.Correlations)
+        .getStringArray(SanityCheckerNames.ValuesLabel)
+      correlations(0).toDouble
     }
 
     val sanityCheckerSpearman = new SanityChecker()
@@ -383,7 +383,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val featuresWithNaNCorr = Seq("textMap_7")
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -424,7 +424,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     )
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -460,7 +460,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     )
     val featuresWithNaNCorr = Seq.empty[String]
 
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -494,7 +494,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     )
     val featuresWithNaNCorr = Seq.empty[String]
 
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -528,7 +528,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val featuresWithNaNCorr = Seq("textMap_7")
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -575,7 +575,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -629,9 +629,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     outputColName: String,
     transformedData: DataFrame,
     expectedFeatNames: Seq[String],
-    expectedCorrFeatNames: Seq[String],
     expectedFeaturesToDrop: Seq[String],
-    expectedCorrFeatNamesIsNan: Seq[String]
+    expectedCorrFeatNamesIsNan: Seq[String],
+    ignoredNames: Seq[String] = Seq.empty
   ): Unit = {
     transformedData.select(outputColName).collect().foreach { case Row(features: Vector) =>
       features.toArray.length equals
@@ -643,8 +643,10 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     summary.names.slice(0, summary.names.size - 1) should
       contain theSameElementsAs expectedFeatNames
-    summary.correlationsWLabel.nanCorrs should contain theSameElementsAs expectedCorrFeatNamesIsNan
-    summary.correlationsWLabel.featuresIn should contain theSameElementsAs expectedCorrFeatNames
+    summary.correlations.valuesWithLabel.zip(summary.names).collect{
+      case (corr, name) if corr.isNaN => name
+    } should contain theSameElementsAs expectedCorrFeatNamesIsNan
+    summary.correlations.featuresIn should contain theSameElementsAs expectedFeatNames.diff(ignoredNames)
     summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
   }
 

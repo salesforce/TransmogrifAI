@@ -634,7 +634,7 @@ case object ModelInsights {
               derivedFeatureGroup = h.grouping,
               derivedFeatureValue = h.indicatorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
-              corr = getCorr(s.correlationsWLabel, h.columnName),
+              corr = getCorr(s.correlations, h.columnName),
               cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
               mutualInformation = catGroupIndex.map(i => s.categoricalStats(i).mutualInfo),
               pointwiseMutualInformation = (catGroupIndex, catIndexWithinGroup) match {
@@ -743,11 +743,7 @@ case object ModelInsights {
     if (index >= 0) values.mapValues(_ (index)) else Map.empty
 
   private def getCorr(corr: Correlations, name: String): Option[Double] = {
-    getIfExists(corr.featuresIn.indexOf(name), corr.values).orElse {
-      val j = corr.nanCorrs.indexOf(name)
-      if (j >= 0) Option(Double.NaN)
-      else None
-    }
+    getIfExists(corr.featuresIn.indexOf(name), corr.valuesWithLabel)
   }
 
   private[op] def descaleLRContrib(

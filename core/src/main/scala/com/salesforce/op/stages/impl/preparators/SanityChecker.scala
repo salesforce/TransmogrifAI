@@ -99,6 +99,15 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
   def setMaxCorrelation(value: Double): this.type = set(maxCorrelation, value)
   def getMaxCorrelation: Double = $(maxCorrelation)
 
+  final val maxFeatureCorr = new DoubleParam(
+    parent = this, name = "maxFeatureCorr",
+    doc = "Maximum correlation (absolute value) allowed between a feature two feature vectors which will" +
+      " both be kept. When this value is exceeded the second feature in the correlated pair will be dropped",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
+  )
+  def setMaxFeatureCorr(value: Double): this.type = set(maxCorrelation, value)
+  def getMaxFeatureCorr: Double = $(maxCorrelation)
+
   final val minCorrelation = new DoubleParam(
     parent = this, name = "minCorrelation",
     doc = "Minimum correlation (absolute value) allowed between a feature in the feature vector and the label",
@@ -190,6 +199,7 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
     sampleUpperLimit -> SanityChecker.SampleUpperLimit,
     maxCorrelation -> SanityChecker.MaxCorrelation,
     minCorrelation -> SanityChecker.MinCorrelation,
+    maxFeatureCorr -> SanityChecker.MaxFeatureCorr,
     minVariance -> SanityChecker.MinVariance,
     maxCramersV -> SanityChecker.MaxCramersV,
     removeBadFeatures -> SanityChecker.RemoveBadFeatures,
@@ -280,7 +290,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
               val colsCleaned = cols.map(_._2).filterNot(c => repeats.contains(c.index))
               (group, colsCleaned.map(_.makeColName()), colsCleaned.map(_.index),
                 colsCleaned.exists(_.hasParentOfSubType[MultiPickList]))
-          }
+            }
 
         colIndicesByGrouping.map {
           case (group, colNames, valueIndices, isMpl) =>
@@ -443,13 +453,13 @@ class SanityChecker(uid: String = UID[SanityChecker])
     else ((0 until featureSize + 1).toArray, vectorRows)
     val numCorrIndices = corrIndices.length
 
-    // TODO: We are still calculating the full correlation matrix when featureLabelCorrOnly is false, but are not
-    // TODO: storing it anywhere. If we want access to the inter-feature correlations then need to refactor this a bit.
-    val corrsWithLabel = if ($(featureLabelCorrOnly)) {
-      OpStatistics.computeCorrelationsWithLabel(vectorRowsForCorr, colStats, count)
+    val (corrMatrix, corrsWithLabel) = if ($(featureLabelCorrOnly)) {
+      None -> OpStatistics.computeCorrelationsWithLabel(vectorRowsForCorr, colStats, count)
     }
-    else Statistics.corr(vectorRowsForCorr, getCorrelationType.sparkName).rowIter
-      .map(_.apply(numCorrIndices - 1)).toArray
+    else {
+      val matrix = Statistics.corr(vectorRowsForCorr, getCorrelationType.sparkName)
+      Option(matrix) -> matrix.rowIter.map(_.apply(numCorrIndices - 1)).toArray
+    }
 
     // Only calculate this if the label is categorical, so ignore if user has flagged label as not categorical
     val categoricalStats =
@@ -467,7 +477,8 @@ class SanityChecker(uid: String = UID[SanityChecker])
       Option((in1.name, featureSize)), // label column goes at end of vector
       corrsWithLabel,
       corrIndices,
-      categoricalStats
+      categoricalStats,
+      corrMatrix
     )
     stats.foreach { stat => logInfo(stat.toString) }
 
@@ -478,6 +489,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         $(minVariance),
         $(minCorrelation),
         $(maxCorrelation),
+        $(maxFeatureCorr),
         $(maxCramersV),
         $(maxRuleConfidence),
         $(minRequiredRuleSupport),
@@ -542,6 +554,7 @@ object SanityChecker {
   val SampleLowerLimit = 1E3.toInt
   val SampleUpperLimit = 1E6.toInt
   val MaxCorrelation = 0.95
+  val MaxFeatureCorr = 0.999
   val MinCorrelation = 0.0
   val MinVariance = 1E-5
   val MaxCramersV = 0.95

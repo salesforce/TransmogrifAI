@@ -43,7 +43,8 @@ import org.scalatest.junit.JUnitRunner
 class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
   val summary = SanityCheckerSummary(
-    correlationsWLabel = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(), CorrelationType.Pearson),
+    correlations = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(Seq(0.2, 0.3), Seq(0.3, 0.2)),
+      CorrelationType.Pearson),
     dropped = Seq("f1"),
     featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
       Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3)),
@@ -79,10 +80,10 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     val retrieved = SanityCheckerSummary.fromMetadata(meta)
     retrieved.isInstanceOf[SanityCheckerSummary]
-    retrieved.correlationsWLabel.nanCorrs should contain theSameElementsAs summary.correlationsWLabel.nanCorrs
+    retrieved.correlations.valuesWithFeatures should contain theSameElementsAs summary.correlations.valuesWithFeatures
 
-    retrieved.correlationsWLabel.featuresIn should contain theSameElementsAs summary.correlationsWLabel.featuresIn
-    retrieved.correlationsWLabel.values should contain theSameElementsAs summary.correlationsWLabel.values
+    retrieved.correlations.featuresIn should contain theSameElementsAs summary.correlations.featuresIn
+    retrieved.correlations.valuesWithLabel should contain theSameElementsAs summary.correlations.valuesWithLabel
     retrieved.categoricalStats.map(_.cramersV) should contain theSameElementsAs
       summary.categoricalStats.map(_.cramersV)
 
@@ -95,7 +96,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     retrieved.featuresStatistics.variance should contain theSameElementsAs summary.featuresStatistics.variance
 
     retrieved.names should contain theSameElementsAs summary.names
-    retrieved.correlationsWLabel.corrType shouldBe summary.correlationsWLabel.corrType
+    retrieved.correlations.corrType shouldBe summary.correlations.corrType
 
     retrieved.categoricalStats.flatMap(_.categoricalFeatures) should contain theSameElementsAs
       summary.categoricalStats.flatMap(_.categoricalFeatures)
