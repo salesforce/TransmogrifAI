@@ -455,13 +455,12 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       "textMap_6", "textMap_7", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
       "textMap_beverage_NullIndicatorValue_10"
     )
-    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
-    )
+    val featuresIgnore = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
+      "textMap_6", "textMap_7")
     val featuresWithNaNCorr = Seq.empty[String]
 
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
-      featuresToDrop, featuresWithNaNCorr)
+      featuresToDrop, featuresWithNaNCorr, featuresIgnore)
   }
 
   it should "not calculate correlations on hashed text features if asked not to (using vectorizer)" in {
@@ -489,13 +488,11 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
       Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
         "textMap_fruit_NullIndicatorValue_514")
-    val featuresWithCorr = Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
-      "textMap_fruit_NullIndicatorValue_514"
-    )
+    val featuresIngore = (0 until 512).map(i => "textMap_" + i.toString)
     val featuresWithNaNCorr = Seq.empty[String]
 
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
-      featuresToDrop, featuresWithNaNCorr)
+      featuresToDrop, featuresWithNaNCorr, featuresIngore)
   }
 
   it should "only calculate correlations between feature and the label if requested" in {

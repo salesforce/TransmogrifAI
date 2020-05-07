@@ -43,7 +43,8 @@ import org.scalatest.junit.JUnitRunner
 class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
   val summary = SanityCheckerSummary(
-    correlations = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(Seq(0.2, 0.3), Seq(0.3, 0.2)),
+    correlations = Correlations(Seq("f2", "f3", "f4"), Seq(0.2, 0.3, Double.NaN), Seq(Seq(0.2, 0.3, 0.1),
+      Seq(0.3, 0.2, Double.NaN), Seq(0.1, 0.1, 0.1)),
       CorrelationType.Pearson),
     dropped = Seq("f1"),
     featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
@@ -80,10 +81,16 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     val retrieved = SanityCheckerSummary.fromMetadata(meta)
     retrieved.isInstanceOf[SanityCheckerSummary]
-    retrieved.correlations.valuesWithFeatures should contain theSameElementsAs summary.correlations.valuesWithFeatures
 
     retrieved.correlations.featuresIn should contain theSameElementsAs summary.correlations.featuresIn
-    retrieved.correlations.valuesWithLabel should contain theSameElementsAs summary.correlations.valuesWithLabel
+    retrieved.correlations.valuesWithLabel.zip(summary.correlations.valuesWithLabel).foreach{
+      case (rd, id) => if (rd.isNaN) id.isNaN shouldBe true else rd shouldEqual id
+    }
+    retrieved.correlations.valuesWithFeatures.zip(summary.correlations.valuesWithFeatures).foreach{
+      case (rs, is) => rs.zip(is).foreach{
+        case (rd, id) => if (rd.isNaN) id.isNaN shouldBe true else rd shouldEqual id
+      }
+    }
     retrieved.categoricalStats.map(_.cramersV) should contain theSameElementsAs
       summary.categoricalStats.map(_.cramersV)
 
