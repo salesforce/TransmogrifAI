@@ -183,6 +183,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     checker.getOrDefault(checker.maxCorrelation) shouldBe SanityChecker.MaxCorrelation
     checker.getOrDefault(checker.minVariance) shouldBe SanityChecker.MinVariance
     checker.getOrDefault(checker.minCorrelation) shouldBe SanityChecker.MinCorrelation
+    checker.getOrDefault(checker.maxFeatureCorr) shouldBe SanityChecker.MaxFeatureCorr
     checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson.entryName
     checker.getOrDefault(checker.removeBadFeatures) shouldBe SanityChecker.RemoveBadFeatures
   }
@@ -428,6 +429,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
+
   it should "not calculate correlations on hashed text features if asked not to (using SmartTextVectorizer)" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
@@ -442,6 +444,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setCorrelationExclusion(CorrelationExclusion.HashedText)
       .setMinCorrelation(0.0)
       .setMaxCorrelation(0.8)
+      .setMaxFeatureCorr(1.0)
       .setMaxCramersV(0.8)
       .setInput(targetResponse, smartMapVectorized)
       .getOutput()
@@ -476,6 +479,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setMinVariance(-0.1)
       .setMinCorrelation(0.0)
       .setMaxCorrelation(0.8)
+      .setMaxFeatureCorr(1.0)
       .setMaxCramersV(0.8)
       .setInput(targetResponse, vectorized)
       .getOutput()

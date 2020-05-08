@@ -120,4 +120,11 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     recovered.hashCode() shouldEqual summary.toMetadata().hashCode()
   }
 
+  it should "be able to read metadata from the old format" in {
+    val json = ""
+    val recovered = Metadata.fromJson(json)
+    val summaryRecovered = SanityCheckerSummary.fromMetadata(recovered)
+    summaryRecovered.correlations.valuesWithLabel.filter(_.isNaN) shouldBe true
+  }
+
 }

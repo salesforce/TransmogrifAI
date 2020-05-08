@@ -474,6 +474,7 @@ trait RichNumericFeature {
       sampleUpperLimit: Int = SanityChecker.SampleUpperLimit,
       maxCorrelation: Double = SanityChecker.MaxCorrelation,
       minCorrelation: Double = SanityChecker.MinCorrelation,
+      maxFeatureCorr: Double = SanityChecker.MaxFeatureCorr,
       maxCramersV: Double = SanityChecker.MaxCramersV,
       correlationType: CorrelationType = SanityChecker.CorrelationTypeDefault,
       minVariance: Double = SanityChecker.MinVariance,
@@ -494,6 +495,7 @@ trait RichNumericFeature {
         .setSampleUpperLimit(sampleUpperLimit)
         .setMaxCorrelation(maxCorrelation)
         .setMinCorrelation(minCorrelation)
+        .setMaxFeatureCorr(maxFeatureCorr)
         .setMaxCramersV(maxCramersV)
         .setCorrelationType(correlationType)
         .setMinVariance(minVariance)

@@ -88,6 +88,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
+      .setMaxFeatureCorr(1.1)
       .setInput(labelData, genFeatureVector)
       .setRemoveBadFeatures(true)
       .getOutput()
@@ -98,6 +99,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
 
     // Check that all the PickList features are dropped and they are the only ones dropped
     // (9 choices + "other" + empty = 11 total dropped columns)
+    println(retrieved.dropped)
     retrieved.dropped.forall(_.startsWith("picklist")) shouldBe true
     retrieved.dropped.length shouldBe 11
     retrieved.categoricalStats.flatMap(_.categoricalFeatures).length shouldBe
@@ -245,6 +247,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
+      .setMaxFeatureCorr(1.1)
       .setInput(labelData, genFeatureVector)
       .setRemoveBadFeatures(true)
       .getOutput()
@@ -289,6 +292,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
+      .setMaxFeatureCorr(1.1)
       .setInput(labelData, genFeatureVector)
       .setRemoveBadFeatures(true)
       .setCategoricalLabel(false)
@@ -333,6 +337,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawIntegralMap).transmogrify()
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
+      .setMaxFeatureCorr(1.1)
       .setInput(labelData, genFeatureVector)
       .setRemoveBadFeatures(true)
       .getOutput()
@@ -642,6 +647,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val genFeatureVector = Seq(rawCity, rawCountry, rawPickList).transmogrify()
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
+      .setMaxFeatureCorr(1.1)
       .setInput(labels, genFeatureVector)
       .setRemoveBadFeatures(true)
       .getOutput()

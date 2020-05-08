@@ -178,7 +178,7 @@ object DerivedFeatureFilterUtils {
           cramersV = cramersVMap.get(name),
           featureCorrs = corrIndices.indexOf(i) match {
             case -1 => Seq.empty
-            case ind => featureCorrs.getOrElse(Array.empty).map(_.apply(ind))
+            case ind => featureCorrs.getOrElse(Array.empty).map(_.apply(ind)).dropRight(1) // drop label corr
           },
           parentCorr = getParentValue(col, corrParent, corrParentNoKeys),
           parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys),

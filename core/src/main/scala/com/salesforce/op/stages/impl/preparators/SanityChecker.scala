@@ -94,7 +94,7 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
   final val maxCorrelation = new DoubleParam(
     parent = this, name = "maxCorrelation",
     doc = "Maximum correlation (absolute value) allowed between a feature in the feature vector and the label",
-    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
+    isValid = ParamValidators.inRange(lowerBound = -0.1, upperBound = 1.1, lowerInclusive = true, upperInclusive = true)
   )
   def setMaxCorrelation(value: Double): this.type = set(maxCorrelation, value)
   def getMaxCorrelation: Double = $(maxCorrelation)
@@ -103,15 +103,15 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
     parent = this, name = "maxFeatureCorr",
     doc = "Maximum correlation (absolute value) allowed between a feature two feature vectors which will" +
       " both be kept. When this value is exceeded the second feature in the correlated pair will be dropped",
-    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
+    isValid = ParamValidators.inRange(lowerBound = -0.1, upperBound = 1.1, lowerInclusive = true, upperInclusive = true)
   )
-  def setMaxFeatureCorr(value: Double): this.type = set(maxCorrelation, value)
-  def getMaxFeatureCorr: Double = $(maxCorrelation)
+  def setMaxFeatureCorr(value: Double): this.type = set(maxFeatureCorr, value)
+  def getMaxFeatureCorr: Double = $(maxFeatureCorr)
 
   final val minCorrelation = new DoubleParam(
     parent = this, name = "minCorrelation",
     doc = "Minimum correlation (absolute value) allowed between a feature in the feature vector and the label",
-    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
+    isValid = ParamValidators.inRange(lowerBound = -0.1, upperBound = 1.1, lowerInclusive = true, upperInclusive = true)
   )
   def setMinCorrelation(value: Double): this.type = set(minCorrelation, value)
   def getMinCorrelation: Double = $(minCorrelation)
@@ -554,7 +554,7 @@ object SanityChecker {
   val SampleLowerLimit = 1E3.toInt
   val SampleUpperLimit = 1E6.toInt
   val MaxCorrelation = 0.95
-  val MaxFeatureCorr = 0.999
+  val MaxFeatureCorr = 0.99
   val MinCorrelation = 0.0
   val MinVariance = 1E-5
   val MaxCramersV = 0.95

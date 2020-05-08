@@ -323,7 +323,7 @@ case class Correlations
       } else {
         corrType
       }
-    new Correlations(featuresIn ++ corr.featuresIn, valuesWithLabel ++ corr.valuesWithLabel,
+    Correlations(featuresIn ++ corr.featuresIn, valuesWithLabel ++ corr.valuesWithLabel,
       valuesWithFeatures ++ corr.valuesWithFeatures, corrName)
   }
 }
@@ -342,15 +342,26 @@ case object SanityCheckerSummary {
   private def correlationsFromMetadata(meta: Metadata): Correlations = {
     val wrapped = meta.wrapped
     val features = wrapped.getArray[String](SanityCheckerNames.FeaturesIn).toSeq
-    val fc = wrapped.get[Metadata](SanityCheckerNames.ValuesFeatures).wrapped
-    Correlations(
-      featuresIn = wrapped.getArray[String](SanityCheckerNames.FeaturesIn).toSeq,
-      valuesWithLabel = wrapped.getArray[String](SanityCheckerNames.ValuesLabel).toSeq.map(_.toDouble),
-      valuesWithFeatures =
-        if (fc.underlyingMap.isEmpty) Seq.empty
-        else features.map(f => fc.getArray[String](f).toSeq.map(_.toDouble)),
-      corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
-    )
+    if (wrapped.underlyingMap.keySet.contains("values")) { // old sanity checker meta
+      val nans = wrapped.getArray[String]("correlationsWithLabelIsNaN")
+      val labelCorr = wrapped.getArray[Double]("values").toSeq
+      Correlations(
+        featuresIn = features ++ nans,
+        valuesWithLabel = labelCorr ++ Seq.fill(nans.length)(Double.NaN),
+        valuesWithFeatures = Seq.empty,
+        corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
+      )
+    } else {
+      val fc = wrapped.get[Metadata](SanityCheckerNames.ValuesFeatures).wrapped
+      Correlations(
+        featuresIn = features,
+        valuesWithLabel = wrapped.getArray[String](SanityCheckerNames.ValuesLabel).toSeq.map(_.toDouble),
+        valuesWithFeatures =
+          if (fc.underlyingMap.isEmpty) Seq.empty
+          else features.map(f => fc.getArray[String](f).toSeq.map(_.toDouble)),
+        corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
+      )
+    }
   }
 
   private def statisticsFromMetadata(meta: Metadata): SummaryStatistics = {
