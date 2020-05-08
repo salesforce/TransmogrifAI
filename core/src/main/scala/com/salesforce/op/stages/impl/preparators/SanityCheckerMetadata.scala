@@ -402,18 +402,23 @@ case object SanityCheckerSummary {
     val wrapped = meta.wrapped
     // Try parsing as an older version of metadata (pre-3.3.0) if this doesn't work
     Try {
+      val corr =
+        if (wrapped.underlyingMap.contains("correlationsWithLabel")) {
+          wrapped.get[Metadata]("correlationsWithLabel")
+        } else wrapped.get[Metadata](SanityCheckerNames.Correlations)
       SanityCheckerSummary(
-        correlations = correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.Correlations)),
+        correlations = correlationsFromMetadata(corr),
         dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
         featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
         names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
         categoricalStats = wrapped.getArray[Metadata](SanityCheckerNames.CategoricalStats)
           .map(categoricalGroupStatsFromMetadata)
       )
-    } match {
-      case Success(summary) => summary
-      // Parse it under the old format
-      case Failure(_) => throw new IllegalArgumentException(s"failed to parse SanityCheckerSummary from $meta")
     }
+  } match {
+    case Success(summary) => summary
+    // Parse it under the old format
+    case Failure(_) => throw new IllegalArgumentException(s"failed to parse SanityCheckerSummary from $meta")
   }
 }
+

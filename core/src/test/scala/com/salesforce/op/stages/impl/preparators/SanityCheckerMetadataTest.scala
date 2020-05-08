@@ -121,10 +121,63 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
   }
 
   it should "be able to read metadata from the old format" in {
-    val json = ""
+    val json = """{
+                 |  "statistics" : {
+                 |    "sampleFraction" : 0.01,
+                 |    "count" : 3.0,
+                 |    "variance" : [ 0.1, 0.2, 0.3 ],
+                 |    "mean" : [ 0.1, 0.2, 0.3 ],
+                 |    "min" : [ 0.1, 0.2, 0.3 ],
+                 |    "max" : [ 0.1, 0.2, 0.3 ]
+                 |  },
+                 |  "names" : [ "f1", "f2", "f3" ],
+                 |  "correlationsWithLabel" : {
+                 |    "correlationType" : "pearson",
+                 |    "values" : [ 0.2, 0.3 ],
+                 |    "features" : [ "f2", "f3" ],
+                 |    "correlationsWithLabelIsNaN" : [ ]
+                 |  },
+                 |  "categoricalStats" : [ {
+                 |    "support" : [ 1.0 ],
+                 |    "contingencyMatrix" : {
+                 |      "2" : [ 12.0 ],
+                 |      "1" : [ 12.0 ],
+                 |      "0" : [ 12.0 ]
+                 |    },
+                 |    "maxRuleConfidence" : [ 1.0 ],
+                 |    "categoricalFeatures" : [ "f4" ],
+                 |    "pointwiseMutualInfoAgainstLabel" : {
+                 |      "2" : [ -0.32 ],
+                 |      "1" : [ 1.11 ],
+                 |      "0" : [ 1.23 ]
+                 |    },
+                 |    "mutualInfo" : -1.22,
+                 |    "cramersV" : 0.45,
+                 |    "group" : "f4"
+                 |  }, {
+                 |    "support" : [ 1.0 ],
+                 |    "contingencyMatrix" : {
+                 |      "2" : [ 12.0 ],
+                 |      "1" : [ 12.0 ],
+                 |      "0" : [ 12.0 ]
+                 |    },
+                 |    "maxRuleConfidence" : [ 1.0 ],
+                 |    "categoricalFeatures" : [ "f5" ],
+                 |    "pointwiseMutualInfoAgainstLabel" : {
+                 |      "2" : [ 0.99 ],
+                 |      "1" : [ 0.34 ],
+                 |      "0" : [ -2.11 ]
+                 |    },
+                 |    "mutualInfo" : -0.51,
+                 |    "cramersV" : 0.11,
+                 |    "group" : "f5"
+                 |  } ],
+                 |  "featuresDropped" : [ "f1" ]
+                 |}""".stripMargin
     val recovered = Metadata.fromJson(json)
     val summaryRecovered = SanityCheckerSummary.fromMetadata(recovered)
-    summaryRecovered.correlations.valuesWithLabel.filter(_.isNaN) shouldBe true
+    summaryRecovered.correlations.valuesWithLabel.size shouldBe 2
+    summaryRecovered.correlations.valuesWithFeatures shouldBe Seq.empty
   }
 
 }
