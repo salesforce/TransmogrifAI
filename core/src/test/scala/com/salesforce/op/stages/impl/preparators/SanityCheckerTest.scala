@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op._
+
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
@@ -466,6 +467,35 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr, featuresIgnore)
   }
 
+  it should "not through out duplicate features if their correlation is above the max feature corr" in {
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(false)
+      .setProtectTextSharedHash(false)
+      .setCorrelationExclusion(CorrelationExclusion.HashedText)
+      .setMinVariance(-0.1)
+      .setMinCorrelation(-0.1)
+      .setMaxCorrelation(1.1)
+      .setMaxFeatureCorr(0.9)
+      .setMaxCramersV(1.0)
+      .setInput(targetLabel, featureVector)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(featureVector, checkedFeatures).transform(testData)
+
+    val featuresToDrop = Seq("testFeatNegCor_4")
+    val expectedFeatNames = Seq("age_0", "height_1", "height_null_2", "gender_3", "testFeatNegCor_4")
+    val featuresIngore = Seq.empty
+    val featuresWithNaNCorr = Seq("age_0")
+
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
+      featuresToDrop, featuresWithNaNCorr, featuresIngore)
+  }
+
   it should "not calculate correlations on hashed text features if asked not to (using vectorizer)" in {
 
     val vectorized = textMap.vectorize(cleanText = TransmogrifierDefaults.CleanText)
@@ -641,7 +671,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val metadata: Metadata = getMetadata(outputColName, transformedData)
     val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
-
+println(summary.correlations)
     summary.names.slice(0, summary.names.size - 1) should
       contain theSameElementsAs expectedFeatNames
     summary.correlations.valuesWithLabel.zip(summary.names).collect{
