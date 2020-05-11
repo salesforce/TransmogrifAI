@@ -103,7 +103,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .getOrElse(Seq.empty)
       val coverage = cumCount.lift(math.min(topKValue, cumCount.length) - 1).getOrElse(0L) * 1.0 / totalCount
       val vecMethod: TextVectorizationMethod = stats match {
-        // If cardinality not respect, but coverage is, then pivot the feature
+        // If cardinality not respected, but coverage is, then pivot the feature
+        // Extra checks need to be passed :
+        //
+        //  - Cardinality must be greater than maxCard (already mentioned above).
+        //  - Cardinality must also be greater than topK.
+        //  - Finally, the computed coverage of the topK with minimum support must be > 0.
         case _ if stats.valueCounts.size > maxCard && stats.valueCounts.size > topKValue && coverage > 0 &&
           coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
