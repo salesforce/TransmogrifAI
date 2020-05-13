@@ -4,7 +4,7 @@
 
 Bug fixes:
 - Fix flaky `ModelInsight` tests [#407](https://github.com/salesforce/TransmogrifAI/pull/407)
-- Remove logging of tokens of text fields [#420](https://github.com/salesforce/TransmogrifAI/pull/420), [#438](https://github.com/salesforce/TransmogrifAI/pull/438), [#447](https://github.com/salesforce/TransmogrifAI/pull/447)
+- Remove logging of tokens of text fields [#420](https://github.com/salesforce/TransmogrifAI/pull/420), [#438](https://github.com/salesforce/TransmogrifAI/pull/438), [#447](https://github.com/salesforce/TransmogrifAI/pull/447), [#474](https://github.com/salesforce/TransmogrifAI/pull/474)
 - Add validation prepare call before model selection when no DAG is passed [#424](https://github.com/salesforce/TransmogrifAI/pull/424), [#429](https://github.com/salesforce/TransmogrifAI/pull/429)
 
 New features / updates:
@@ -21,6 +21,7 @@ New features / updates:
 - Add MinVarianceFilter which checks that computed features have a minimum variance [#463](https://github.com/salesforce/TransmogrifAI/pull/463), [#465](https://github.com/salesforce/TransmogrifAI/pull/465)
 - Allow TextStats length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
 - Use Spark job grouping to distinguish steps of the machine learning flow [#467](https://github.com/salesforce/TransmogrifAI/pull/467), [#468](https://github.com/salesforce/TransmogrifAI/pull/468), [#470](https://github.com/salesforce/TransmogrifAI/pull/470)
+- Fix Days.daysBetween int overflow [#471](https://github.com/salesforce/TransmogrifAI/pull/471)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
 - Update Apache Spark version to 2.4.5
