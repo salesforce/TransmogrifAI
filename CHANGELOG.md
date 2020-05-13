@@ -9,19 +9,19 @@ Bug fixes:
 
 New features / updates:
 - Downsample the number of training samples to `maxTrainingSample` for regression [#413](https://github.com/salesforce/TransmogrifAI/pull/413) and multi-class classification [#414](https://github.com/salesforce/TransmogrifAI/pull/414)
-- Refactor InsightLOCOTest [#412](https://github.com/salesforce/TransmogrifAI/pull/412)
-- Enable more loss types for OpLinearRegression [#421](https://github.com/salesforce/TransmogrifAI/pull/421)
+- Refactor `InsightLOCOTest` [#412](https://github.com/salesforce/TransmogrifAI/pull/412)
+- Enable more loss types for `OpLinearRegression` [#421](https://github.com/salesforce/TransmogrifAI/pull/421)
 - Add property-based tests for regression model selection [#427](https://github.com/salesforce/TransmogrifAI/pull/427)
 - Add option to calculate LOCO for dates/texts by leaving out their entire vector [#418](https://github.com/salesforce/TransmogrifAI/pull/418)
-- Add Chinese and Korean examples to TextTokenizerTest [#442](https://github.com/salesforce/TransmogrifAI/pull/442)
-- Add support for ignoring text that looks like IDs in SmartTextVectorizer [#448](https://github.com/salesforce/TransmogrifAI/pull/448), [#455](https://github.com/salesforce/TransmogrifAI/pull/455)
+- Add Chinese and Korean examples to `TextTokenizerTest` [#442](https://github.com/salesforce/TransmogrifAI/pull/442)
+- Add support for ignoring text that looks like IDs in `SmartTextVectorizer` [#448](https://github.com/salesforce/TransmogrifAI/pull/448), [#455](https://github.com/salesforce/TransmogrifAI/pull/455)
 - Add a unary estimator for detecting names in text fields and transforming to likely gender [#445](https://github.com/salesforce/TransmogrifAI/pull/445)
 - Allow result features to be removed by raw feature filter [#458](https://github.com/salesforce/TransmogrifAI/pull/458)
 - Metadata changes for sensitive feature information [#457](https://github.com/salesforce/TransmogrifAI/pull/457)
-- Add MinVarianceFilter which checks that computed features have a minimum variance [#463](https://github.com/salesforce/TransmogrifAI/pull/463), [#465](https://github.com/salesforce/TransmogrifAI/pull/465)
-- Allow TextStats length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
+- Add `MinVarianceFilter` which checks that computed features have a minimum variance [#463](https://github.com/salesforce/TransmogrifAI/pull/463), [#465](https://github.com/salesforce/TransmogrifAI/pull/465)
+- Allow `TextStats` length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
 - Use Spark job grouping to distinguish steps of the machine learning flow [#467](https://github.com/salesforce/TransmogrifAI/pull/467), [#468](https://github.com/salesforce/TransmogrifAI/pull/468), [#470](https://github.com/salesforce/TransmogrifAI/pull/470)
-- Fix Days.daysBetween int overflow [#471](https://github.com/salesforce/TransmogrifAI/pull/471)
+- Fix `Days.daysBetween` int overflow [#471](https://github.com/salesforce/TransmogrifAI/pull/471)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
 - Update Apache Spark version to 2.4.5
