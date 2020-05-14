@@ -156,8 +156,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
           //
           //  - Cardinality must be greater than maxCard (already mentioned above).
           //  - Cardinality must also be greater than topK.
-          //  - Finally, the computed coverage of the topK with minimum support must be > 0.  
-          case _ if textStats.valueCounts.size > maxCard && textStats.valueCounts.size > topKValue && coverage > 0 &&
+          //  - Finally, the computed coverage of the topK with minimum support must be > 0.
+          case _ if textStats.valueCounts.size > maxCard && textStats.valueCounts.size > topKValue &&
             coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
           case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
           case _ if textStats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore

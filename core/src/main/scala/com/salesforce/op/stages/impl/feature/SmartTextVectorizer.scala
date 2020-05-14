@@ -109,8 +109,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         //  - Cardinality must be greater than maxCard (already mentioned above).
         //  - Cardinality must also be greater than topK.
         //  - Finally, the computed coverage of the topK with minimum support must be > 0.
-        case _ if stats.valueCounts.size > maxCard && stats.valueCounts.size > topKValue && coverage > 0 &&
-          coverage >= $(coveragePct) => TextVectorizationMethod.Pivot
+        case _ if stats.valueCounts.size > maxCard && stats.valueCounts.size > topKValue && coverage >= $(coveragePct)
+        => TextVectorizationMethod.Pivot
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
         case _ => TextVectorizationMethod.Hash
@@ -388,7 +388,7 @@ trait MaxCardinalityParams extends Params {
     parent = this, name = "coveragePct",
     doc = "Threshold of percentage of the entries. If the topK entries make up for more than this pecentage," +
       " the feature is treated as a categorical",
-    isValid = ParamValidators.inRange(lowerBound = 0, upperBound = 1)
+    isValid = ParamValidators.inRange(lowerBound = 0, upperBound = 1, lowerInclusive = false, upperInclusive = true)
   )
   final def setCoveragePct(v: Double): this.type = set(coveragePct, v)
   final def getCoveragePct: Double = $(coveragePct)
