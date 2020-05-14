@@ -467,7 +467,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr, featuresIgnore)
   }
 
-  it should "not through out duplicate features if their correlation is above the max feature corr" in {
+  it should "throw out duplicate features if their correlation is above the max feature corr" in {
 
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
@@ -671,7 +671,6 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val metadata: Metadata = getMetadata(outputColName, transformedData)
     val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
-println(summary.correlations)
     summary.names.slice(0, summary.names.size - 1) should
       contain theSameElementsAs expectedFeatNames
     summary.correlations.valuesWithLabel.zip(summary.names).collect{

@@ -253,11 +253,9 @@ case class CategoricalStats
    * @throws RuntimeException in case of unsupported value type
    * @return [[Metadata]] metadata
    */
-  // TODO: Build the metadata here instead of by treating Cramer's V and mutual info as correlations
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
     meta.putStringArray(SanityCheckerNames.CategoricalFeatures, categoricalFeatures)
-    // TODO: use custom serializer here instead of replacing NaNs with 0s
     meta.putDoubleArray(SanityCheckerNames.CramersV, cramersVs.map(f => if (f.isNaN) 0 else f))
     meta.putDoubleArray(SanityCheckerNames.MutualInfo, mutualInfos)
     meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel,
@@ -342,7 +340,7 @@ case object SanityCheckerSummary {
   private def correlationsFromMetadata(meta: Metadata): Correlations = {
     val wrapped = meta.wrapped
     val features = wrapped.getArray[String](SanityCheckerNames.FeaturesIn).toSeq
-    if (wrapped.underlyingMap.keySet.contains("values")) { // old sanity checker meta
+    if (wrapped.underlyingMap.keySet.contains("correlationsWithLabelIsNaN")) { // old sanity checker meta
       val nans = wrapped.getArray[String]("correlationsWithLabelIsNaN")
       val labelCorr = wrapped.getArray[Double]("values").toSeq
       Correlations(

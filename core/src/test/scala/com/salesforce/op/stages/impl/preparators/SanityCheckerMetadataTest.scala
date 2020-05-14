@@ -135,7 +135,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
                  |    "correlationType" : "pearson",
                  |    "values" : [ 0.2, 0.3 ],
                  |    "features" : [ "f2", "f3" ],
-                 |    "correlationsWithLabelIsNaN" : [ ]
+                 |    "correlationsWithLabelIsNaN" : ["f1"]
                  |  },
                  |  "categoricalStats" : [ {
                  |    "support" : [ 1.0 ],
@@ -176,7 +176,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
                  |}""".stripMargin
     val recovered = Metadata.fromJson(json)
     val summaryRecovered = SanityCheckerSummary.fromMetadata(recovered)
-    summaryRecovered.correlations.valuesWithLabel.size shouldBe 2
+    summaryRecovered.correlations.valuesWithLabel.size shouldBe 3
     summaryRecovered.correlations.valuesWithFeatures shouldBe Seq.empty
   }
 

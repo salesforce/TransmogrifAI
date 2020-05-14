@@ -99,7 +99,6 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
 
     // Check that all the PickList features are dropped and they are the only ones dropped
     // (9 choices + "other" + empty = 11 total dropped columns)
-    println(retrieved.dropped)
     retrieved.dropped.forall(_.startsWith("picklist")) shouldBe true
     retrieved.dropped.length shouldBe 11
     retrieved.categoricalStats.flatMap(_.categoricalFeatures).length shouldBe

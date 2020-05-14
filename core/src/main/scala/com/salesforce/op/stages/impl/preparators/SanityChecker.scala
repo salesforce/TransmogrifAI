@@ -101,8 +101,8 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
 
   final val maxFeatureCorr = new DoubleParam(
     parent = this, name = "maxFeatureCorr",
-    doc = "Maximum correlation (absolute value) allowed between a feature two feature vectors which will" +
-      " both be kept. When this value is exceeded the second feature in the correlated pair will be dropped",
+    doc = "Maximum correlation (absolute value) allowed between two features. When this value is exceeded the second" +
+      " feature in the correlated pair will be dropped.",
     isValid = ParamValidators.inRange(lowerBound = -0.1, upperBound = 1.1, lowerInclusive = true, upperInclusive = true)
   )
   def setMaxFeatureCorr(value: Double): this.type = set(maxFeatureCorr, value)

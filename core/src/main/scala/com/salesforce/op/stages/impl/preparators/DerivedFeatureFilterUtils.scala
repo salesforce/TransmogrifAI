@@ -374,7 +374,7 @@ private[op] case class ColumnStatistics
           s"correlation $corr higher than max correlation $maxCorrelation"
         ),
         column.flatMap{ case cl => featureCorrs.take(cl.index).find(Math.abs(_) > maxFeatureCorr).map(corr =>
-          s"this feature has correlations $corr with other features higher than max feature-feature" +
+          s"this feature has correlations $corr with another feature higher than max feature-feature" +
             s" correlation $maxFeatureCorr")
         },
         cramersV.filter(_ > maxCramersV).map(cv =>
