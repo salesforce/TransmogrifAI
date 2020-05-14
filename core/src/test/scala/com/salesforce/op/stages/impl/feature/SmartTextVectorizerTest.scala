@@ -280,17 +280,17 @@ class SmartTextVectorizerTest
     meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
-  it should "treat the edge case of coverage being 0" in {
+  it should "treat the edge case of coverage being near 0" in {
     val maxCard = 100
-    val vectorizer = new SmartTextVectorizer().setCoveragePct(0.0).setMaxCardinality(maxCard).setMinSupport(1)
+    val vectorizer = new SmartTextVectorizer().setCoveragePct(1e-10).setMaxCardinality(maxCard).setMinSupport(1)
       .setTrackTextLen(true).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
     assertVectorLength(transformed, output, TransmogrifierDefaults.TopK + 2, Pivot)
   }
-  it should "treat the edge case of coverage being 1" in {
+  it should "treat the edge case of coverage being near 1" in {
     val maxCard = 100
-    val vectorizer = new SmartTextVectorizer().setCoveragePct(1.0).setMaxCardinality(maxCard).setMinSupport(1)
+    val vectorizer = new SmartTextVectorizer().setCoveragePct(1.0 - 1e-10).setMaxCardinality(maxCard).setMinSupport(1)
       .setTrackTextLen(true).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
