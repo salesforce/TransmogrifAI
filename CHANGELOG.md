@@ -6,6 +6,7 @@ Bug fixes:
 - Fix flaky `ModelInsight` tests [#407](https://github.com/salesforce/TransmogrifAI/pull/407)
 - Remove logging of tokens of text fields [#420](https://github.com/salesforce/TransmogrifAI/pull/420), [#438](https://github.com/salesforce/TransmogrifAI/pull/438), [#447](https://github.com/salesforce/TransmogrifAI/pull/447), [#474](https://github.com/salesforce/TransmogrifAI/pull/474)
 - Add validation prepare call before model selection when no DAG is passed [#424](https://github.com/salesforce/TransmogrifAI/pull/424), [#429](https://github.com/salesforce/TransmogrifAI/pull/429)
+- Fix `Days.daysBetween` int overflow [#471](https://github.com/salesforce/TransmogrifAI/pull/471)
 
 New features / updates:
 - Downsample the number of training samples to `maxTrainingSample` for regression [#413](https://github.com/salesforce/TransmogrifAI/pull/413) and multi-class classification [#414](https://github.com/salesforce/TransmogrifAI/pull/414)
@@ -21,11 +22,13 @@ New features / updates:
 - Add `MinVarianceFilter` which checks that computed features have a minimum variance [#463](https://github.com/salesforce/TransmogrifAI/pull/463), [#465](https://github.com/salesforce/TransmogrifAI/pull/465)
 - Allow `TextStats` length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
 - Use Spark job grouping to distinguish steps of the machine learning flow [#467](https://github.com/salesforce/TransmogrifAI/pull/467), [#468](https://github.com/salesforce/TransmogrifAI/pull/468), [#470](https://github.com/salesforce/TransmogrifAI/pull/470)
-- Fix `Days.daysBetween` int overflow [#471](https://github.com/salesforce/TransmogrifAI/pull/471)
+- Add categorical detection to be coverage based in addition to unique count based [#473](https://github.com/salesforce/TransmogrifAI/pull/473)
+- Remove duplicate features using sanity checker feature to feature correlations [#476](https://github.com/salesforce/TransmogrifAI/pull/476)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
 - Update Apache Spark version to 2.4.5
 - Avro is a built-in data source in Spark 2.4, so no longer using the `spark-avro` package
+- Avro to 1.8.2
 - XGBoost to 0.90
 - MLeap to 0.14.0
 - json4s to 3.5.3
