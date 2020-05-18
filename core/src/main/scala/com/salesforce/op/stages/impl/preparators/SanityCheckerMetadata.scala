@@ -272,7 +272,7 @@ case class CategoricalStats
  *
  * @param featuresIn names of features
  * @param valuesWithLabel     correlation of feature with label
- * @param valuesWithFeatures   correlations between features features
+ * @param valuesWithFeatures   correlations between features
  * @param corrType   type of correlation done on
  */
 case class Correlations
