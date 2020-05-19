@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op._
+
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
@@ -158,7 +159,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformedData = model.transform(testData)
     val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames,
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
@@ -183,6 +184,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     checker.getOrDefault(checker.maxCorrelation) shouldBe SanityChecker.MaxCorrelation
     checker.getOrDefault(checker.minVariance) shouldBe SanityChecker.MinVariance
     checker.getOrDefault(checker.minCorrelation) shouldBe SanityChecker.MinCorrelation
+    checker.getOrDefault(checker.maxFeatureCorrelation) shouldBe SanityChecker.MaxFeatureCorr
     checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson.entryName
     checker.getOrDefault(checker.removeBadFeatures) shouldBe SanityChecker.RemoveBadFeatures
   }
@@ -209,7 +211,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     outputColumns.columns.length + summary.dropped.length shouldEqual testMetadata.columns.length
 
     val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames,
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
@@ -228,7 +230,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val transformedData = model.transform(testData)
 
     val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames,
       Seq(), expectedCorrFeatNamesIsNan)
   }
 
@@ -318,9 +320,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
       val summaryMeta = model.getMetadata().getSummaryMetadata()
       val correlations = summaryMeta
-        .getMetadata(SanityCheckerNames.CorrelationsWLabel)
-        .getDoubleArray(SanityCheckerNames.Values)
-      correlations(0)
+        .getMetadata(SanityCheckerNames.Correlations)
+        .getStringArray(SanityCheckerNames.ValuesLabel)
+      correlations(0).toDouble
     }
 
     val sanityCheckerSpearman = new SanityChecker()
@@ -384,7 +386,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val featuresWithNaNCorr = Seq("textMap_7")
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -426,9 +428,10 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     )
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
+
 
   it should "not calculate correlations on hashed text features if asked not to (using SmartTextVectorizer)" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
@@ -445,6 +448,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setCorrelationExclusion(CorrelationExclusion.HashedText)
       .setMinCorrelation(0.0)
       .setMaxCorrelation(0.8)
+      .setMaxFeatureCorrelation(1.0)
       .setMaxCramersV(0.8)
       .setInput(targetResponse, smartMapVectorized)
       .getOutput()
@@ -458,13 +462,41 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       "textMap_6", "textMap_7", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
       "textMap_beverage_NullIndicatorValue_10"
     )
-    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
-    )
+    val featuresIgnore = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
+      "textMap_6", "textMap_7")
     val featuresWithNaNCorr = Seq.empty[String]
 
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
+      featuresToDrop, featuresWithNaNCorr, featuresIgnore)
+  }
+
+  it should "throw out duplicate features if their correlation is above the max feature corr" in {
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(false)
+      .setProtectTextSharedHash(false)
+      .setCorrelationExclusion(CorrelationExclusion.HashedText)
+      .setMinVariance(-0.1)
+      .setMinCorrelation(-0.1)
+      .setMaxCorrelation(1.1)
+      .setMaxFeatureCorrelation(0.9)
+      .setMaxCramersV(1.0)
+      .setInput(targetLabel, featureVector)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(featureVector, checkedFeatures).transform(testData)
+
+    val featuresToDrop = Seq("testFeatNegCor_4")
+    val expectedFeatNames = Seq("age_0", "height_1", "height_null_2", "gender_3", "testFeatNegCor_4")
+    val featuresIngore = Seq.empty
+    val featuresWithNaNCorr = Seq("age_0")
+
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
+      featuresToDrop, featuresWithNaNCorr, featuresIngore)
   }
 
   it should "not calculate correlations on hashed text features if asked not to (using vectorizer)" in {
@@ -480,6 +512,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setMinVariance(-0.1)
       .setMinCorrelation(0.0)
       .setMaxCorrelation(0.8)
+      .setMaxFeatureCorrelation(1.0)
       .setMaxCramersV(0.8)
       .setInput(targetResponse, vectorized)
       .getOutput()
@@ -492,13 +525,11 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
       Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
         "textMap_fruit_NullIndicatorValue_514")
-    val featuresWithCorr = Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
-      "textMap_fruit_NullIndicatorValue_514"
-    )
+    val featuresIngore = (0 until 512).map(i => "textMap_" + i.toString)
     val featuresWithNaNCorr = Seq.empty[String]
 
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
+      featuresToDrop, featuresWithNaNCorr, featuresIngore)
   }
 
   it should "only calculate correlations between feature and the label if requested" in {
@@ -532,7 +563,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val featuresWithNaNCorr = Seq("textMap_7")
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -579,7 +610,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
       featuresToDrop, featuresWithNaNCorr)
   }
 
@@ -633,9 +664,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     outputColName: String,
     transformedData: DataFrame,
     expectedFeatNames: Seq[String],
-    expectedCorrFeatNames: Seq[String],
     expectedFeaturesToDrop: Seq[String],
-    expectedCorrFeatNamesIsNan: Seq[String]
+    expectedCorrFeatNamesIsNan: Seq[String],
+    ignoredNames: Seq[String] = Seq.empty
   ): Unit = {
     transformedData.select(outputColName).collect().foreach { case Row(features: Vector) =>
       features.toArray.length equals
@@ -644,11 +675,12 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val metadata: Metadata = getMetadata(outputColName, transformedData)
     val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
-
     summary.names.slice(0, summary.names.size - 1) should
       contain theSameElementsAs expectedFeatNames
-    summary.correlationsWLabel.nanCorrs should contain theSameElementsAs expectedCorrFeatNamesIsNan
-    summary.correlationsWLabel.featuresIn should contain theSameElementsAs expectedCorrFeatNames
+    summary.correlations.valuesWithLabel.zip(summary.names).collect{
+      case (corr, name) if corr.isNaN => name
+    } should contain theSameElementsAs expectedCorrFeatNamesIsNan
+    summary.correlations.featuresIn should contain theSameElementsAs expectedFeatNames.diff(ignoredNames)
     summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
   }
 

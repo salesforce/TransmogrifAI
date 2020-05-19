@@ -36,6 +36,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.{Vectors => NewVectors}
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, Params}
+import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
 import org.apache.spark.sql.types.Metadata
 
@@ -98,7 +99,8 @@ object DerivedFeatureFilterUtils {
     labelNameAndIndex: Option[(String, Int)] = None,
     corrsWithLabel: Array[Double] = Array.empty,
     corrIndices: Array[Int] = Array.empty,
-    categoricalStats: Array[CategoricalGroupStats] = Array.empty
+    categoricalStats: Array[CategoricalGroupStats] = Array.empty,
+    corrMatrix: Option[Matrix] = None
   ): Array[ColumnStatistics] = {
     // precompute all statistics to avoid rebuilding the vectors every time
     val means = statsSummary.mean
@@ -108,7 +110,7 @@ object DerivedFeatureFilterUtils {
     val variances = statsSummary.variance
     val cramersVMap = categoricalStats.flatMap(f => f.categoricalFeatures.map(c => c -> f.cramersV))
       .toMap[String, Double]
-    val numCorrIndices = corrIndices.length
+    val featureCorrs = corrMatrix.map(_.rowIter.map(_.toArray).toArray)
 
     def maxByParent(seq: Seq[(String, Double)]) = seq.groupBy(_._1).map { case (k, v) =>
       // Filter out the NaNs because max(3.4, NaN) = NaN, and we still want the keep the largest correlation
@@ -174,6 +176,10 @@ object DerivedFeatureFilterUtils {
             case ind => Option(corrsWithLabel(ind))
           },
           cramersV = cramersVMap.get(name),
+          featureCorrs = corrIndices.indexOf(i) match {
+            case -1 => Seq.empty
+            case ind => featureCorrs.getOrElse(Array.empty).map(_.apply(ind)).dropRight(1) // drop label corr
+          },
           parentCorr = getParentValue(col, corrParent, corrParentNoKeys),
           parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys),
           maxRuleConfidences = maxRuleConfMap.getOrElse(name, Seq.empty),
@@ -195,6 +201,7 @@ object DerivedFeatureFilterUtils {
           variance = variances(labelColumnIndex),
           corrLabel = None,
           cramersV = None,
+          featureCorrs = Seq.empty,
           parentCorr = None,
           parentCramersV = None,
           maxRuleConfidences = Seq.empty,
@@ -214,6 +221,7 @@ object DerivedFeatureFilterUtils {
    * @param minVariance            Min variance for dropping features
    * @param minCorrelation         Min correlation with label for dropping features
    * @param maxCorrelation         Max correlation with label for dropping features
+   * @param maxFeatureCorr         Max correlation between features for dropping the later features
    * @param maxCramersV            Max Cramer's V for dropping categorical features
    * @param maxRuleConfidence      Max allowed confidence of association rules for dropping features
    * @param minRequiredRuleSupport Threshold for association rule
@@ -229,6 +237,7 @@ object DerivedFeatureFilterUtils {
     minVariance: Double,
     minCorrelation: Double = 0.0,
     maxCorrelation: Double = 1.0,
+    maxFeatureCorr: Double = 1.0,
     maxCramersV: Double = 1.0,
     maxRuleConfidence: Double = 1.0,
     minRequiredRuleSupport: Double = 1.0,
@@ -256,6 +265,7 @@ object DerivedFeatureFilterUtils {
         minVariance = minVariance,
         minCorrelation = minCorrelation,
         maxCorrelation = maxCorrelation,
+        maxFeatureCorr = maxFeatureCorr,
         maxCramersV = maxCramersV,
         maxRuleConfidence = maxRuleConfidence,
         minRequiredRuleSupport = minRequiredRuleSupport,
@@ -314,6 +324,7 @@ private[op] case class ColumnStatistics
   cramersV: Option[Double],
   parentCorr: Option[Double],
   parentCramersV: Option[Double],
+  featureCorrs: Seq[Double],
   // Need to be able to hold up to two maxRuleConfidences or supports for the case of nullIndicator columns coming
   // from non-categorical features (since they will correspond to a 2x2 contingency matrix)
   maxRuleConfidences: Seq[Double],
@@ -341,6 +352,7 @@ private[op] case class ColumnStatistics
     minVariance: Double,
     maxCorrelation: Double,
     minCorrelation: Double,
+    maxFeatureCorr: Double,
     maxCramersV: Double,
     maxRuleConfidence: Double,
     minRequiredRuleSupport: Double,
@@ -361,6 +373,10 @@ private[op] case class ColumnStatistics
         corrLabel.filter(Math.abs(_) > maxCorrelation).map(corr =>
           s"correlation $corr higher than max correlation $maxCorrelation"
         ),
+        column.flatMap{ case cl => featureCorrs.take(cl.index).find(Math.abs(_) > maxFeatureCorr).map(corr =>
+          s"this feature has correlations $corr with another feature higher than max feature-feature" +
+            s" correlation $maxFeatureCorr")
+        },
         cramersV.filter(_ > maxCramersV).map(cv =>
           s"Cramer's V $cv higher than max Cramer's V $maxCramersV"
         ),
