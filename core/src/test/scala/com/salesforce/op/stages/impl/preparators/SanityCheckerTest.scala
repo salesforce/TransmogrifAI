@@ -184,7 +184,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     checker.getOrDefault(checker.maxCorrelation) shouldBe SanityChecker.MaxCorrelation
     checker.getOrDefault(checker.minVariance) shouldBe SanityChecker.MinVariance
     checker.getOrDefault(checker.minCorrelation) shouldBe SanityChecker.MinCorrelation
-    checker.getOrDefault(checker.maxFeatureCorr) shouldBe SanityChecker.MaxFeatureCorr
+    checker.getOrDefault(checker.maxFeatureCorrelation) shouldBe SanityChecker.MaxFeatureCorr
     checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson.entryName
     checker.getOrDefault(checker.removeBadFeatures) shouldBe SanityChecker.RemoveBadFeatures
   }

@@ -99,14 +99,14 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
   def setMaxCorrelation(value: Double): this.type = set(maxCorrelation, value)
   def getMaxCorrelation: Double = $(maxCorrelation)
 
-  final val maxFeatureCorr = new DoubleParam(
+  final val maxFeatureCorrelation = new DoubleParam(
     parent = this, name = "maxFeatureCorr",
     doc = "Maximum correlation (absolute value) allowed between two features. When this value is exceeded the second" +
       " feature in the correlated pair will be dropped.",
     isValid = ParamValidators.inRange(lowerBound = -0.1, upperBound = 1.1, lowerInclusive = true, upperInclusive = true)
   )
-  def setMaxFeatureCorr(value: Double): this.type = set(maxFeatureCorr, value)
-  def getMaxFeatureCorr: Double = $(maxFeatureCorr)
+  def setMaxFeatureCorr(value: Double): this.type = set(maxFeatureCorrelation, value)
+  def getMaxFeatureCorr: Double = $(maxFeatureCorrelation)
 
   final val minCorrelation = new DoubleParam(
     parent = this, name = "minCorrelation",
@@ -199,7 +199,7 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
     sampleUpperLimit -> SanityChecker.SampleUpperLimit,
     maxCorrelation -> SanityChecker.MaxCorrelation,
     minCorrelation -> SanityChecker.MinCorrelation,
-    maxFeatureCorr -> SanityChecker.MaxFeatureCorr,
+    maxFeatureCorrelation -> SanityChecker.MaxFeatureCorr,
     minVariance -> SanityChecker.MinVariance,
     maxCramersV -> SanityChecker.MaxCramersV,
     removeBadFeatures -> SanityChecker.RemoveBadFeatures,
@@ -489,7 +489,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         $(minVariance),
         $(minCorrelation),
         $(maxCorrelation),
-        $(maxFeatureCorr),
+        $(maxFeatureCorrelation),
         $(maxCramersV),
         $(maxRuleConfidence),
         $(minRequiredRuleSupport),
