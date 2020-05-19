@@ -495,7 +495,7 @@ trait RichNumericFeature {
         .setSampleUpperLimit(sampleUpperLimit)
         .setMaxCorrelation(maxCorrelation)
         .setMinCorrelation(minCorrelation)
-        .setMaxFeatureCorr(maxFeatureCorr)
+        .setMaxFeatureCorrelation(maxFeatureCorr)
         .setMaxCramersV(maxCramersV)
         .setCorrelationType(correlationType)
         .setMinVariance(minVariance)

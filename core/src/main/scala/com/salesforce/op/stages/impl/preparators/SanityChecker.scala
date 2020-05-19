@@ -105,8 +105,8 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
       " feature in the correlated pair will be dropped.",
     isValid = ParamValidators.inRange(lowerBound = -0.1, upperBound = 1.1, lowerInclusive = true, upperInclusive = true)
   )
-  def setMaxFeatureCorr(value: Double): this.type = set(maxFeatureCorrelation, value)
-  def getMaxFeatureCorr: Double = $(maxFeatureCorrelation)
+  def setMaxFeatureCorrelation(value: Double): this.type = set(maxFeatureCorrelation, value)
+  def getMaxFeatureCorrelation: Double = $(maxFeatureCorrelation)
 
   final val minCorrelation = new DoubleParam(
     parent = this, name = "minCorrelation",
