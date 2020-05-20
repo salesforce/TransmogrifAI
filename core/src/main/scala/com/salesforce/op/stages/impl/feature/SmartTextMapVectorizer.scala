@@ -381,8 +381,10 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val keysText = keysHash + keysIgnore // Go algebird!
     val categoricalVector = categoricalPivotFn(rowCategorical)
 
-    val rowHashTokenized = rowHash.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
-    val rowIgnoreTokenized = rowIgnore.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
+    val rowHashTokenized = rowHash.map(_.value.map { case (k, v) => k -> tokenize(text = v.toText,
+      analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens })
+    val rowIgnoreTokenized = rowIgnore.map(_.value.map { case (k, v) => k -> tokenize(text = v.toText,
+      analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens })
     val rowTextTokenized = rowHashTokenized + rowIgnoreTokenized // Go go algebird!
     val hashVector = hash(rowHashTokenized, keysHash, args.hashingParams)
 

@@ -342,8 +342,10 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
 
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
-      val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
-      val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
+      val textTokens: Seq[TextList] = textToHash.map(t => tokenize(text = t,
+        analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens)
+      val ignorableTextTokens: Seq[TextList] = textToIgnore.map(t => tokenize(text = t,
+        analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)
