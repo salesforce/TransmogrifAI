@@ -31,16 +31,21 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.Assertion
 import org.scalatest.junit.JUnitRunner
+
+import scala.util.Random
 
 
 @RunWith(classOf[JUnitRunner])
@@ -97,6 +102,10 @@ class SmartTextVectorizerTest
   val stringData: String = "I have got a LovEly buncH of cOcOnuts. " +
     "Here they are ALL standing in a row."
   val tol = 1e-12 // Tolerance for comparing real numbers
+
+  val oneCountryData: Seq[Text] = Seq.fill(1000)(Text("United States"))
+  val categoricalCountryData = Random.shuffle(oneCountryData ++ countryData)
+  val (countryDF, rawCatCountry) = TestFeatureBuilder("rawCatCountry", categoricalCountryData)
 
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
@@ -235,6 +244,7 @@ class SmartTextVectorizerTest
     meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
+
   it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance" in {
     val topKCategorial = 3
     val hashSize = 5
@@ -268,6 +278,98 @@ class SmartTextVectorizerTest
     meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
     meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
     meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "treat the edge case of coverage being near 0" in {
+    val maxCard = 100
+    val vectorizer = new SmartTextVectorizer().setCoveragePct(1e-10).setMaxCardinality(maxCard).setMinSupport(1)
+      .setTrackTextLen(true).setInput(rawCatCountry)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.TopK + 2, Pivot)
+  }
+  it should "treat the edge case of coverage being near 1" in {
+    val maxCard = 100
+    val vectorizer = new SmartTextVectorizer().setCoveragePct(1.0 - 1e-10).setMaxCardinality(maxCard).setMinSupport(1)
+      .setTrackTextLen(true).setInput(rawCatCountry)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.DefaultNumOfFeatures + 2, Hash)
+  }
+
+  it should "detect one categorical with high cardinality using the coverage" in {
+    val maxCard = 100
+    val topK = 10
+    val cardinality = countryDF.select(rawCatCountry).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
+      .setInput(rawCatCountry)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
+    assertVectorLength(transformed, output, topK + 2, Pivot)
+  }
+
+  it should "not pivot using the coverage because of a high minimum support" in {
+    val maxCard = 100
+    val topK = 10
+    val minSupport = 99999
+    val numHashes = 5
+    val cardinality = countryDF.select(rawCatCountry).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(minSupport).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountry)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
+    assertVectorLength(transformed, output, numHashes + 2, Hash)
+  }
+
+  it should "still pivot using the coverage despite a high minimum support" in {
+    val maxCard = 100
+    val topK = 10
+    val minSupport = 100
+    val numHashes = 5
+    val cardinality = countryDF.select(rawCatCountry).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(minSupport).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountry)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
+    assertVectorLength(transformed, output, 3, Pivot)
+  }
+
+  it should "not pivot using the coverage because top K is too high" in {
+    val maxCard = 100
+    val topK = 1000000
+    val numHashes = 5
+    val cardinality = countryDF.select(rawCatCountry).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be <= topK
+    val vectorizer = new SmartTextVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountry)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
+    assertVectorLength(transformed, output, numHashes + 2, Hash)
+  }
+
+  it should "still transform country into text, despite the coverage" in {
+    val maxCard = 100
+    val topK = 10
+    val numHashes = 5
+    val cardinality = rawDF.select(rawCountry).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val coverageHashed = new SmartTextVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
+      .setTrackTextLen(true).setNumFeatures(numHashes).setInput(rawCountry).getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(coverageHashed).transform(rawDF)
+    assertVectorLength(transformed, coverageHashed, numHashes + 2, Hash)
   }
 
   it should "fail with an error" in {
@@ -543,6 +645,23 @@ class SmartTextVectorizerTest
 
     checkDerivedQuantities(res, Seq(58).map(_.toLong))
   }
+
+  private[op] def assertVectorLength(df: DataFrame, output: FeatureLike[OPVector],
+    expectedLength: Int, textVectorizationMethod: TextVectorizationMethod): Unit = {
+    val result = df.collect(output)
+    val firstRes = result.head
+    firstRes.v.size shouldBe expectedLength
+    val metaColumns = OpVectorMetadata(df.schema(output.name)).columns
+    metaColumns.length shouldBe expectedLength
+    textVectorizationMethod match {
+      case Pivot => assert(metaColumns(expectedLength - 2).indicatorValue.contains(OpVectorColumnMetadata.OtherString))
+      case Hash => assert(metaColumns(expectedLength - 2).descriptorValue
+        .contains(OpVectorColumnMetadata.TextLenString))
+      case other => throw new Error(s"Only Pivoting or Hashing possible, got ${other} instead")
+    }
+    assert(metaColumns(expectedLength - 1).indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
 
   /**
    * Set of tests to check that the derived quantities calculated on the length distribution in TextStats
