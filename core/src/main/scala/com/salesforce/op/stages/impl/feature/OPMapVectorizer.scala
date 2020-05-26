@@ -186,7 +186,7 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
     parent = this, name = "numFeatures",
     doc = s"number of features (hashes) to generate (default: ${TransmogrifierDefaults.DefaultNumOfFeatures})",
     isValid = ParamValidators.inRange(
-      lowerBound = 0, upperBound = TransmogrifierDefaults.MaxNumOfFeatures,
+      lowerBound = 0, upperBound = 1E7,
       lowerInclusive = false, upperInclusive = true
     )
   )
