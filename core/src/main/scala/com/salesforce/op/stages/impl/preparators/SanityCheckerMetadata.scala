@@ -89,11 +89,17 @@ case class SanityCheckerSummary
     colStats: MultivariateStatisticalSummary,
     names: Seq[String],
     correlationType: CorrelationType,
-    sample: Double
+    sample: Double,
+    keepFeatureFeature: String
   ) {
     this(
       correlations = new Correlations(
-        stats.filter(s => s.corrLabel.isDefined).map(s => (s.name, s.corrLabel.get, s.featureCorrs)),
+        stats.filter(s => s.corrLabel.isDefined).map { s =>
+          keepFeatureFeature match {
+            case CorrelationLevel.Stored.entryName => (s.name, s.corrLabel.get, s.featureCorrs)
+            case _ => (s.name, s.corrLabel.get, Seq.empty)
+          }
+        },
         correlationType
       ),
       dropped = dropped,

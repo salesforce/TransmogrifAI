@@ -532,7 +532,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr, featuresIngore)
   }
 
-  it should "only calculate correlations between feature and the label if requested" in {
+  it should "only store correlations between feature and the label if requested" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setHashSpaceStrategy(HashSpaceStrategy.Shared)
@@ -544,7 +544,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setRemoveBadFeatures(true)
       .setRemoveFeatureGroup(true)
       .setProtectTextSharedHash(true)
-      .setFeatureLabelCorrOnly(true)
+      .setFeatureFeatureCorrLevel(CorrelationLevel.Stored)
       .setMinCorrelation(0.0)
       .setMaxCorrelation(0.8)
       .setMaxCramersV(0.8)
@@ -555,6 +555,8 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
 
+    transformed
+
     val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
     val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
       "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
@@ -564,7 +566,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
-      featuresToDrop, featuresWithNaNCorr)
+      featuresToDrop, featuresWithNaNCorr, true)
   }
 
   it should "not fail when calculating feature-label correlations on a 5k element feature vector" in {
@@ -584,7 +586,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setRemoveBadFeatures(false)
       .setRemoveFeatureGroup(true)
       .setProtectTextSharedHash(true)
-      .setFeatureLabelCorrOnly(true)
+      .setFeatureFeatureCorrLevel(CorrelationLevel.Off)
       .setMinVariance(-0.1)
       .setMinCorrelation(0.0)
       .setMaxCorrelation(0.8)
@@ -611,7 +613,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
-      featuresToDrop, featuresWithNaNCorr)
+      featuresToDrop, featuresWithNaNCorr, false)
   }
 
   it should "not fail when maps have the same keys" in {
@@ -666,7 +668,8 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     expectedFeatNames: Seq[String],
     expectedFeaturesToDrop: Seq[String],
     expectedCorrFeatNamesIsNan: Seq[String],
-    ignoredNames: Seq[String] = Seq.empty
+    ignoredNames: Seq[String] = Seq.empty,
+    hasFeatureFeature: Boolean = false
   ): Unit = {
     transformedData.select(outputColName).collect().foreach { case Row(features: Vector) =>
       features.toArray.length equals
@@ -682,6 +685,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     } should contain theSameElementsAs expectedCorrFeatNamesIsNan
     summary.correlations.featuresIn should contain theSameElementsAs expectedFeatNames.diff(ignoredNames)
     summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
+    summary.correlations.valuesWithFeatures.isEmpty shouldEqual hasFeatureFeature
   }
 
   private def getMetadata(outputColName: String, transformedData: DataFrame): Metadata = {
