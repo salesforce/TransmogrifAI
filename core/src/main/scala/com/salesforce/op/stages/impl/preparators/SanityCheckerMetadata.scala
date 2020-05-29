@@ -95,8 +95,8 @@ case class SanityCheckerSummary
     this(
       correlations = new Correlations(
         stats.filter(s => s.corrLabel.isDefined).map { s =>
-          keepFeatureFeature match {
-            case CorrelationLevel.Stored.entryName => (s.name, s.corrLabel.get, s.featureCorrs)
+          CorrelationLevel.withName(keepFeatureFeature) match {
+            case CorrelationLevel.Stored => (s.name, s.corrLabel.get, s.featureCorrs)
             case _ => (s.name, s.corrLabel.get, Seq.empty)
           }
         },
