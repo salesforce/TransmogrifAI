@@ -564,7 +564,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
-      featuresToDrop, featuresWithNaNCorr, true)
+      featuresToDrop, featuresWithNaNCorr, hasFeatureFeature = true)
   }
 
   it should "not fail when calculating feature-label correlations on a 5k element feature vector" in {
@@ -611,7 +611,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames,
-      featuresToDrop, featuresWithNaNCorr, false)
+      featuresToDrop, featuresWithNaNCorr, hasFeatureFeature = false)
   }
 
   it should "not fail when maps have the same keys" in {
