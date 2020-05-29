@@ -683,7 +683,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     } should contain theSameElementsAs expectedCorrFeatNamesIsNan
     summary.correlations.featuresIn should contain theSameElementsAs expectedFeatNames.diff(ignoredNames)
     summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
-    summary.correlations.valuesWithFeatures.isEmpty shouldEqual hasFeatureFeature
+    summary.correlations.valuesWithFeatures.nonEmpty shouldEqual hasFeatureFeature
   }
 
   private def getMetadata(outputColName: String, transformedData: DataFrame): Metadata = {

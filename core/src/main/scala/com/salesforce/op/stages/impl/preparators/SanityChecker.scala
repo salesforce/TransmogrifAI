@@ -181,8 +181,8 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
     parent = this, name = "featureFeatureCorrOnly",
     doc = "This setting determines feature-feature correlation computations. Levels are: Off, Computed, Stored"
   )
-  def setFeatureFeatureCorrLevel(value: CorrelationLevel): this.type = set(featureFeatureCorrLevel.name, value)
-  def getFeatureeFatureCorrLevel: CorrelationLevel = CorrelationLevel.withName($(featureFeatureCorrLevel))
+  def setFeatureFeatureCorrLevel(value: CorrelationLevel): this.type = set(featureFeatureCorrLevel, value.entryName)
+  def getFeatureFeatureCorrLevel: CorrelationLevel = CorrelationLevel.withName($(featureFeatureCorrLevel))
 
   @deprecated("this setting is overridden by featureFeatureCorrLevel", "0.7.0")
   def setFeatureLabelCorrOnly(value: Boolean): this.type = {
@@ -522,7 +522,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
       names = featureNames :+ in1.name,
       correlationType = CorrelationType.withNameInsensitive(corrType),
       sample = sampleFraction,
-      keepFeatureFeature = $(featureFeatureCorrLevel)
+      keepFeatureFeature = getFeatureFeatureCorrLevel
     )
     setMetadata(outputMeta.toMetadata.withSummaryMetadata(summary.toMetadata()))
 

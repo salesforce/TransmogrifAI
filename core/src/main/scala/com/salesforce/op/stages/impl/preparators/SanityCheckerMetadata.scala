@@ -90,12 +90,12 @@ case class SanityCheckerSummary
     names: Seq[String],
     correlationType: CorrelationType,
     sample: Double,
-    keepFeatureFeature: String
+    keepFeatureFeature: CorrelationLevel
   ) {
     this(
       correlations = new Correlations(
         stats.filter(s => s.corrLabel.isDefined).map { s =>
-          CorrelationLevel.withName(keepFeatureFeature) match {
+          keepFeatureFeature match {
             case CorrelationLevel.Stored => (s.name, s.corrLabel.get, s.featureCorrs)
             case _ => (s.name, s.corrLabel.get, Seq.empty)
           }
@@ -294,7 +294,7 @@ case class Correlations
   def this(corrs: Seq[(String, Double, Seq[Double])], corrType: CorrelationType) = this(
     featuresIn = corrs.map(_._1),
     valuesWithLabel = corrs.map(_._2),
-    valuesWithFeatures = corrs.map(_._3),
+    valuesWithFeatures = if (corrs.flatMap(_._3).isEmpty) Seq.empty else corrs.map(_._3),
     corrType = corrType
   )
 
