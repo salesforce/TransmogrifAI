@@ -115,6 +115,7 @@ trait RichTextFeature {
      *                             confidence greater than the threshold then defaultLanguage is used.
      * @param hashSpaceStrategy    strategy to determine whether to use shared hash space for all included features
      * @param minTokenLength       minimum token length, >= 1.
+     * @param stripHtml                 indicates whether to strip HTML tags from the text or not before analyzing
      * @param trackNulls           indicates whether or not to track null values in a separate column.
      *                             Since features may be combined into a shared hash space here, the null value
      *                             should be tracked separately
@@ -374,6 +375,7 @@ trait RichTextFeature {
      *                       In this case, the tokens will be equivalent to the output from (without empty tokens).
      * @param minTokenLength minimum token length, >= 1.
      * @param toLowercase    indicates whether to convert all characters to lowercase before analyzing
+     * @param stripHtml                 indicates whether to strip HTML tags from the text or not before analyzing
      * @return tokenized feature
      */
     def tokenizeRegex

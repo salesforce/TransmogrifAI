@@ -277,6 +277,7 @@ trait RichMapFeature {
      *                                  options are from the full entry or from the tokens
      * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
      *                                  be hashed instead of ignored
+     * @param stripHtml                 indicates whether to strip HTML tags from the text or not before analyzing
      * @param others                    additional text features
      * @return result feature of type Vector
      */
@@ -428,10 +429,9 @@ trait RichMapFeature {
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
-     * @param tokenizeForLengths        If true, then the length counts will be lengths of the tokens in the entries.
-     *                                  If false, then the length counts will be the lengths of the entire entries
      * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
      *                                  be hashed instead of ignored
+     * @param stripHtml                 indicates whether to strip HTML tags from the text or not before analyzing
      * @param others                    additional text features
      * @return result feature of type Vector
      */
