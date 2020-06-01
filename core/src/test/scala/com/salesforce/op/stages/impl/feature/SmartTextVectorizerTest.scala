@@ -61,6 +61,18 @@ class SmartTextVectorizerTest
       (Text.empty, Text.empty)
     )
   )
+
+  lazy val (inputData2, t1, t2) = TestFeatureBuilder("text1", "text2",
+    Seq[(Text, Text)](
+      ("<h1>hello world</h1>".toText, "<p>Hello world!</p>".toText),
+      ("<h2 title=\"I'm a header\">hello world</h2>".toText,
+        "<p title=\"I'm a tooltip\">What's up</p>".toText),
+      ("<h1>good evening</h1>".toText, "<p>How are you doing, my friend?</p>".toText),
+      ("<h2 title=\"I'm a header\">hello world</h2>".toText,
+        "<p title=\"I'm a tooltip\">Not bad, my friend.</p>".toText),
+      (Text.empty, Text.empty)
+    )
+  )
   val estimator = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
@@ -120,6 +132,36 @@ class SmartTextVectorizerTest
 
     val transformed = new OpWorkflow()
       .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
+    val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+    val fieldCategorical = transformed.schema(categoricalVectorized.name)
+    val catRes = transformed.collect(categoricalVectorized)
+    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
+    val fieldText = transformed.schema(textVectorized.name)
+    val textRes = transformed.collect(textVectorized)
+    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
+    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
+      val combined = categoricalVector.combine(textVector, nullVector)
+      smartVector -> combined
+    }.unzip
+
+    smart shouldBe expected
+  }
+
+  it should "detect one categorical and one non-categorical text feature with html data" in {
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setStripHtml(true).setInput(t1, t2).getOutput()
+
+    val categoricalVectorized = new OpTextPivotVectorizer[Text]().setMinSupport(1).setTopK(2).setInput(t1).getOutput()
+    val tokenizedText = new TextTokenizer[Text]().setInput(t2).getOutput()
+    val textVectorized = new OPCollectionHashingVectorizer[TextList]()
+      .setNumFeatures(4).setPrependFeatureName(false).setInput(tokenizedText).getOutput()
+    val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
+
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData2)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
