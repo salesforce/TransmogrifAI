@@ -290,7 +290,7 @@ class SmartTextVectorizerTest
   }
   it should "treat the edge case of coverage being 1" in {
     val maxCard = 100
-    val vectorizer = new SmartTextVectorizer().setCoveragePct(1.0).setMaxCardinality(maxCard).setMinSupport(1)
+    val vectorizer = new SmartTextVectorizer().setCoveragePct(1.0 - 1e-10).setMaxCardinality(maxCard).setMinSupport(1)
       .setTrackTextLen(true).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
