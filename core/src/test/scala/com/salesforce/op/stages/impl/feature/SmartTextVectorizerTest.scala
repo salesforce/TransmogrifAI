@@ -174,6 +174,9 @@ class SmartTextVectorizerTest
       smartVector -> combined
     }.unzip
 
+    println(smart)
+    println("?????????")
+    println(expected)
     smart shouldBe expected
   }
 
