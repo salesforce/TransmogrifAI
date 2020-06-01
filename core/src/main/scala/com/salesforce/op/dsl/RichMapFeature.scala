@@ -304,6 +304,7 @@ trait RichMapFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       others: Array[FeatureLike[TextMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -318,6 +319,7 @@ trait RichMapFeature {
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
         .setMinTokenLength(minTokenLength)
+        .setStripHtml(stripHtml)
         .setToLowercase(toLowercase)
         .setTopK(topK)
         .setMinSupport(minSupport)
@@ -457,6 +459,7 @@ trait RichMapFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -471,6 +474,7 @@ trait RichMapFeature {
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
         .setMinTokenLength(minTokenLength)
+        .setStripHtml(stripHtml)
         .setToLowercase(toLowercase)
         .setTopK(topK)
         .setMinSupport(minSupport)

@@ -241,6 +241,7 @@ trait RichTextFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -254,6 +255,7 @@ trait RichTextFeature {
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
         .setMinTokenLength(minTokenLength)
+        .setStripHtml(stripHtml)
         .setToLowercase(toLowercase)
         .setTopK(topK)
         .setMinSupport(minSupport)
@@ -315,7 +317,8 @@ trait RichTextFeature {
       autoDetectThreshold: Double,
       defaultLanguage: Language,
       minTokenLength: Int,
-      toLowercase: Boolean
+      toLowercase: Boolean,
+      stripHtml: Boolean
     ): FeatureLike[TextList] =
       f.transformWith(
         new TextTokenizer[T](analyzer = analyzer, languageDetector = languageDetector)
@@ -324,6 +327,7 @@ trait RichTextFeature {
           .setAutoDetectThreshold(autoDetectThreshold)
           .setMinTokenLength(minTokenLength)
           .setToLowercase(toLowercase)
+          .setStripHtml(stripHtml)
       )
 
     /**
