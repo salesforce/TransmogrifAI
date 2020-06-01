@@ -177,13 +177,21 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
   def setMinRequiredRuleSupport(value: Double): this.type = set(minRequiredRuleSupport, value)
   def getMinRequiredRuleSupport: Double = $(minRequiredRuleSupport)
 
-  final val featureLabelCorrOnly = new BooleanParam(
-    parent = this, name = "featureLabelCorrOnly",
-    doc = "If true, then only calculate the correlations between the features and the label. Otherwise, calculate " +
-      "the entire correlation matrix, which includes all feature-feature correlations."
+  final val featureFeatureCorrLevel = new Param[String](
+    parent = this, name = "featureFeatureCorrOnly",
+    doc = "This setting determines feature-feature correlation computations. Levels are: Off, Computed, Stored"
   )
-  def setFeatureLabelCorrOnly(value: Boolean): this.type = set(featureLabelCorrOnly, value)
-  def getFeatureLabelCorrOnly: Boolean = $(featureLabelCorrOnly)
+  def setFeatureFeatureCorrLevel(value: CorrelationLevel): this.type = set(featureFeatureCorrLevel, value.entryName)
+  def getFeatureFeatureCorrLevel: CorrelationLevel = CorrelationLevel.withName($(featureFeatureCorrLevel))
+
+  @deprecated("this setting is overridden by featureFeatureCorrLevel", "0.7.0")
+  def setFeatureLabelCorrOnly(value: Boolean): this.type = {
+    if (value) set(featureFeatureCorrLevel, CorrelationLevel.Off.entryName)
+    else set(featureFeatureCorrLevel, CorrelationLevel.Computed.entryName)
+  }
+
+  @deprecated("this setting is overridden by featureFeatureCorrLevel", "0.7.0")
+  def getFeatureLabelCorrOnly: Boolean = $(featureFeatureCorrLevel) == CorrelationLevel.Off.entryName
 
   final val correlationExclusion: Param[String] = new Param[String](this, "correlationExclusion",
     "Setting for what categories of feature vector columns to exclude from the correlation calculation",
@@ -208,7 +216,7 @@ trait SanityCheckerParams extends DerivedFeatureFilterParams {
     correlationType -> SanityChecker.CorrelationTypeDefault.entryName,
     maxRuleConfidence -> SanityChecker.MaxRuleConfidence,
     minRequiredRuleSupport -> SanityChecker.MinRequiredRuleSupport,
-    featureLabelCorrOnly -> SanityChecker.FeatureLabelCorrOnly,
+    featureFeatureCorrLevel -> SanityChecker.FeatureFeatureCorrLevel.entryName,
     correlationExclusion -> SanityChecker.CorrelationExclusionDefault.entryName
   )
 }
@@ -453,7 +461,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     else ((0 until featureSize + 1).toArray, vectorRows)
     val numCorrIndices = corrIndices.length
 
-    val (corrMatrix, corrsWithLabel) = if ($(featureLabelCorrOnly)) {
+    val (corrMatrix, corrsWithLabel) = if ($(featureFeatureCorrLevel) == CorrelationLevel.Off.entryName) {
       None -> OpStatistics.computeCorrelationsWithLabel(vectorRowsForCorr, colStats, count)
     }
     else {
@@ -513,7 +521,8 @@ class SanityChecker(uid: String = UID[SanityChecker])
       colStats = colStats,
       names = featureNames :+ in1.name,
       correlationType = CorrelationType.withNameInsensitive(corrType),
-      sample = sampleFraction
+      sample = sampleFraction,
+      keepFeatureFeature = getFeatureFeatureCorrLevel
     )
     setMetadata(outputMeta.toMetadata.withSummaryMetadata(summary.toMetadata()))
 
@@ -565,7 +574,7 @@ object SanityChecker {
   // These settings will make the maxRuleConfidence check off by default
   val MaxRuleConfidence = 1.0
   val MinRequiredRuleSupport = 1.0
-  val FeatureLabelCorrOnly = false
+  val FeatureFeatureCorrLevel = CorrelationLevel.Computed
   val CorrelationExclusionDefault = CorrelationExclusion.NoExclusion
 
   def SampleSeed: Long = util.Random.nextLong() // scalastyle:off method.name
@@ -619,4 +628,29 @@ object CorrelationExclusion extends Enum[CorrelationExclusion] {
    * Exclude columns coming from hashed text features
    */
   case object HashedText extends CorrelationExclusion
+}
+
+
+/**
+ * Settings for feature - feature correlations
+ */
+sealed trait CorrelationLevel extends EnumEntry with Serializable
+
+object CorrelationLevel extends Enum[CorrelationLevel] {
+  val values: Seq[CorrelationLevel] = findValues
+
+  /**
+   * Feature-feature correlations are off
+   */
+  case object Off extends CorrelationLevel
+
+  /**
+   * Feature-feature correlations computed for feature exclusion
+   */
+  case object Computed extends CorrelationLevel
+
+  /**
+   * Feature-feature correlations stored in metadata
+   */
+  case object Stored extends CorrelationLevel
 }
