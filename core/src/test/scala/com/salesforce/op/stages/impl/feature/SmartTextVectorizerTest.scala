@@ -65,11 +65,9 @@ class SmartTextVectorizerTest
   lazy val (inputData2, t1, t2) = TestFeatureBuilder("text1", "text2",
     Seq[(Text, Text)](
       ("<h1>hello world</h1>".toText, "<p>Hello world!</p>".toText),
-      ("<h2 title=\"I'm a header\">hello world</h2>".toText,
-        "<p title=\"I'm a tooltip\">What's up</p>".toText),
+      ("<h2>hello world</h2>".toText, "<p>What's up</p>".toText),
       ("<h1>good evening</h1>".toText, "<p>How are you doing, my friend?</p>".toText),
-      ("<h2 title=\"I'm a header\">hello world</h2>".toText,
-        "<p title=\"I'm a tooltip\">Not bad, my friend.</p>".toText),
+      ("<h2>hello world</h2>".toText, "<p>Not bad, my friend.</p>".toText),
       (Text.empty, Text.empty)
     )
   )
