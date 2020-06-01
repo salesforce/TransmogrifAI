@@ -137,6 +137,7 @@ trait RichTextFeature {
       autoDetectLanguage: Boolean,
       minTokenLength: Int,
       toLowercase: Boolean,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
@@ -158,7 +159,8 @@ trait RichTextFeature {
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,
         minTokenLength = minTokenLength,
-        toLowercase = toLowercase
+        toLowercase = toLowercase,
+        stripHtml = stripHtml
       ))
       val hashedFeatures = new OPCollectionHashingVectorizer[TextList]()
         .setInput(tokenized)
@@ -308,6 +310,7 @@ trait RichTextFeature {
      *                            failed to make a good enough prediction.
      * @param minTokenLength      minimum token length, >= 1.
      * @param toLowercase         indicates whether to convert all characters to lowercase before analyzing
+     * @param stripHtml           indicates whether to strip HTML tags from the text or not before analyzing
      * @return tokenized feature
      */
     def tokenize(
@@ -358,7 +361,8 @@ trait RichTextFeature {
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,
         minTokenLength = minTokenLength,
-        toLowercase = toLowercase
+        toLowercase = toLowercase,
+        stripHtml = stripHtml
       )
 
     /**
@@ -377,7 +381,8 @@ trait RichTextFeature {
       pattern: String,
       group: Int = -1,
       minTokenLength: Int = TextTokenizer.MinTokenLength,
-      toLowercase: Boolean = TextTokenizer.ToLowercase
+      toLowercase: Boolean = TextTokenizer.ToLowercase,
+      stripHtml: Boolean = TextTokenizer.StripHtml
     ): FeatureLike[TextList] = {
 
       tokenize(
@@ -387,7 +392,8 @@ trait RichTextFeature {
         autoDetectThreshold = 1.0,
         defaultLanguage = Language.Unknown,
         minTokenLength = minTokenLength,
-        toLowercase = toLowercase
+        toLowercase = toLowercase,
+        stripHtml = stripHtml
       )
     }
 
