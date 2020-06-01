@@ -53,7 +53,7 @@ private[op] trait TransmogrifierDefaults {
   val NullString: String = OpVectorColumnMetadata.NullString
   val OtherString: String = OpVectorColumnMetadata.OtherString
   val DefaultNumOfFeatures: Int = 512
-  val MaxNumOfFeatures: Int = 131072 //2^17
+  val MaxNumOfFeatures: Int = 131072 // 2^17
   val DateListDefault: DateListPivot = DateListPivot.SinceLast
   val ReferenceDate: org.joda.time.DateTime = DateTimeUtils.now()
   val TopK: Int = 20
