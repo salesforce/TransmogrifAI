@@ -23,7 +23,8 @@ New features / updates:
 - Allow `TextStats` length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
 - Use Spark job grouping to distinguish steps of the machine learning flow [#467](https://github.com/salesforce/TransmogrifAI/pull/467), [#468](https://github.com/salesforce/TransmogrifAI/pull/468), [#470](https://github.com/salesforce/TransmogrifAI/pull/470)
 - Add categorical detection to be coverage based in addition to unique count based [#473](https://github.com/salesforce/TransmogrifAI/pull/473)
-- Remove duplicate features using sanity checker feature to feature correlations [#476](https://github.com/salesforce/TransmogrifAI/pull/476)
+- Remove duplicate features using sanity checker feature to feature correlations [#476](https://github.com/salesforce/TransmogrifAI/pull/476), [#479](https://github.com/salesforce/TransmogrifAI/pull/479)
+- Lift the upper bound on number of hash features [#477](https://github.com/salesforce/TransmogrifAI/pull/477)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
 - Update Apache Spark version to 2.4.5
