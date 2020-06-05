@@ -153,7 +153,7 @@ class SmartTextVectorizerTest
       .setStripHtml(true).setInput(t1, t2).getOutput()
 
     val categoricalVectorized = new OpTextPivotVectorizer[Text]().setMinSupport(1).setTopK(2).setInput(t1).getOutput()
-    val tokenizedText = new TextTokenizer[Text]().setInput(t2).getOutput()
+    val tokenizedText = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip).setInput(t2).getOutput()
     val textVectorized = new OPCollectionHashingVectorizer[TextList]()
       .setNumFeatures(4).setPrependFeatureName(false).setInput(tokenizedText).getOutput()
     val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
