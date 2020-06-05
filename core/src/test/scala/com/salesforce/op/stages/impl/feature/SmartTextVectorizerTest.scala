@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.FeatureLike
+import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
@@ -39,6 +39,7 @@ import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.text.TextAnalyzer
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -117,19 +118,28 @@ class SmartTextVectorizerTest
   val categoricalCountryData = Random.shuffle(oneCountryData ++ countryData)
   val (countryDF, rawCatCountry) = TestFeatureBuilder("rawCatCountry", categoricalCountryData)
 
-  it should "detect one categorical and one non-categorical text feature" in {
-    val smartVectorized = new SmartTextVectorizer()
-      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
-      .setInput(f1, f2).getOutput()
+  def testCategoricalAndNoncategorical(
+    feature1: Feature[Text],
+    feature2: Feature[Text],
+    df: DataFrame,
+    analyzer: TextAnalyzer = TextTokenizer.Analyzer,
+    stripHtml: Boolean = false
+  ): (Array[OPVector], Array[OPVector]) = {
 
-    val categoricalVectorized = new OpTextPivotVectorizer[Text]().setMinSupport(1).setTopK(2).setInput(f1).getOutput()
-    val tokenizedText = new TextTokenizer[Text]().setInput(f2).getOutput()
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+      .setTopK(2).setPrependFeatureName(false).setStripHtml(stripHtml)
+      .setInput(feature1, feature2).getOutput()
+
+    val categoricalVectorized = new OpTextPivotVectorizer[Text]()
+      .setMinSupport(1).setTopK(2).setInput(feature1).getOutput()
+    val tokenizedText = new TextTokenizer[Text](analyzer = analyzer).setInput(feature2).getOutput()
     val textVectorized = new OPCollectionHashingVectorizer[TextList]()
       .setNumFeatures(4).setPrependFeatureName(false).setInput(tokenizedText).getOutput()
     val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
 
     val transformed = new OpWorkflow()
-      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
+      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(df)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
@@ -139,44 +149,21 @@ class SmartTextVectorizerTest
     val fieldText = transformed.schema(textVectorized.name)
     val textRes = transformed.collect(textVectorized)
     assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
-    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
+    result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
       val combined = categoricalVector.combine(textVector, nullVector)
       smartVector -> combined
     }.unzip
+  }
 
+  it should "detect one categorical and one non-categorical text feature" in {
+    val (smart, expected) = testCategoricalAndNoncategorical(f1, f2, inputData)
     smart shouldBe expected
   }
 
   it should "detect one categorical and one non-categorical text feature with html data" in {
-    val smartVectorized = new SmartTextVectorizer()
-      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
-      .setStripHtml(true).setInput(t1, t2).getOutput()
-
-    val categoricalVectorized = new OpTextPivotVectorizer[Text]().setMinSupport(1).setTopK(2).setInput(t1).getOutput()
-    val tokenizedText = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip).setInput(t2).getOutput()
-    val textVectorized = new OPCollectionHashingVectorizer[TextList]()
-      .setNumFeatures(4).setPrependFeatureName(false).setInput(tokenizedText).getOutput()
-    val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
-
-    val transformed = new OpWorkflow()
-      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData2)
-    val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
-    val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
-    val fieldCategorical = transformed.schema(categoricalVectorized.name)
-    val catRes = transformed.collect(categoricalVectorized)
-    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
-    val fieldText = transformed.schema(textVectorized.name)
-    val textRes = transformed.collect(textVectorized)
-    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
-    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
-      val combined = categoricalVector.combine(textVector, nullVector)
-      smartVector -> combined
-    }.unzip
-
-    println(smart)
-    println("?????????")
-    println(expected)
+    val (smart, expected) = testCategoricalAndNoncategorical(
+      t1, t2, inputData2, TextTokenizer.AnalyzerHtmlStrip, true
+    )
     smart shouldBe expected
   }
 
