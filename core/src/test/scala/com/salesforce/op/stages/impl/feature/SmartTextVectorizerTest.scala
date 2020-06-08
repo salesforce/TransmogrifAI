@@ -712,4 +712,14 @@ class SmartTextVectorizerTest
     ts.lengthStdDev.isNaN shouldBe true
   }
 
+  it should "turn on stripHTML flag is equivalent to passing in a custom AnalyzerHtmlStrip" +
+    "inside SmartTextVectorizer" in {
+    val exampleHTML = "<body>Big ones, small <h1>ones</h1>, some as big as your head</body>".toText
+    val tokensWithFlag = new SmartTextVectorizer()
+      .setStripHtml(true).setInput(f1).tokenize(exampleHTML).tokens.value
+    val tokensWithAnalyzer = new SmartTextVectorizer().setInput(f1)
+      .tokenize(exampleHTML, analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens.value
+    tokensWithFlag should contain theSameElementsInOrderAs tokensWithAnalyzer
+  }
+
 }

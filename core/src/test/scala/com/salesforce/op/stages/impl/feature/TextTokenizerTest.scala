@@ -220,17 +220,6 @@ class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]]
         .setDefaultLanguage(Language.English)
     )
   }
-
-  it should "strip html tags and tokenize text correctly " +
-    "inside SmartTextVectorizer via stripHTML flag" in new English {
-    val exampleHTML = "<body>Big ones, small <h1>ones</h1>, some as big as your head</body>".toText
-    val tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
-    val smartText = new SmartTextVectorizer().setStripHtml(true).setInput(english)
-    val smartTextTokens = smartText.tokenize(exampleHTML).tokens.value
-    val manualTokens = tokenizer.tokenize(exampleHTML).tokens.value
-    smartTextTokens should contain theSameElementsInOrderAs manualTokens
-  }
-
   it should "strip html tags and tokenize text correctly [Japanese]" in new Japanese {
     assertTextTokenizer(
       input = japanese, expected = expectedHtml,

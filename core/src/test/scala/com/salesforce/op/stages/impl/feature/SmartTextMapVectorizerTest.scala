@@ -772,6 +772,16 @@ class SmartTextMapVectorizerTest
     checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3).map(_.toLong))
   }
 
+  it should "turn on stripHTML flag is equivalent to passing in a custom AnalyzerHtmlStrip" +
+    "inside SmartTextMapVectorizer" in {
+    val exampleHTML = "<body>Big ones, small <h1>ones</h1>, some as big as your head</body>".toText
+    val tokensWithFlag = new SmartTextMapVectorizer()
+      .setStripHtml(true).setInput(m1).tokenize(exampleHTML).tokens.value
+    val tokensWithAnalyzer = new SmartTextMapVectorizer().setInput(m1)
+      .tokenize(exampleHTML, analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens.value
+    tokensWithFlag should contain theSameElementsInOrderAs tokensWithAnalyzer
+  }
+
   private[op] def assertVectorLength(df: DataFrame, output: FeatureLike[OPVector],
     expectedLength: Int, textVectorizationMethod: TextVectorizationMethod): Unit = {
     val result = df.collect(output)
