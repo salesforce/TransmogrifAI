@@ -504,7 +504,8 @@ class SmartTextVectorizerTest
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
-      .setTopK(2).setPrependFeatureName(false).setStripHtml(stripHtml)
+      .setTopK(2).setPrependFeatureName(false)
+      .setStripHtml(stripHtml).setTrackTextLen(true)
       .setInput(feature1, feature2).getOutput()
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(df)
