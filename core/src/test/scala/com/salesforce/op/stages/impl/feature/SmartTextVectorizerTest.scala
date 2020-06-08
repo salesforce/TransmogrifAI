@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.{Feature, FeatureLike}
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
@@ -61,17 +61,6 @@ class SmartTextVectorizerTest
       (Text.empty, Text.empty)
     )
   )
-
-  lazy val (inputData2, t1, t2) = TestFeatureBuilder("text1", "text2",
-    Seq[(Text, Text)](
-      ("<h1>hello world</h1>".toText, "<p>Hello world!</p>".toText),
-      ("<h1>hello</h1> world".toText, "<p>What's <a>up</a> </p>".toText),
-      ("<h1>good evening</h1>".toText, "<p>How are you doing, my friend?</p>".toText),
-      ("hello <h1>world</h1>".toText, "<p>Not bad, <body>my</body> friend.</p>".toText),
-      (Text.empty, Text.empty)
-    )
-  )
-
   val estimator = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
@@ -493,29 +482,6 @@ class SmartTextVectorizerTest
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
-  }
-
-  def testSmartVecHTML(
-    feature1: Feature[Text],
-    feature2: Feature[Text],
-    df: DataFrame,
-    stripHtml: Boolean = false
-  ): Array[OPVector] = {
-
-    val smartVectorized = new SmartTextVectorizer()
-      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
-      .setTopK(2).setPrependFeatureName(false)
-      .setStripHtml(stripHtml).setTrackTextLen(true)
-      .setInput(feature1, feature2).getOutput()
-
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(df)
-
-    transformed.collect(smartVectorized)
-
-  }
-
-  it should "tokenize text vector correctly when html stripping is turned on" in {
-    testSmartVecHTML(f1, f2, inputData) shouldEqual testSmartVecHTML(t1, t2, inputData2, true)
   }
 
   it should "append the text lengths to the feature vector if one feature is determined to be text" in {
