@@ -216,35 +216,46 @@ class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]]
   it should "strip html tags and tokenize text correctly [English]" in new English {
     assertTextTokenizer(
       input = english, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text]().setStripHtml(true)
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.English)
     )
   }
+
+  it should "strip html tags and tokenize text correctly [English] via stripHTML flag" in new English {
+    val exampleHTML = "<body>Big ones, small <h1>ones</h1>, some as big as your head</body>".toText
+    val tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
+    val smartTextTokens = new SmartTextVectorizer().setStripHtml(true).tokenize(exampleHTML).tokens.value
+    val smartTextMapTokens = new SmartTextMapVectorizer().setStripHtml(true).tokenize(exampleHTML).tokens.value
+    val manualTokens = tokenizer.tokenize(exampleHTML).tokens.value
+    smartTextTokens should contain theSameElementsInOrderAs manualTokens
+    smartTextMapTokens should contain theSameElementsInOrderAs manualTokens
+  }
+
   it should "strip html tags and tokenize text correctly [Japanese]" in new Japanese {
     assertTextTokenizer(
       input = japanese, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text]().setStripHtml(true)
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.Japanese)
     )
   }
   it should "strip html tags and tokenize text correctly [French]" in new French {
     assertTextTokenizer(
       input = french, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text]().setStripHtml(true)
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.French)
     )
   }
   it should "strip html tags and tokenize text correctly [Chinese (Simplified)]" in new Chinese {
     assertTextTokenizer(
       input = chinese, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text]().setStripHtml(true)
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.SimplifiedChinese)
     )
   }
   it should "strip html tags and tokenize text correctly [Korean]" in new Korean {
     assertTextTokenizer(
       input = korean, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text]().setStripHtml(true)
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.Korean)
     )
   }
