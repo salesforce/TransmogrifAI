@@ -370,7 +370,6 @@ trait RichTextFeature {
      *                       In this case, the tokens will be equivalent to the output from (without empty tokens).
      * @param minTokenLength minimum token length, >= 1.
      * @param toLowercase    indicates whether to convert all characters to lowercase before analyzing
-     * @param stripHtml      indicates whether to strip HTML tags from the text or not before analyzing
      * @return tokenized feature
      */
     def tokenizeRegex
@@ -378,8 +377,7 @@ trait RichTextFeature {
       pattern: String,
       group: Int = -1,
       minTokenLength: Int = TextTokenizer.MinTokenLength,
-      toLowercase: Boolean = TextTokenizer.ToLowercase,
-      stripHtml: Boolean = TextTokenizer.StripHtml
+      toLowercase: Boolean = TextTokenizer.ToLowercase
     ): FeatureLike[TextList] = {
       // html stripping won't work here due since LuceneRegexTextAnalyzer
       tokenize(
