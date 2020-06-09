@@ -155,13 +155,12 @@ trait RichTextFeature {
       // scalastyle:on parameter.number
       val tokenized = (f +: others).map(_.tokenize(
         languageDetector = languageDetector,
-        analyzer = analyzer,
+        analyzer = if (stripHtml) TextTokenizer.AnalyzerHtmlStrip else analyzer,
         autoDetectLanguage = autoDetectLanguage,
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,
         minTokenLength = minTokenLength,
-        toLowercase = toLowercase,
-        stripHtml = stripHtml
+        toLowercase = toLowercase
       ))
       val hashedFeatures = new OPCollectionHashingVectorizer[TextList]()
         .setInput(tokenized)
@@ -311,7 +310,6 @@ trait RichTextFeature {
      *                            failed to make a good enough prediction.
      * @param minTokenLength      minimum token length, >= 1.
      * @param toLowercase         indicates whether to convert all characters to lowercase before analyzing
-     * @param stripHtml           indicates whether to strip HTML tags from the text or not before analyzing
      * @return tokenized feature
      */
     def tokenize(
@@ -321,8 +319,7 @@ trait RichTextFeature {
       autoDetectThreshold: Double,
       defaultLanguage: Language,
       minTokenLength: Int,
-      toLowercase: Boolean,
-      stripHtml: Boolean
+      toLowercase: Boolean
     ): FeatureLike[TextList] =
       f.transformWith(
         new TextTokenizer[T](analyzer = analyzer, languageDetector = languageDetector)
@@ -331,7 +328,6 @@ trait RichTextFeature {
           .setAutoDetectThreshold(autoDetectThreshold)
           .setMinTokenLength(minTokenLength)
           .setToLowercase(toLowercase)
-          .setStripHtml(stripHtml)
       )
 
     /**
@@ -362,8 +358,7 @@ trait RichTextFeature {
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,
         minTokenLength = minTokenLength,
-        toLowercase = toLowercase,
-        stripHtml = stripHtml
+        toLowercase = toLowercase
       )
 
     /**
@@ -386,7 +381,7 @@ trait RichTextFeature {
       toLowercase: Boolean = TextTokenizer.ToLowercase,
       stripHtml: Boolean = TextTokenizer.StripHtml
     ): FeatureLike[TextList] = {
-
+      // html stripping won't work here due since LuceneRegexTextAnalyzer
       tokenize(
         languageDetector = TextTokenizer.LanguageDetector,
         analyzer = new LuceneRegexTextAnalyzer(pattern, group),
@@ -394,8 +389,7 @@ trait RichTextFeature {
         autoDetectThreshold = 1.0,
         defaultLanguage = Language.Unknown,
         minTokenLength = minTokenLength,
-        toLowercase = toLowercase,
-        stripHtml = stripHtml
+        toLowercase = toLowercase
       )
     }
 
