@@ -148,6 +148,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       .setMinTokenLength(getMinTokenLength)
       .setToLowercase(getToLowercase)
       .setTrackTextLen($(trackTextLen))
+      .setStripHtml(getStripHtml)
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
