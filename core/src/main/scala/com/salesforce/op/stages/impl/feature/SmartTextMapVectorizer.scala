@@ -221,6 +221,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       .setMinTokenLength(getMinTokenLength)
       .setToLowercase(getToLowercase)
       .setTrackTextLen($(trackTextLen))
+      .setStripHtml(getStripHtml)
   }
 }
 
