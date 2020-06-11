@@ -3,7 +3,7 @@
 Start up your spark shell and add the [TransmogrifAI package](https://spark-packages.org/package/salesforce/TransmogrifAI):
 
 ```bash
-$SPARK_HOME/bin/spark-shell --packages com.salesforce.transmogrifai:transmogrifai-core_2.11:0.6.1
+$SPARK_HOME/bin/spark-shell --packages com.salesforce.transmogrifai:transmogrifai-core_2.11:0.7.0
 ```
 
 Or if you'd like to use the latest version from master:
