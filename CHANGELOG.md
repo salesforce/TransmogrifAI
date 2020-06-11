@@ -25,11 +25,11 @@ New features / updates:
 - Add categorical detection to be coverage based in addition to unique count based [#473](https://github.com/salesforce/TransmogrifAI/pull/473)
 - Remove duplicate features using sanity checker feature to feature correlations [#476](https://github.com/salesforce/TransmogrifAI/pull/476), [#479](https://github.com/salesforce/TransmogrifAI/pull/479)
 - Lift the upper bound on number of hash features [#477](https://github.com/salesforce/TransmogrifAI/pull/477)
-- Enable Html stripping on Text-like features [#478](https://github.com/salesforce/TransmogrifAI/pull/478)
+- Enable Html stripping on text-like features [#478](https://github.com/salesforce/TransmogrifAI/pull/478)
 
 Dependency updates ([#402](https://github.com/salesforce/TransmogrifAI/pull/402), [#466](https://github.com/salesforce/TransmogrifAI/pull/466)):
 - Update Apache Spark version to 2.4.5
-- Avro is a built-in data source in Spark 2.4, so no longer using the `spark-avro` package
+- Avro is a built-in data source in Spark 2.4, so no longer using the spark-avro package
 - Avro to 1.8.2
 - XGBoost to 0.90
 - MLeap to 0.14.0
