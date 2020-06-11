@@ -25,6 +25,7 @@ New features / updates:
 - Add categorical detection to be coverage based in addition to unique count based [#473](https://github.com/salesforce/TransmogrifAI/pull/473)
 - Remove duplicate features using sanity checker feature to feature correlations [#476](https://github.com/salesforce/TransmogrifAI/pull/476), [#479](https://github.com/salesforce/TransmogrifAI/pull/479)
 - Lift the upper bound on number of hash features [#477](https://github.com/salesforce/TransmogrifAI/pull/477)
+- Enable Html stripping on Text-like features [#478](https://github.com/salesforce/TransmogrifAI/pull/478)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
 - Update Apache Spark version to 2.4.5
