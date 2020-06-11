@@ -27,7 +27,7 @@ New features / updates:
 - Lift the upper bound on number of hash features [#477](https://github.com/salesforce/TransmogrifAI/pull/477)
 - Enable Html stripping on Text-like features [#478](https://github.com/salesforce/TransmogrifAI/pull/478)
 
-Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
+Dependency updates ([#402](https://github.com/salesforce/TransmogrifAI/pull/402), [#466](https://github.com/salesforce/TransmogrifAI/pull/466)):
 - Update Apache Spark version to 2.4.5
 - Avro is a built-in data source in Spark 2.4, so no longer using the `spark-avro` package
 - Avro to 1.8.2
