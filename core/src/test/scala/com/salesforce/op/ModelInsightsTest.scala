@@ -457,6 +457,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
+            i.distributions.foreach { i => i.cardEstimate should not be None}
+            o.distributions.foreach { o => o.cardEstimate shouldEqual None}
             RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
             RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
             RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
@@ -527,7 +529,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val labelName = "l"
 
   val summary = SanityCheckerSummary(
-    correlationsWLabel = Correlations(Seq("f0_f0_f2_1", "f0_f0_f3_2"), Seq(5.2, 5.3), Seq("f1_0"),
+    correlations = Correlations(Seq("f1_0", "f0_f0_f2_1", "f0_f0_f3_2"), Seq(Double.NaN, 5.2, 5.3), Seq.empty,
       CorrelationType.Pearson),
     dropped = Seq("f1_0"),
     featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
@@ -969,4 +971,5 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       "second" -> classOf[SingleMetric]
     )
   }
+
 }

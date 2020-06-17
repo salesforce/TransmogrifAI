@@ -115,6 +115,7 @@ trait RichTextFeature {
      *                             confidence greater than the threshold then defaultLanguage is used.
      * @param hashSpaceStrategy    strategy to determine whether to use shared hash space for all included features
      * @param minTokenLength       minimum token length, >= 1.
+     * @param stripHtml            indicates whether to strip HTML tags from the text or not before analyzing
      * @param trackNulls           indicates whether or not to track null values in a separate column.
      *                             Since features may be combined into a shared hash space here, the null value
      *                             should be tracked separately
@@ -137,6 +138,7 @@ trait RichTextFeature {
       autoDetectLanguage: Boolean,
       minTokenLength: Int,
       toLowercase: Boolean,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
@@ -153,7 +155,7 @@ trait RichTextFeature {
       // scalastyle:on parameter.number
       val tokenized = (f +: others).map(_.tokenize(
         languageDetector = languageDetector,
-        analyzer = analyzer,
+        analyzer = if (stripHtml) TextTokenizer.AnalyzerHtmlStrip else analyzer,
         autoDetectLanguage = autoDetectLanguage,
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,
@@ -241,6 +243,7 @@ trait RichTextFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -254,6 +257,7 @@ trait RichTextFeature {
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
         .setMinTokenLength(minTokenLength)
+        .setStripHtml(stripHtml)
         .setToLowercase(toLowercase)
         .setTopK(topK)
         .setMinSupport(minSupport)
@@ -375,7 +379,7 @@ trait RichTextFeature {
       minTokenLength: Int = TextTokenizer.MinTokenLength,
       toLowercase: Boolean = TextTokenizer.ToLowercase
     ): FeatureLike[TextList] = {
-
+      // html stripping won't work here due since LuceneRegexTextAnalyzer
       tokenize(
         languageDetector = TextTokenizer.LanguageDetector,
         analyzer = new LuceneRegexTextAnalyzer(pattern, group),
