@@ -525,6 +525,29 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     droppedMapDerivedIn.head.derivedFeatureGroup shouldBe Some("Female")
   }
 
+  it should "have derived feature value for map feature insights" in {
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+    val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
+    mapDerivedIn.size shouldBe 3
+    val f1InDer = mapDerivedIn.head
+    println(f1InDer)
+    f1InDer.derivedFeatureName shouldBe "f1_0"
+    f1InDer.stagesApplied shouldBe Seq.empty
+    f1InDer.derivedFeatureGroup shouldBe None
+    f1InDer.derivedFeatureValue shouldBe None
+    f1InDer.excluded shouldBe Option(true)
+    f1InDer.corr.map(_.toString) shouldBe Some("NaN")
+    f1InDer.cramersV shouldBe None
+    f1InDer.mutualInformation shouldBe None
+    f1InDer.pointwiseMutualInformation shouldBe Map.empty
+    f1InDer.countMatrix shouldBe Map.empty
+    f1InDer.contribution shouldBe Seq.empty
+    f1InDer.min shouldBe Some(1.1)
+    f1InDer.max shouldBe Some(0.1)
+    f1InDer.mean shouldBe Some(2.1)
+    f1InDer.variance shouldBe Some(3.1)
+  }
+
   val labelName = "l"
 
   val summary = SanityCheckerSummary(
