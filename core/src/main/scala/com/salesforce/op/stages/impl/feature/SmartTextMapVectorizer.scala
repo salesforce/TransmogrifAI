@@ -272,7 +272,8 @@ private[op] object TextMapStats extends CleanTextFun {
  * @param vectorizationMethod   method to use for text vectorization (either pivot, hashing, or ignoring)
  * @param topValues             most common values of a feature (only for categoricals)
  */
-case class SmartTextFeatureInfo(
+case class SmartTextFeatureInfo
+(
   key: String,
   vectorizationMethod: TextVectorizationMethod,
   topValues: Array[String]
@@ -336,7 +337,8 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
    * @param ignoreMaps        Sequence of maps that have at least one key that should be ignored
    * @param ignoreKeys        Sequence containing keys for each map that correspond to ignored features
    */
-  case class PartitionResult(
+  case class PartitionResult
+  (
     categoricalMaps: Seq[OPMap[String]],
     categoricalKeys: Seq[Seq[String]],
     hashMaps: Seq[OPMap[String]],
