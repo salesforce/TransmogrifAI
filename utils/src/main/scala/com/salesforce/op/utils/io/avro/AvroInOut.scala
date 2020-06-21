@@ -102,7 +102,8 @@ object AvroInOut {
       val fsFailed: Try[FileSystem] = fsSeq.head
       fsFailed match {
         case Failure(message) => throw new IllegalArgumentException(s"No readable path found : $message")
-        case Success(_) => throw new IllegalArgumentException("This shouldn't happen since no readable paths were found earlier.")
+        case Success(_) => throw new IllegalArgumentException("This shouldn't happen since no readable paths were " +
+                                                              "found earlier.")
       }
     }
   }
