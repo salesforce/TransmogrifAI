@@ -116,6 +116,9 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
 
     selectExistingPaths(s"$f1,$f3") shouldBe f1.toString
 
+    // check for path order insensitivity
+    selectExistingPaths(s"$f3,$f1") shouldBe f1.toString
+
     intercept[IllegalArgumentException] { selectExistingPaths("") }
   }
 

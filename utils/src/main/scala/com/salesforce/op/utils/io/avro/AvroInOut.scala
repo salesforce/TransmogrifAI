@@ -31,7 +31,6 @@
 package com.salesforce.op.utils.io.avro
 
 import java.net.URI
-import java.nio.file.FileSystems
 
 import com.salesforce.op.utils.spark.RichRDD._
 import org.apache.avro.Schema
@@ -46,6 +45,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -86,18 +86,25 @@ object AvroInOut {
   }
 
   private[avro] def selectExistingPaths(path: String)(implicit sc: SparkSession): String = {
-    val paths = Option(path).map(_.split(',')).getOrElse(Array.empty)
-    val fs = try {
-      val separator = FileSystems.getDefault.getSeparator
-      val firstPath = paths.head.split(separator)
-      val bucket = firstPath.slice(0, math.min(4, firstPath.length)).mkString(separator)
-      FileSystem.get(new URI(bucket), sc.sparkContext.hadoopConfiguration)
-    } catch {
-      case ex: Exception => throw new IllegalArgumentException(s"Bad path '$path': ${ex.getMessage}")
+    val paths = path.split(',')
+    val fsSeq = paths.map(path => Try(FileSystem.get(new URI(path), sc.sparkContext.hadoopConfiguration)))
+    val validFS = fsSeq.filter(p => p.isSuccess)
+    if (validFS.nonEmpty) {
+      val fs = validFS.head.get // just get the first valid FS instance
+      val validPaths: Array[String] = paths.filter(p => fs.exists(new Path(p)))
+      if (validPaths.isEmpty) { // no path exists
+        throw new IllegalArgumentException(s"No valid directory found in path '$path'")
+      }
+      validPaths.mkString(",") // found valid or empty paths
     }
-    val found = paths.filter(p => fs.exists(new Path(p)))
-    if (found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in path '$path'")
-    found.mkString(",")
+    else { // no path from the comma separated path string argument was readable by FileSystem get
+      // just get the first error message
+      val fsFailed: Try[FileSystem] = fsSeq.head
+      fsFailed match {
+        case Failure(message) => throw new IllegalArgumentException(s"No readable path found : $message")
+        case Success(_) => throw new IllegalArgumentException("This shouldn't happen since no readable paths were found earlier.")
+      }
+    }
   }
 
   /**
