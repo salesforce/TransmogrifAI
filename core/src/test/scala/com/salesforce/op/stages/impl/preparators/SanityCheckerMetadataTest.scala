@@ -121,6 +121,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
   }
 
   it should "be able to read metadata from the old format" in {
+    // scalastyle:off indentation
     val json = """{
                  |  "statistics" : {
                  |    "sampleFraction" : 0.01,
@@ -174,6 +175,8 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
                  |  } ],
                  |  "featuresDropped" : [ "f1" ]
                  |}""".stripMargin
+    // scalastyle:on indentation
+
     val recovered = Metadata.fromJson(json)
     val summaryRecovered = SanityCheckerSummary.fromMetadata(recovered)
     summaryRecovered.correlations.valuesWithLabel.size shouldBe 3
