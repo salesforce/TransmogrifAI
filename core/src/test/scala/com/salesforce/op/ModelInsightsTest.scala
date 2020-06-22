@@ -68,6 +68,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   private val label = survived.occurs()
   private val checked =
     label.sanityCheck(features, removeBadFeatures = true, removeFeatureGroup = false, checkSample = 1.0)
+  private val checkedWithMaps =
+    label.sanityCheck(featuresWithMaps, removeBadFeatures = true, removeFeatureGroup = false, checkSample = 1.0)
+
   val lr = new OpLogisticRegression()
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
@@ -80,30 +83,17 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     new OpWorkflow().setResultFeatures(xgbClassifierPred, xgbRegressorPred).setReader(dataReader)
   lazy val xgbWorkflowModel = xgbWorkflow.train()
 
-  def generatePredWithMaps(
-    label: FeatureLike[RealNN],
-    removeBadFeatures: Boolean): FeatureLike[Prediction] = {
-    val checkedWithMaps =
-      label.sanityCheck(
-        featuresWithMaps, removeBadFeatures = removeBadFeatures, removeFeatureGroup = false, checkSample = 1.0
-      )
-
-    BinaryClassificationModelSelector
-      .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
-        modelsAndParameters = models)
-      .setInput(label, checkedWithMaps)
-      .getOutput()
-  }
-
   val pred = BinaryClassificationModelSelector
     .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
       modelsAndParameters = models)
     .setInput(label, checked)
     .getOutput()
 
-  val predWithMaps = generatePredWithMaps(label, true)
-
-  val predWithMapsNoRemove = generatePredWithMaps(label, false)
+  val predWithMaps = BinaryClassificationModelSelector
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+      modelsAndParameters = models)
+    .setInput(label, checkedWithMaps)
+    .getOutput()
 
   val predLin = RegressionModelSelector
     .withTrainValidationSplit(seed = 42, dataSplitter = None, modelsAndParameters = Seq(new OpLinearRegression() ->
@@ -533,30 +523,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     droppedMapDerivedIn.size shouldBe 1
     droppedMapDerivedIn.head.excluded shouldBe Some(true)
     droppedMapDerivedIn.head.derivedFeatureGroup shouldBe Some("Female")
-  }
-
-  it should "have derived feature value for map feature insights" in {
-    val insights = modelWithRFF.modelInsights(predWithMapsNoRemove)
-    val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
-    mapDerivedIn.size shouldBe 3
-
-    val f1InDer = mapDerivedIn.head
-    println(f1InDer)
-    f1InDer.derivedFeatureName shouldBe "f1_0"
-    f1InDer.stagesApplied shouldBe Seq.empty
-    f1InDer.derivedFeatureGroup shouldBe None
-    f1InDer.derivedFeatureValue shouldBe None
-    f1InDer.excluded shouldBe Option(true)
-    f1InDer.corr.map(_.toString) shouldBe Some("NaN")
-    f1InDer.cramersV shouldBe None
-    f1InDer.mutualInformation shouldBe None
-    f1InDer.pointwiseMutualInformation shouldBe Map.empty
-    f1InDer.countMatrix shouldBe Map.empty
-    f1InDer.contribution shouldBe Seq.empty
-    f1InDer.min shouldBe Some(1.1)
-    f1InDer.max shouldBe Some(0.1)
-    f1InDer.mean shouldBe Some(2.1)
-    f1InDer.variance shouldBe Some(3.1)
   }
 
   val labelName = "l"
