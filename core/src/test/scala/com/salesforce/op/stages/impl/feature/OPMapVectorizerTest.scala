@@ -462,26 +462,18 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
     }
 
     // Assert metadata for descriptorValue & indicatorValue
-    val baseMetaDataValue: Array[String] = baseColMetaArray
-      .map(f => (f.indicatorValue, f.descriptorValue) match {
-        case (Some(iv), None) => iv
-        case (None, None) => ""
-        case (None, Some(dv)) => dv
-        case (Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
-      }).sorted
-
-    val mapMetaDataValue: Array[String] = mapColMetaArray
-      .map(f => (f.indicatorValue, f.descriptorValue) match {
-        case (Some(iv), None) => iv
-        case (None, None) => ""
-        case (None, Some(dv)) => dv
-        case (Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
-      }).sorted
-
-    baseMetaDataValue should contain theSameElementsInOrderAs mapMetaDataValue
+    extractIndiDescripValues(baseColMetaArray) should contain theSameElementsInOrderAs
+      extractIndiDescripValues(mapColMetaArray)
   }
 
-
+  def extractIndiDescripValues(metadata: Array[OpVectorColumnMetadata]): Array[String] = {
+    metadata.map(f => (f.indicatorValue, f.descriptorValue) match {
+      case (Some(iv), None) => iv
+      case (None, None) => ""
+      case (None, Some(dv)) => dv
+      case (Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
+    }).sorted
+  }
 
   /**
    * Construct Mapify transformer for raw features
