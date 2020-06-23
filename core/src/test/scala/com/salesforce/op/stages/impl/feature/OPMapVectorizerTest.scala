@@ -35,7 +35,7 @@ import java.util.{Date => JDate}
 import com.salesforce.op.{OpWorkflow, UID}
 import com.salesforce.op.features.types.{OPMap, _}
 import com.salesforce.op.features.{Feature, FeatureLike}
-import com.salesforce.op.stages.base.ternary.{TernaryLambdaTransformer, TernaryTransformer}
+import com.salesforce.op.stages.base.ternary.{TernaryTransformer}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit._
 import com.salesforce.op.utils.spark.RichDataset._
@@ -461,7 +461,23 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
         isTheSame shouldBe true
     }
 
-    // TODO assert metadata
+    // Assert metadata for descriptorValue & indicatorValue
+    val baseMetaDataValue: Array[String] = baseColMetaArray
+      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.descriptorValue) match {
+        case (pfName, Some(iv), None) => pfName + iv
+        case (pfName, None, None) => pfName
+        case (pfName, None, Some(dv)) => pfName + dv
+        case (_, Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
+      }).sorted
+
+    val mapMetaDataValue: Array[String] = mapColMetaArray
+      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.descriptorValue) match {
+        case (pfName, Some(iv), None) => pfName + iv
+        case (pfName, None, None) => pfName
+        case (pfName, None, Some(dv)) => pfName + dv
+      }).sorted
+
+    baseMetaDataValue should contain theSameElementsInOrderAs mapMetaDataValue
   }
 
 
