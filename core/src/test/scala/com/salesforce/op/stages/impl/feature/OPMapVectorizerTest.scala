@@ -463,18 +463,19 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
 
     // Assert metadata for descriptorValue & indicatorValue
     val baseMetaDataValue: Array[String] = baseColMetaArray
-      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.descriptorValue) match {
-        case (pfName, Some(iv), None) => pfName + iv
-        case (pfName, None, None) => pfName
-        case (pfName, None, Some(dv)) => pfName + dv
-        case (_, Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
+      .map(f => (f.indicatorValue, f.descriptorValue) match {
+        case (Some(iv), None) => iv
+        case (None, None) => ""
+        case (None, Some(dv)) => dv
+        case (Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
       }).sorted
 
     val mapMetaDataValue: Array[String] = mapColMetaArray
-      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.descriptorValue) match {
-        case (pfName, Some(iv), None) => pfName + iv
-        case (pfName, None, None) => pfName
-        case (pfName, None, Some(dv)) => pfName + dv
+      .map(f => (f.indicatorValue, f.descriptorValue) match {
+        case (Some(iv), None) => iv
+        case (None, None) => ""
+        case (None, Some(dv)) => dv
+        case (Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
       }).sorted
 
     baseMetaDataValue should contain theSameElementsInOrderAs mapMetaDataValue
