@@ -30,8 +30,6 @@
 
 package com.salesforce.op.utils.io.avro
 
-import java.net.URI
-
 import com.salesforce.op.utils.spark.RichRDD._
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -45,7 +43,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 
 /**
@@ -86,26 +84,14 @@ object AvroInOut {
   }
 
   private[avro] def selectExistingPaths(path: String)(implicit sc: SparkSession): String = {
-    val paths = path.split(',')
-    val fsSeq = paths.map(path => Try(FileSystem.get(new URI(path), sc.sparkContext.hadoopConfiguration)))
-    val validFS = fsSeq.filter(p => p.isSuccess)
-    if (validFS.nonEmpty) {
-      val fs = validFS.head.get // just get the first valid FS instance
-      val validPaths: Array[String] = paths.filter(p => fs.exists(new Path(p)))
-      if (validPaths.isEmpty) { // no path exists
-        throw new IllegalArgumentException(s"No valid directory found in path '$path'")
-      }
-      validPaths.mkString(",") // found valid or empty paths
-    }
-    else { // no path from the comma separated path string argument was readable by FileSystem get
-      // just get the first error message
-      val fsFailed: Try[FileSystem] = fsSeq.head
-      fsFailed match {
-        case Failure(message) => throw new IllegalArgumentException(s"No readable path found : $message")
-        case Success(_) => throw new IllegalArgumentException("This shouldn't happen since no readable paths were " +
-                                                              "found earlier.")
-      }
-    }
+    val paths = Option(path).map(_.split(',')).getOrElse(Array.empty).map(new Path(_))
+    val found = paths.headOption.flatMap(firstPath =>
+      Try(firstPath.getFileSystem(sc.sparkContext.hadoopConfiguration)).recover { case t =>
+        throw new IllegalArgumentException(s"Bad path '$path': ${t.getMessage}", t)
+      }.toOption)
+      .map(fs => paths.filter(fs.exists)).getOrElse(Array.empty)
+    if(found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in path '$path'")
+    found.mkString(",")
   }
 
   /**

@@ -109,16 +109,22 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
     f3.delete()
     assume(f1.exists && !f2.exists && !f3.exists)
 
+    // check for one dir being invalid in the path amongst two
     selectExistingPaths(s"$f1,$f2") shouldBe f1.toString
 
+    // check if all dirs in the path are invalid then we get an exception
     intercept[IllegalArgumentException] { selectExistingPaths(f2.toString) }
+
+    // also, check if all dirs in the path are invalid ( in a different way ) then we get an exception
     intercept[IllegalArgumentException] { selectExistingPaths(f3.toString) }
 
+    // check for one dir being invalid ( in a different way ) in the path amongst the two dirs in it
     selectExistingPaths(s"$f1,$f3") shouldBe f1.toString
 
-    // check for path order insensitivity
+    // check for paths order insensitivity
     selectExistingPaths(s"$f3,$f1") shouldBe f1.toString
 
+    // check for an exception if the path is an empty string
     intercept[IllegalArgumentException] { selectExistingPaths("") }
   }
 
