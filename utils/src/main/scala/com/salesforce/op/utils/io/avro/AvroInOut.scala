@@ -90,7 +90,7 @@ object AvroInOut {
         throw new IllegalArgumentException(s"Bad path '$path': ${t.getMessage}", t)
       }.toOption)
       .map(fs => paths.filter(fs.exists)).getOrElse(Array.empty)
-    if(found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in path '$path'")
+    if (found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in path '$path'")
     found.mkString(",")
   }
 
