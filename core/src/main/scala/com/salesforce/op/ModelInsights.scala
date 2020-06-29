@@ -802,12 +802,18 @@ case object ModelInsights {
       case m: XGBoostRegressionModel =>
         Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
           case Success(contrib) => contrib
-          case _ => Seq.empty
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Seq.fill(n)(0.0))
+            case _ => Seq(Seq.empty)
+          }
         }
       case m: XGBoostClassificationModel =>
         Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
           case Success(contrib) => contrib
-          case _ => Seq.empty
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Seq.fill(n)(0.0))
+            case _ => Seq(Seq.empty)
+          }
         }
     }
     contributions.getOrElse(Seq.empty)
