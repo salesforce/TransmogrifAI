@@ -59,7 +59,7 @@ import org.json4s.jackson.Serialization._
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
-import scala.util.Try
+import scala.util.{Success, Try}
 
 /**
  * Summary of all model insights
@@ -799,8 +799,22 @@ case object ModelInsights {
       case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
-      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+      case m: XGBoostRegressionModel =>
+        Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
+          case Success(contrib) => contrib
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
+            case _ => Seq(Seq.empty)
+          }
+        }
+      case m: XGBoostClassificationModel =>
+        Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
+          case Success(contrib) => contrib
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
+            case _ => Seq(Seq.empty)
+          }
+        }
     }
     contributions.getOrElse(Seq.empty)
   }
