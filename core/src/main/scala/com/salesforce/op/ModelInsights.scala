@@ -803,7 +803,7 @@ case object ModelInsights {
         Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
           case Success(contrib) => contrib
           case _ => featureVectorSize match {
-            case Some(n) => Seq(Seq.fill(n)(0.0))
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
             case _ => Seq(Seq.empty)
           }
         }
@@ -811,7 +811,7 @@ case object ModelInsights {
         Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
           case Success(contrib) => contrib
           case _ => featureVectorSize match {
-            case Some(n) => Seq(Seq.fill(n)(0.0))
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
             case _ => Seq(Seq.empty)
           }
         }
