@@ -126,6 +126,10 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
         .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepthXGBClassifier)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
+        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
+        .addGrid(xgb.maximizeEvaluationMetrics, Array(true))
+        .addGrid(xgb.evalMetric, Array("aucpr"))
+        .addGrid(xgb.objective, Array("binary:logistic"))
 
       Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams,
         nb -> nbParams, dt -> dtParams, xgb -> xgbParams)

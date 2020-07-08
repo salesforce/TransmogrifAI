@@ -67,5 +67,5 @@ object DefaultSelectorParams {
   val Eta = Array(0.02) // step size shrinkage for xgboost (default 0.3)
   val MinChildWeight = Array(1.0, 20.0) // minimum sum of instance weight needed in a child for xgboost (default 1)
   val MaxDepthXGBClassifier = Array(10) // max depth of each tree for xgboost (default is 6)
-
+  val MissingValPad = Array(0.toFloat) // treat 0 as missing value, (default is Float.NaN)
 }
