@@ -176,7 +176,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   private def buildAndSaveModel(
     modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]
-  ): (String, OpWorkflowModel, FeatureLike[Prediction])  = {
+  ): (String, OpWorkflowModel, FeatureLike[Prediction]) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
     modelsAndParameters = modelsAndParams, splitter = None
     ).setInput(survivedNum, features).getOutput()
