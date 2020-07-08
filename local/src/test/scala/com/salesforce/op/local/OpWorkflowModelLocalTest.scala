@@ -38,6 +38,7 @@ import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression, OpXGBoostClassifier}
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
+import com.salesforce.op.stages.impl.selector.DefaultSelectorParams
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomList, RandomText}
@@ -68,9 +69,11 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   val logReg = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
     case (lg: OpLogisticRegression, _) => lg -> new ParamGridBuilder().build()
   }
-
+  // note: xgb needs to treat missing value as 0.0
   val xgb = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
-    case (xgb: OpXGBoostClassifier, _) => xgb -> new ParamGridBuilder().build()
+    case (xgb: OpXGBoostClassifier, _) => xgb ->
+      new ParamGridBuilder()
+        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad).build()
   }
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
