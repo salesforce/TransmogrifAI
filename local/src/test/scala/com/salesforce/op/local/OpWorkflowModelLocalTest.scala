@@ -77,7 +77,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   }
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
-  val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
+  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
 
   lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
   lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
