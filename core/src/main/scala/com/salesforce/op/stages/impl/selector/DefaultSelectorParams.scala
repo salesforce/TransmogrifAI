@@ -70,7 +70,7 @@ object DefaultSelectorParams {
   val MissingValPad = Array(0.toFloat) // treat 0 as missing value, (default is Float.NaN)
   val BinaryClassXGBEvaluationMetric = Array("aucpr") // XGBoost evaluation metrics for validation data (default: error)
   val BinaryClassXGBObjective = Array("binary:logistic") // XGBoost learning objective (default: reg:squarederror)
-  val EarlyStopping = Array(20) // number of rounds of decreasing eval metric to tolerate before stopping the training (default: 0)
-  val MaximizeEvaluationMetrics = Array(true) // define the expected optimization to the XGBoost evaluation metrics, true to maximize (default: false as it minimizes error)
+  val EarlyStopping = Array(20) // stop training xgboost if eval metrics drop in a number of rounds (default: 0)
+  val MaximizeEvaluationMetrics = Array(true) // true to maximize XGB eval metrics (default: false, minimizes error)
   val BinaryClassXGBGamma = Array(0.8) // regularization param for xgboost, default = 0
 }
