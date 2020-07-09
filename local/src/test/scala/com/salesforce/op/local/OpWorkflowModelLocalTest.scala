@@ -85,8 +85,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   }
 
   Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark" in {
-    assertLoadModelAndScore(modelLocation, rawData, expectedScores)
-    assertLoadModelAndScore(xgbModelLocation, rawDataXGB, expectedXGBScores)
+    assertLoadModelAndScore(modelLocation, rawData, expectedScores, prediction)
+    assertLoadModelAndScore(xgbModelLocation, rawDataXGB, expectedXGBScores, xgbPred)
   }
 
   it should "produce scores without Spark in timely fashion" in {
@@ -99,7 +99,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
       val start = System.currentTimeMillis()
       val scores = rawData.map(scoreFn)
       elapsed += System.currentTimeMillis() - start
-      assert(scores, expectedScores)
+      assert(scores, expectedScores, prediction)
     }
     log.info(s"Scored ${expectedScores.length * numOfRuns} records in ${elapsed}ms")
     log.info(s"Average time per record: ${elapsed.toDouble / (expectedScores.length * numOfRuns)}ms")
@@ -148,7 +148,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   private def assert(
     scores: Array[Map[String, Any]],
-    expectedScores: Array[(Prediction, RealNN, RealNN, Text)]
+    expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
+    prediction: FeatureLike[Prediction]
   ): Unit = {
     scores.length shouldBe expectedScores.length
     for {
@@ -167,12 +168,13 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   private def assertLoadModelAndScore(
     modelLocation: String,
     rawData: Array[Map[String, Any]],
-    expectedScores: Array[(Prediction, RealNN, RealNN, Text)]
+    expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
+    prediction: FeatureLike[Prediction]
   ): Unit = {
     val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
     scoreFn shouldBe a[ScoreFunction]
     val scores = rawData.map(scoreFn)
-    assert(scores, expectedScores)
+    assert(scores, expectedScores, prediction)
   }
 
   private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
