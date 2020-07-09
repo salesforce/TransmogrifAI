@@ -89,8 +89,10 @@ case object OpXGBoost {
      * @param featureVectorSize   size of feature vectors the xgboost model is trained on
      * @return vector containing feature scores
      */
-    def getFeatureScoreVector(featureVectorSize: Option[Int] = None): Vector = {
-      val featureScore = booster.getFeatureScore()
+    def getFeatureScoreVector(
+      featureVectorSize: Option[Int] = None, importanceType: String = "gain"
+    ): Vector = {
+      val featureScore = booster.getScore(featureMap = null, importanceType = importanceType)
       require(featureScore.nonEmpty, "Feature score map is empty")
       val indexScore = featureScore.map { case (fid, score) =>
         val index = fid.tail.toInt
