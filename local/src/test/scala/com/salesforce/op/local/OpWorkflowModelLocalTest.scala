@@ -85,17 +85,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   }
 
   Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark" in {
-    val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
-    scoreFn shouldBe a[ScoreFunction]
-    val scores = rawData.map(scoreFn)
-    assert(scores, expectedScores)
-  }
-
-  Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark for XGBoost" in {
-    val scoreFn = OpWorkflowModel.load(xgbModelLocation).scoreFunction
-    scoreFn shouldBe a[ScoreFunction]
-    val scores = rawDataXGB.map(scoreFn)
-    assert(scores, expectedXGBScores)
+    assertLoadModelAndScore(modelLocation, rawData, expectedScores)
+    assertLoadModelAndScore(xgbModelLocation, rawDataXGB, expectedXGBScores)
   }
 
   it should "produce scores without Spark in timely fashion" in {
@@ -171,6 +162,17 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     } withClue(s"Record index $i: ") {
       score shouldBe expected
     }
+  }
+
+  private def assertLoadModelAndScore(
+    modelLocation: String,
+    rawData: Array[Map[String, Any]],
+    expectedScores: Array[(Prediction, RealNN, RealNN, Text)]
+  ): Unit = {
+    val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
+    scoreFn shouldBe a[ScoreFunction]
+    val scores = rawData.map(scoreFn)
+    assert(scores, expectedScores)
   }
 
   private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
