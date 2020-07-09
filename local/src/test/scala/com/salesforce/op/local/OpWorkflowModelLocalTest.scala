@@ -32,7 +32,7 @@ package com.salesforce.op.local
 
 import java.nio.file.Paths
 
-import com.salesforce.op.features.Feature
+import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
@@ -78,8 +78,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
   lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
-  lazy val (rawData, expectedScores) = genRawDataAndScore(model)
-  lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel)
+  lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
+  lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel, xgbPred)
   lazy val modelLocation2 = {
     Paths.get(tempDir.toString, "op-runner-local-test-model-2").toFile.getCanonicalFile.toString
   }
@@ -185,7 +185,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     (path, model, prediction)
   }
 
-  private def genRawDataAndScore(model: OpWorkflowModel) = {
+  private def genRawDataAndScore(model: OpWorkflowModel, prediction: FeatureLike[Prediction]) = {
     lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
     lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
     (rawData, expectedScores)
