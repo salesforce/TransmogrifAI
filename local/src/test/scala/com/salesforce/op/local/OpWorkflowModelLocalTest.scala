@@ -32,7 +32,7 @@ package com.salesforce.op.local
 
 import java.nio.file.Paths
 
-import com.salesforce.op.features.{Feature, FeatureLike}
+import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
