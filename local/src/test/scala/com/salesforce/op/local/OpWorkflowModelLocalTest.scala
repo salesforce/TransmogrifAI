@@ -78,11 +78,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
   lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
-
-  lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
-  lazy val rawDataXGB = dataReader.generateDataFrame(xgbModel.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
-  lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
-  lazy val expectedXGBScores = xgbModel.score().sort(KeyFieldName).collect(xgbPred, survivedNum, indexed, deindexed)
+  lazy val (rawData, expectedScores) = genRawDataAndScore(model)
+  lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel)
   lazy val modelLocation2 = {
     Paths.get(tempDir.toString, "op-runner-local-test-model-2").toFile.getCanonicalFile.toString
   }
@@ -176,9 +173,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     }
   }
 
-  private def buildAndSaveModel(
-    modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]
-  ): (String, OpWorkflowModel, FeatureLike[Prediction]) = {
+  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
     modelsAndParameters = modelsAndParams, splitter = None
     ).setInput(survivedNum, features).getOutput()
@@ -188,6 +183,12 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)
+  }
+
+  private def genRawDataAndScore(model: OpWorkflowModel) = {
+    lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
+    lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
+    (rawData, expectedScores)
   }
 
 }
