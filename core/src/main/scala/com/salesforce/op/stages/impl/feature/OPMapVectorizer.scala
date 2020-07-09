@@ -186,7 +186,7 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
     parent = this, name = "numFeatures",
     doc = s"number of features (hashes) to generate (default: ${TransmogrifierDefaults.DefaultNumOfFeatures})",
     isValid = ParamValidators.inRange(
-      lowerBound = 0, upperBound = TransmogrifierDefaults.MaxNumOfFeatures,
+      lowerBound = 0, upperBound = 1E7,
       lowerInclusive = false, upperInclusive = true
     )
   )
@@ -291,7 +291,8 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
       grouping = Option(key),
-      indicatorValue = None
+      indicatorValue = None,
+      descriptorValue = col.descriptorValue
     )
     meta.withColumns(cols.toArray)
   }

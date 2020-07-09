@@ -59,7 +59,7 @@ import org.json4s.jackson.Serialization._
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
-import scala.util.Try
+import scala.util.{Success, Try}
 
 /**
  * Summary of all model insights
@@ -408,11 +408,15 @@ case object ModelInsights {
         { case x: EvalMetric => JString(x.entryName) }
       )
     )
+    val featureDistributionSerializer = FieldSerializer[FeatureDistribution](
+      FieldSerializer.ignore("cardEstimate")
+    )
     Serialization.formats(typeHints) +
       EnumEntrySerializer.json4s[ValidationType](ValidationType) +
       EnumEntrySerializer.json4s[ProblemType](ProblemType) +
       new SpecialDoubleSerializer +
-      evalMetricsSerializer
+      evalMetricsSerializer +
+      featureDistributionSerializer
   }
 
   /**
@@ -632,9 +636,12 @@ case object ModelInsights {
               derivedFeatureName = h.columnName,
               stagesApplied = h.parentFeatureStages,
               derivedFeatureGroup = h.grouping,
-              derivedFeatureValue = h.indicatorValue,
+              derivedFeatureValue = h.indicatorValue match {
+                case Some(_) => h.indicatorValue
+                case _ => h.descriptorValue
+              },
               excluded = Option(s.dropped.contains(h.columnName)),
-              corr = getCorr(s.correlationsWLabel, h.columnName),
+              corr = getCorr(s.correlations, h.columnName),
               cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
               mutualInformation = catGroupIndex.map(i => s.categoricalStats(i).mutualInfo),
               pointwiseMutualInformation = (catGroupIndex, catIndexWithinGroup) match {
@@ -708,11 +715,9 @@ case object ModelInsights {
             sensitiveInformation = sensitiveFeatureInformation
           )
       }.toSeq ++ {
-        /*
-          Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata.
-          With current TMOG settings, this will not happen unless null tracking is turned off since
-          null indicators are created for all text features, even ignored ones.
-        */
+        //  Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata.
+        //  With current TMOG settings, this will not happen unless null tracking is turned off since
+        //  null indicators are created for all text features, even ignored ones.
         vectorInfo match {
           case Some(v) =>
             // Find features where `actionTaken` is true for all of the sensitive feature informations
@@ -743,11 +748,7 @@ case object ModelInsights {
     if (index >= 0) values.mapValues(_ (index)) else Map.empty
 
   private def getCorr(corr: Correlations, name: String): Option[Double] = {
-    getIfExists(corr.featuresIn.indexOf(name), corr.values).orElse {
-      val j = corr.nanCorrs.indexOf(name)
-      if (j >= 0) Option(Double.NaN)
-      else None
-    }
+    getIfExists(corr.featuresIn.indexOf(name), corr.valuesWithLabel)
   }
 
   private[op] def descaleLRContrib(
@@ -798,8 +799,22 @@ case object ModelInsights {
       case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
-      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+      case m: XGBoostRegressionModel =>
+        Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
+          case Success(contrib) => contrib
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
+            case _ => Seq(Seq.empty)
+          }
+        }
+      case m: XGBoostClassificationModel =>
+        Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
+          case Success(contrib) => contrib
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
+            case _ => Seq(Seq.empty)
+          }
+        }
     }
     contributions.getOrElse(Seq.empty)
   }

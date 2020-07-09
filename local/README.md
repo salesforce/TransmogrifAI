@@ -10,12 +10,12 @@ Add the `transmogrifai-local` dependency into your project.
 For Gradle in `build.gradle` add:
 ```gradle
 dependencies {
-    compile 'com.salesforce.transmogrifai:transmogrifai-local_2.11:0.6.1'
+    compile 'com.salesforce.transmogrifai:transmogrifai-local_2.11:0.7.0'
 }
 ```
 For SBT in `build.sbt` add:
 ```sbt
-libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.6.1"
+libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.7.0"
 ```
 
 Then in your code you may load and score models as follows:

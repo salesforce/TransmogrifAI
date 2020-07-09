@@ -35,7 +35,7 @@ import java.util.{Date => JDate}
 import com.salesforce.op.{OpWorkflow, UID}
 import com.salesforce.op.features.types.{OPMap, _}
 import com.salesforce.op.features.{Feature, FeatureLike}
-import com.salesforce.op.stages.base.ternary.{TernaryLambdaTransformer, TernaryTransformer}
+import com.salesforce.op.stages.base.ternary.{TernaryTransformer}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit._
 import com.salesforce.op.utils.spark.RichDataset._
@@ -461,10 +461,19 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
         isTheSame shouldBe true
     }
 
-    // TODO assert metadata
+    // Assert metadata for descriptorValue & indicatorValue
+    extractIndiDescripValues(baseColMetaArray) should contain theSameElementsInOrderAs
+      extractIndiDescripValues(mapColMetaArray)
   }
 
-
+  def extractIndiDescripValues(metadata: Array[OpVectorColumnMetadata]): Array[String] = {
+    metadata.map(f => (f.indicatorValue, f.descriptorValue) match {
+      case (Some(iv), None) => iv
+      case (None, None) => ""
+      case (None, Some(dv)) => dv
+      case (Some(_), Some(_)) => throw new RuntimeException("this metadata config should not exist")
+    }).sorted
+  }
 
   /**
    * Construct Mapify transformer for raw features

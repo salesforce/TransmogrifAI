@@ -39,7 +39,7 @@ ext {
     junitVersion = '4.12'
     sparkVersion = '2.4.5'
     scalatestVersion = '3.0.0'
-    transmogrifaiVersion ='0.6.1'
+    transmogrifaiVersion ='0.7.0'
     collectionsVersion = '3.2.2'
     scoveragePluginVersion = '1.3.1'
 }

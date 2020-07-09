@@ -277,6 +277,7 @@ trait RichMapFeature {
      *                                  options are from the full entry or from the tokens
      * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
      *                                  be hashed instead of ignored
+     * @param stripHtml                 indicates whether to strip HTML tags from the text or not before analyzing
      * @param others                    additional text features
      * @return result feature of type Vector
      */
@@ -304,6 +305,7 @@ trait RichMapFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       others: Array[FeatureLike[TextMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -318,6 +320,7 @@ trait RichMapFeature {
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
         .setMinTokenLength(minTokenLength)
+        .setStripHtml(stripHtml)
         .setToLowercase(toLowercase)
         .setTopK(topK)
         .setMinSupport(minSupport)
@@ -426,10 +429,9 @@ trait RichMapFeature {
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
-     * @param tokenizeForLengths        If true, then the length counts will be lengths of the tokens in the entries.
-     *                                  If false, then the length counts will be the lengths of the entire entries
      * @param minLengthStdDev           minimum standard deviation of the lengths of tokens in a text field for it to
      *                                  be hashed instead of ignored
+     * @param stripHtml                 indicates whether to strip HTML tags from the text or not before analyzing
      * @param others                    additional text features
      * @return result feature of type Vector
      */
@@ -457,6 +459,7 @@ trait RichMapFeature {
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
+      stripHtml: Boolean = TextTokenizer.StripHtml,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -471,6 +474,7 @@ trait RichMapFeature {
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
         .setMinTokenLength(minTokenLength)
+        .setStripHtml(stripHtml)
         .setToLowercase(toLowercase)
         .setTopK(topK)
         .setMinSupport(minSupport)

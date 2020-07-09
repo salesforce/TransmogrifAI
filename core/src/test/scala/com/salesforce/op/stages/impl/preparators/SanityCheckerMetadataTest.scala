@@ -43,7 +43,9 @@ import org.scalatest.junit.JUnitRunner
 class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
   val summary = SanityCheckerSummary(
-    correlationsWLabel = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(), CorrelationType.Pearson),
+    correlations = Correlations(Seq("f2", "f3", "f4"), Seq(0.2, 0.3, Double.NaN), Seq(Seq(0.2, 0.3, 0.1),
+      Seq(0.3, 0.2, Double.NaN), Seq(0.1, 0.1, 0.1)),
+      CorrelationType.Pearson),
     dropped = Seq("f1"),
     featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
       Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3)),
@@ -79,10 +81,16 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     val retrieved = SanityCheckerSummary.fromMetadata(meta)
     retrieved.isInstanceOf[SanityCheckerSummary]
-    retrieved.correlationsWLabel.nanCorrs should contain theSameElementsAs summary.correlationsWLabel.nanCorrs
 
-    retrieved.correlationsWLabel.featuresIn should contain theSameElementsAs summary.correlationsWLabel.featuresIn
-    retrieved.correlationsWLabel.values should contain theSameElementsAs summary.correlationsWLabel.values
+    retrieved.correlations.featuresIn should contain theSameElementsAs summary.correlations.featuresIn
+    retrieved.correlations.valuesWithLabel.zip(summary.correlations.valuesWithLabel).foreach{
+      case (rd, id) => if (rd.isNaN) id.isNaN shouldBe true else rd shouldEqual id
+    }
+    retrieved.correlations.valuesWithFeatures.zip(summary.correlations.valuesWithFeatures).foreach{
+      case (rs, is) => rs.zip(is).foreach{
+        case (rd, id) => if (rd.isNaN) id.isNaN shouldBe true else rd shouldEqual id
+      }
+    }
     retrieved.categoricalStats.map(_.cramersV) should contain theSameElementsAs
       summary.categoricalStats.map(_.cramersV)
 
@@ -95,7 +103,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     retrieved.featuresStatistics.variance should contain theSameElementsAs summary.featuresStatistics.variance
 
     retrieved.names should contain theSameElementsAs summary.names
-    retrieved.correlationsWLabel.corrType shouldBe summary.correlationsWLabel.corrType
+    retrieved.correlations.corrType shouldBe summary.correlations.corrType
 
     retrieved.categoricalStats.flatMap(_.categoricalFeatures) should contain theSameElementsAs
       summary.categoricalStats.flatMap(_.categoricalFeatures)
@@ -110,6 +118,69 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     // recovered shouldBe meta
     recovered.hashCode() shouldEqual summary.toMetadata().hashCode()
+  }
+
+  it should "be able to read metadata from the old format" in {
+    // scalastyle:off indentation
+    val json = """{
+                 |  "statistics" : {
+                 |    "sampleFraction" : 0.01,
+                 |    "count" : 3.0,
+                 |    "variance" : [ 0.1, 0.2, 0.3 ],
+                 |    "mean" : [ 0.1, 0.2, 0.3 ],
+                 |    "min" : [ 0.1, 0.2, 0.3 ],
+                 |    "max" : [ 0.1, 0.2, 0.3 ]
+                 |  },
+                 |  "names" : [ "f1", "f2", "f3" ],
+                 |  "correlationsWithLabel" : {
+                 |    "correlationType" : "pearson",
+                 |    "values" : [ 0.2, 0.3 ],
+                 |    "features" : [ "f2", "f3" ],
+                 |    "correlationsWithLabelIsNaN" : ["f1"]
+                 |  },
+                 |  "categoricalStats" : [ {
+                 |    "support" : [ 1.0 ],
+                 |    "contingencyMatrix" : {
+                 |      "2" : [ 12.0 ],
+                 |      "1" : [ 12.0 ],
+                 |      "0" : [ 12.0 ]
+                 |    },
+                 |    "maxRuleConfidence" : [ 1.0 ],
+                 |    "categoricalFeatures" : [ "f4" ],
+                 |    "pointwiseMutualInfoAgainstLabel" : {
+                 |      "2" : [ -0.32 ],
+                 |      "1" : [ 1.11 ],
+                 |      "0" : [ 1.23 ]
+                 |    },
+                 |    "mutualInfo" : -1.22,
+                 |    "cramersV" : 0.45,
+                 |    "group" : "f4"
+                 |  }, {
+                 |    "support" : [ 1.0 ],
+                 |    "contingencyMatrix" : {
+                 |      "2" : [ 12.0 ],
+                 |      "1" : [ 12.0 ],
+                 |      "0" : [ 12.0 ]
+                 |    },
+                 |    "maxRuleConfidence" : [ 1.0 ],
+                 |    "categoricalFeatures" : [ "f5" ],
+                 |    "pointwiseMutualInfoAgainstLabel" : {
+                 |      "2" : [ 0.99 ],
+                 |      "1" : [ 0.34 ],
+                 |      "0" : [ -2.11 ]
+                 |    },
+                 |    "mutualInfo" : -0.51,
+                 |    "cramersV" : 0.11,
+                 |    "group" : "f5"
+                 |  } ],
+                 |  "featuresDropped" : [ "f1" ]
+                 |}""".stripMargin
+    // scalastyle:on indentation
+
+    val recovered = Metadata.fromJson(json)
+    val summaryRecovered = SanityCheckerSummary.fromMetadata(recovered)
+    summaryRecovered.correlations.valuesWithLabel.size shouldBe 3
+    summaryRecovered.correlations.valuesWithFeatures shouldBe Seq.empty
   }
 
 }

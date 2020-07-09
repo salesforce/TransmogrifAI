@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.7.0
+
+Bug fixes:
+- Fix flaky `ModelInsight` tests [#407](https://github.com/salesforce/TransmogrifAI/pull/407)
+- Remove logging of tokens of text fields [#420](https://github.com/salesforce/TransmogrifAI/pull/420), [#438](https://github.com/salesforce/TransmogrifAI/pull/438), [#447](https://github.com/salesforce/TransmogrifAI/pull/447), [#474](https://github.com/salesforce/TransmogrifAI/pull/474)
+- Add validation prepare call before model selection when no DAG is passed [#424](https://github.com/salesforce/TransmogrifAI/pull/424), [#429](https://github.com/salesforce/TransmogrifAI/pull/429)
+- Fix `Days.daysBetween` int overflow [#471](https://github.com/salesforce/TransmogrifAI/pull/471)
+
+New features / updates:
+- Downsample the number of training samples to `maxTrainingSample` for regression [#413](https://github.com/salesforce/TransmogrifAI/pull/413) and multi-class classification [#414](https://github.com/salesforce/TransmogrifAI/pull/414)
+- Refactor `InsightLOCOTest` [#412](https://github.com/salesforce/TransmogrifAI/pull/412)
+- Enable more loss types for `OpLinearRegression` [#421](https://github.com/salesforce/TransmogrifAI/pull/421)
+- Add property-based tests for regression model selection [#427](https://github.com/salesforce/TransmogrifAI/pull/427)
+- Add option to calculate LOCO for dates/texts by leaving out their entire vector [#418](https://github.com/salesforce/TransmogrifAI/pull/418)
+- Add Chinese and Korean examples to `TextTokenizerTest` [#442](https://github.com/salesforce/TransmogrifAI/pull/442)
+- Add support for ignoring text that looks like IDs in `SmartTextVectorizer` [#448](https://github.com/salesforce/TransmogrifAI/pull/448), [#455](https://github.com/salesforce/TransmogrifAI/pull/455)
+- Add a unary estimator for detecting names in text fields and transforming to likely gender [#445](https://github.com/salesforce/TransmogrifAI/pull/445)
+- Allow result features to be removed by raw feature filter [#458](https://github.com/salesforce/TransmogrifAI/pull/458)
+- Metadata changes for sensitive feature information [#457](https://github.com/salesforce/TransmogrifAI/pull/457)
+- Add `MinVarianceFilter` which checks that computed features have a minimum variance [#463](https://github.com/salesforce/TransmogrifAI/pull/463), [#465](https://github.com/salesforce/TransmogrifAI/pull/465)
+- Allow `TextStats` length distribution to be token-based and refactor for testability [#464](https://github.com/salesforce/TransmogrifAI/pull/464)
+- Use Spark job grouping to distinguish steps of the machine learning flow [#467](https://github.com/salesforce/TransmogrifAI/pull/467), [#468](https://github.com/salesforce/TransmogrifAI/pull/468), [#470](https://github.com/salesforce/TransmogrifAI/pull/470)
+- Add categorical detection to be coverage based in addition to unique count based [#473](https://github.com/salesforce/TransmogrifAI/pull/473)
+- Remove duplicate features using sanity checker feature to feature correlations [#476](https://github.com/salesforce/TransmogrifAI/pull/476), [#479](https://github.com/salesforce/TransmogrifAI/pull/479)
+- Lift the upper bound on number of hash features [#477](https://github.com/salesforce/TransmogrifAI/pull/477)
+- Enable Html stripping on text-like features [#478](https://github.com/salesforce/TransmogrifAI/pull/478)
+
+Dependency updates ([#402](https://github.com/salesforce/TransmogrifAI/pull/402), [#466](https://github.com/salesforce/TransmogrifAI/pull/466)):
+- Update Apache Spark version to 2.4.5
+- Avro is a built-in data source in Spark 2.4, so no longer using the spark-avro package
+- Avro to 1.8.2
+- XGBoost to 0.90
+- MLeap to 0.14.0
+- json4s to 3.5.3
+- JUnit to 4.12
+- chill to 0.9.3
+- gradle-avro-plugin to 0.16.0 
+
+Miscellaneous:
+- Add ROADMAP.md [#394](https://github.com/salesforce/TransmogrifAI/pull/394)
+
 ## 0.6.1
 
 Bug fixes:
@@ -19,7 +60,7 @@ New features / updates:
 - Use compact and compressed model json by default [#375](https://github.com/salesforce/TransmogrifAI/pull/375)
 - Descale feature contribution for Linear Regression & Logistic Regression [#345](https://github.com/salesforce/TransmogrifAI/pull/345)
 
-Dependency updates:   
+Dependency updates:
 - Update tika version [#382](https://github.com/salesforce/TransmogrifAI/pull/382)
 
 ## 0.6.0
