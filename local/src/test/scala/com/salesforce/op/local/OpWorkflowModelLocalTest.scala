@@ -80,8 +80,9 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
 
   lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
+  lazy val rawDataXGB = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
   lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
-  val expectedXGBScores = xgbModel.score().sort(KeyFieldName).collect(xgbPred, survivedNum, indexed, deindexed)
+  lazy val expectedXGBScores = xgbModel.score().sort(KeyFieldName).collect(xgbPred, survivedNum, indexed, deindexed)
   lazy val modelLocation2 = {
     Paths.get(tempDir.toString, "op-runner-local-test-model-2").toFile.getCanonicalFile.toString
   }
@@ -96,7 +97,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark for XGBoost" in {
     val scoreFn = OpWorkflowModel.load(xgbModelLocation).scoreFunction
     scoreFn shouldBe a[ScoreFunction]
-    val scores = rawData.map(scoreFn)
+    val scores = rawDataXGB.map(scoreFn)
     assert(scores, expectedXGBScores)
   }
 
@@ -183,7 +184,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     ).setInput(survivedNum, features).getOutput()
     val workflow = new OpWorkflow().setReader(dataReader)
     .setResultFeatures(prediction, survivedNum, indexed, deindexed)
-    val model = workflow.train()
+    lazy val model = workflow.train()
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)
