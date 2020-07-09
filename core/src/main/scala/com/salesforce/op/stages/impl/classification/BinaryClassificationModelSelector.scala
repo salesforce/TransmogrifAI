@@ -123,13 +123,15 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       val xgb = new OpXGBoostClassifier()
       val xgbParams = new ParamGridBuilder()
         .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+        .addGrid(xgb.numEarlyStoppingRounds, DefaultSelectorParams.EarlyStopping)
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
+        .addGrid(xgb.gamma, DefaultSelectorParams.BinaryClassXGBGamma)
         .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepthXGBClassifier)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
         .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
-        .addGrid(xgb.maximizeEvaluationMetrics, Array(true))
-        .addGrid(xgb.evalMetric, Array("aucpr"))
-        .addGrid(xgb.objective, Array("binary:logistic"))
+        .addGrid(xgb.maximizeEvaluationMetrics, DefaultSelectorParams.MaximizeEvaluationMetrics)
+        .addGrid(xgb.evalMetric, DefaultSelectorParams.BinaryClassXGBEvaluationMetric)
+        .addGrid(xgb.objective, DefaultSelectorParams.BinaryClassXGBObjective)
 
       Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams,
         nb -> nbParams, dt -> dtParams, xgb -> xgbParams)

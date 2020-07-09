@@ -65,7 +65,12 @@ object DefaultSelectorParams {
   //    the tweedie family is 1 - variancePower.
   val NumRound = Array(200) // number of rounds for xgboost (default 1)
   val Eta = Array(0.02) // step size shrinkage for xgboost (default 0.3)
-  val MinChildWeight = Array(1.0, 20.0) // minimum sum of instance weight needed in a child for xgboost (default 1)
+  val MinChildWeight = Array(1.0, 10.0) // minimum sum of instance weight needed in a child for xgboost (default 1)
   val MaxDepthXGBClassifier = Array(10) // max depth of each tree for xgboost (default is 6)
   val MissingValPad = Array(0.toFloat) // treat 0 as missing value, (default is Float.NaN)
+  val BinaryClassXGBEvaluationMetric = Array("aucpr") // XGBoost evaluation metrics for validation data (default: error)
+  val BinaryClassXGBObjective = Array("binary:logistic") // XGBoost learning objective (default: reg:squarederror)
+  val EarlyStopping = Array(20) // number of rounds of decreasing eval metric to tolerate before stopping the training (default: 0)
+  val MaximizeEvaluationMetrics = Array(true) // define the expected optimization to the XGBoost evaluation metrics, true to maximize (default: false as it minimizes error)
+  val BinaryClassXGBGamma = Array(0.8) // regularization param for xgboost, default = 0
 }
