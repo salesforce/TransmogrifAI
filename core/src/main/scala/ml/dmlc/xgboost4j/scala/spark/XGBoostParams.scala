@@ -30,6 +30,8 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
+import com.salesforce.op.stages.impl.preparators.CorrelationLevel.findValues
+import enumeratum.{Enum, EnumEntry}
 import ml.dmlc.xgboost4j.LabeledPoint
 import ml.dmlc.xgboost4j.scala.Booster
 import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
@@ -91,9 +93,9 @@ case object OpXGBoost {
      * @return vector containing feature scores
      */
     def getFeatureScoreVector(
-      featureVectorSize: Option[Int] = None, importanceType: String = "gain"
+      featureVectorSize: Option[Int] = None, importanceType: ImportanceType = ImportanceType.Gain
     ): Vector = {
-      val featureScore = booster.getScore(featureMap = null, importanceType = importanceType)
+      val featureScore = booster.getScore(featureMap = null, importanceType = importanceType.name)
       require(featureScore.nonEmpty, "Feature score map is empty")
       val indexScore = featureScore.map { case (fid, score) =>
         val index = fid.tail.toInt
@@ -112,3 +114,34 @@ case object OpXGBoost {
   def processMissingValues(xgbLabelPoints: Iterator[LabeledPoint], missing: Float): Iterator[LabeledPoint] =
     XGBoost.processMissingValues(xgbLabelPoints, missing)
 }
+
+/**
+ * Settings for XGBoost feature importance type
+ */
+sealed abstract class ImportanceType(val name: String) extends EnumEntry with Serializable
+
+object ImportanceType extends Enum[ImportanceType] {
+  val values: Seq[ImportanceType] = findValues
+
+  /**
+   * The average gain across all splits the feature is used in.
+   */
+  case object Gain extends ImportanceType(name = "gain")
+
+  /**
+   * The average coverage across all splits the feature is used in.
+   */
+  case object Cover extends ImportanceType(name = "cover")
+
+  /**
+   * The total gain across all splits the feature is used in.
+   */
+  case object TotalGain extends ImportanceType(name = "total_gain")
+
+  /**
+   * The total coverage across all splits the feature is used in.
+   */
+  case object TotalCover extends ImportanceType(name = "total_cover")
+
+}
+
