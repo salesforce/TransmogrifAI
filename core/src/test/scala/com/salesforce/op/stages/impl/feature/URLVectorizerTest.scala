@@ -158,10 +158,10 @@ class URLVectorizerTest
 
     val vectorizedallowlist = f1.vectorize(topK = TopK, minSupport = MinSupport,
       cleanText = CleanText, cleanKeys = CleanKeys, allowListKeys = Array(urlKey), trackNulls = false)
-    val resultallowlist = transformAndCollect(ds1, vectorizedallowlist)
-    resultallowlist(0) shouldBe resultallowlist(1)
-    resultallowlist(2) shouldBe resultallowlist(3)
-    resultallowlist should contain theSameElementsAs expectedUrlMap
+    val resultAllowlist = transformAndCollect(ds1, vectorizedallowlist)
+    resultAllowlist(0) shouldBe resultAllowlist(1)
+    resultAllowlist(2) shouldBe resultAllowlist(3)
+    resultAllowlist should contain theSameElementsAs expectedUrlMap
   }
 
   it should "track nulls allowlisted/ignore blocklisted keys in UrlMap" in {
@@ -176,10 +176,10 @@ class URLVectorizerTest
 
     val vectorizedallowlist = f1.vectorize(topK = TopK, minSupport = MinSupport,
       cleanText = CleanText, cleanKeys = CleanKeys, allowListKeys = Array(urlKey), trackNulls = true)
-    val resultallowlist = transformAndCollect(ds1, vectorizedallowlist)
-    resultallowlist(0) shouldBe resultallowlist(1)
-    resultallowlist(2) shouldBe resultallowlist(3)
-    resultallowlist should contain theSameElementsAs expectedTrackNulls
+    val resultAllowlist = transformAndCollect(ds1, vectorizedallowlist)
+    resultAllowlist(0) shouldBe resultAllowlist(1)
+    resultAllowlist(2) shouldBe resultAllowlist(3)
+    resultAllowlist should contain theSameElementsAs expectedTrackNulls
   }
 
   Spec[RichURLFeature] should "vectorize Urls correctly" in {
