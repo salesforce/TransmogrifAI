@@ -175,6 +175,13 @@ private[op] object OpWorkflowModelReadWriteShared {
     case object RawFeatureFilterResultsFieldName extends FieldNames("rawFeatureFilterResults")
   }
 
+  object DeprecatedFieldNames extends Enum[FieldNames] {
+    val values = findValues
+    case object OldBlocklistedFeaturesUids extends FieldNames("blacklistedFeaturesUids")
+    case object OldBlocklistedMapKeys extends FieldNames("blacklistedMapKeys")
+    case object OldBlocklistedStages extends FieldNames("blacklistedStages")
+  }
+
 }
 
 

@@ -332,6 +332,7 @@ class OpWorkflowModelReaderWriterTest
   it should "load an old version of a saved model (v0.7.1)" in new VectorizedFlow {
     // note: in these old models, "blocklist" was still called "blacklist"
     val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_7_1")
+    wfM.getBlocklistMapKeys() should not be empty
     wfM.getBlocklist() should not be empty
   }
 
