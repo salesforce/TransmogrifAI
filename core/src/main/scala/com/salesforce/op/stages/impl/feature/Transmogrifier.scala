@@ -595,30 +595,30 @@ trait MapPivotParams extends Params {
 
   def setCleanKeys(clean: Boolean): this.type = set(cleanKeys, clean)
 
-  final val whiteListKeys = new StringArrayParam(
-    parent = this, name = "whiteListKeys", doc = "list of map keys to include in pivot"
+  final val allowListKeys = new StringArrayParam(
+    parent = this, name = "allowListKeys", doc = "list of map keys to include in pivot"
   )
-  setDefault(whiteListKeys, Array[String]())
+  setDefault(allowListKeys, Array[String]())
 
-  final def setWhiteListKeys(keys: Array[String]): this.type = set(whiteListKeys, keys)
+  final def setAllowListKeys(keys: Array[String]): this.type = set(allowListKeys, keys)
 
-  final val blackListKeys = new StringArrayParam(
-    parent = this, name = "blackListKeys", doc = "list of map keys to exclude from pivot"
+  final val denyListKeys = new StringArrayParam(
+    parent = this, name = "denyListKeys", doc = "list of map keys to exclude from pivot"
   )
-  setDefault(blackListKeys, Array[String]())
+  setDefault(denyListKeys, Array[String]())
 
-  final def setBlackListKeys(keys: Array[String]): this.type = set(blackListKeys, keys)
+  final def setDenyListKeys(keys: Array[String]): this.type = set(denyListKeys, keys)
 
   protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
     val map = cleanMap[V](m, shouldCleanKey, shouldCleanValue)
-    val (whiteList, blackList) = (
-      $(whiteListKeys).map(cleanTextFn(_, shouldCleanKey)),
-      $(blackListKeys).map(cleanTextFn(_, shouldCleanKey))
+    val (allowList, denyList) = (
+      $(allowListKeys).map(cleanTextFn(_, shouldCleanKey)),
+      $(denyListKeys).map(cleanTextFn(_, shouldCleanKey))
     )
-    if (whiteList.nonEmpty) {
-      map.filter { case (k, v) => whiteList.contains(k) && !blackList.contains(k) }
-    } else if (blackList.nonEmpty) {
-      map.filter { case (k, v) => !blackList.contains(k) }
+    if (allowList.nonEmpty) {
+      map.filter { case (k, v) => allowList.contains(k) && !denyList.contains(k) }
+    } else if (denyList.nonEmpty) {
+      map.filter { case (k, v) => !denyList.contains(k) }
     } else {
       map
     }

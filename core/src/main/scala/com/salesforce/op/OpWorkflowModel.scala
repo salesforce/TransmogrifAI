@@ -76,13 +76,13 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     this
   }
 
-  protected[op] def setBlacklist(features: Array[OPFeature]): this.type = {
-    blacklistedFeatures = features
+  protected[op] def setDenylist(features: Array[OPFeature]): this.type = {
+    denylistedFeatures = features
     this
   }
 
-  protected[op] def setBlacklistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
-    blacklistedMapKeys = mapKeys
+  protected[op] def setDenylistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
+    denylistedMapKeys = mapKeys
     this
   }
 
@@ -138,7 +138,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Updated instance of feature
    */
   def getUpdatedFeatures(features: Array[OPFeature]): Array[OPFeature] = {
-    val allFeatures = getRawFeatures() ++ getBlacklist() ++ getStages().map(_.getOutput())
+    val allFeatures = getRawFeatures() ++ getDenylist() ++ getStages().map(_.getOutput())
     features.map { f =>
       allFeatures.find(_.sameOrigin(f))
         .getOrElse(throw new IllegalArgumentException(s"feature $f is not a part of this workflow"))
@@ -175,7 +175,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
         val parentStageIds = feature.traverse[Set[String]](Set.empty[String])((s, f) => s + f.originStage.uid)
         val modelStages = stages.filter(s => parentStageIds.contains(s.uid))
         ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams,
-          getBlacklist(), getBlacklistMapKeys(), getRawFeatureFilterResults())
+          getDenylist(), getDenylistMapKeys(), getRawFeatureFilterResults())
     }
   }
 
@@ -440,8 +440,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     val copy =
       new OpWorkflowModel(uid = uid, trainingParams = trainingParams.copy())
         .setFeatures(copyFeatures(resultFeatures))
-        .setBlacklist(copyFeatures(blacklistedFeatures))
-        .setBlacklistMapKeys(blacklistedMapKeys)
+        .setDenylist(copyFeatures(denylistedFeatures))
+        .setDenylistMapKeys(denylistedMapKeys)
         .setRawFeatureFilterResults(rawFeatureFilterResults.copy())
         .setStages(stages.map(_.copy(ParamMap.empty)))
         .setParameters(parameters.copy())

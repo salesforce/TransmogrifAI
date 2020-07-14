@@ -436,8 +436,8 @@ case object ModelInsights {
    * @param stages                  stages used to make the feature
    * @param rawFeatures             raw features in the workflow
    * @param trainingParams          parameters used to create the workflow model
-   * @param blacklistedFeatures     blacklisted features from use in DAG
-   * @param blacklistedMapKeys      blacklisted map keys from use in DAG
+   * @param denylistedFeatures      denylisted features from use in DAG
+   * @param denylistedMapKeys       denylisted map keys from use in DAG
    * @param rawFeatureFilterResults results of raw feature filter
    * @return
    */
@@ -445,8 +445,8 @@ case object ModelInsights {
     stages: Array[OPStage],
     rawFeatures: Array[features.OPFeature],
     trainingParams: OpParams,
-    blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]],
+    denylistedFeatures: Array[features.OPFeature],
+    denylistedMapKeys: Map[String, Set[String]],
     rawFeatureFilterResults: RawFeatureFilterResults
   ): ModelInsights = {
 
@@ -523,7 +523,7 @@ case object ModelInsights {
     ModelInsights(
       label = labelSummary,
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, labelSummary),
+        denylistedFeatures, denylistedMapKeys, rawFeatureFilterResults, labelSummary),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -571,8 +571,8 @@ case object ModelInsights {
     summary: Option[SanityCheckerSummary],
     model: Option[Model[_]],
     rawFeatures: Array[features.OPFeature],
-    blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]],
+    denylistedFeatures: Array[features.OPFeature],
+    denylistedMapKeys: Map[String, Set[String]],
     rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults(),
     label: LabelSummary
   ): Seq[FeatureInsights] = {
@@ -678,12 +678,12 @@ case object ModelInsights {
       case (None, _) => Seq.empty
     }
 
-    val blacklistInsights = blacklistedFeatures.map{ f =>
+    val denylistInsights = denylistedFeatures.map{ f =>
       Seq(f.name) -> Insights(derivedFeatureName = f.name, stagesApplied = Seq.empty, derivedFeatureGroup = None,
         derivedFeatureValue = None, excluded = Some(true))
     }
 
-    val blacklistMapInsights = blacklistedMapKeys.toArray.flatMap { case (mname, keys) =>
+    val denylistMapInsights = denylistedMapKeys.toArray.flatMap { case (mname, keys) =>
       keys.toArray.map(key => {
         Seq(mname) ->
           Insights(derivedFeatureName = key, stagesApplied = Seq.empty, derivedFeatureGroup = Some(key),
@@ -691,8 +691,8 @@ case object ModelInsights {
       })
     }
 
-    val allInsights = featureInsights ++ blacklistInsights ++ blacklistMapInsights
-    val allFeatures = rawFeatures ++ blacklistedFeatures
+    val allInsights = featureInsights ++ denylistInsights ++ denylistMapInsights
+    val allFeatures = rawFeatures ++ denylistedFeatures
 
     allInsights
       .flatMap { case (feature, insights) => feature.map(_ -> insights) }

@@ -168,9 +168,9 @@ class GeolocationMapVectorizerTest
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
   }
 
-  it should "correctly whitelist keys" in {
+  it should "correctly allowlist keys" in {
     val vectorizer = new GeolocationMapVectorizer().setCleanKeys(true).setTrackNulls(false)
-      .setInput(m1, m2).setWhiteListKeys(Array("a", "b", "z")).fit(inputData)
+      .setInput(m1, m2).setAllowListKeys(Array("a", "b", "z")).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)
@@ -196,9 +196,9 @@ class GeolocationMapVectorizerTest
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
-  it should "track nulls with whitelist keys" in {
+  it should "track nulls with allowlist keys" in {
     val vectorizer = new GeolocationMapVectorizer().setCleanKeys(true).setTrackNulls(true)
-      .setInput(m1, m2).setWhiteListKeys(Array("a", "b", "z")).fit(inputData)
+      .setInput(m1, m2).setAllowListKeys(Array("a", "b", "z")).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)
@@ -230,7 +230,7 @@ class GeolocationMapVectorizerTest
 
   it should "correctly backlist keys" in {
     val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).setTrackNulls(false)
-      .setBlackListKeys(Array("a", "z")).fit(inputData)
+      .setDenyListKeys(Array("a", "z")).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)
@@ -258,7 +258,7 @@ class GeolocationMapVectorizerTest
 
   it should "track nulls with backlist keys" in {
     val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).setTrackNulls(true)
-      .setBlackListKeys(Array("a", "z")).fit(inputData)
+      .setDenyListKeys(Array("a", "z")).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)

@@ -147,42 +147,42 @@ class EmailVectorizerTest
     result shouldBe expectedMulti
   }
 
-  it should "use whitelisted/ignore blacklisted keys in EmailMap" in {
+  it should "use allowlisted/ignore denylisted keys in EmailMap" in {
     val (ds1, f1) = TestFeatureBuilder(emailMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, blackListKeys = Array(emailKey2), trackNulls = false)
+      cleanText = CleanText, cleanKeys = CleanKeys, denyListKeys = Array(emailKey2), trackNulls = false)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)
     result(2) shouldBe result(3)
     result should contain theSameElementsAs expectedEmailMap
 
-    val vectorizedWhitelist = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, whiteListKeys = Array(emailKey), trackNulls = false)
-    val resultWhitelist = transformAndCollect(ds1, vectorizedWhitelist)
-    resultWhitelist(0) shouldBe resultWhitelist(1)
-    resultWhitelist(2) shouldBe resultWhitelist(3)
-    resultWhitelist should contain theSameElementsAs expectedEmailMap
+    val vectorizedAllowlist = f1.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, cleanKeys = CleanKeys, allowListKeys = Array(emailKey), trackNulls = false)
+    val resultAllowlist = transformAndCollect(ds1, vectorizedAllowlist)
+    resultAllowlist(0) shouldBe resultAllowlist(1)
+    resultAllowlist(2) shouldBe resultAllowlist(3)
+    resultAllowlist should contain theSameElementsAs expectedEmailMap
   }
 
-  it should "track nulls with whitelisted/ignore blacklisted keys in EmailMap" in {
+  it should "track nulls with allowlisted/ignore denylisted keys in EmailMap" in {
 
 
     val (ds1, f1) = TestFeatureBuilder(emailMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, blackListKeys = Array(emailKey2), trackNulls = true)
+      cleanText = CleanText, cleanKeys = CleanKeys, denyListKeys = Array(emailKey2), trackNulls = true)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)
     result(2) shouldBe result(3)
     result should contain theSameElementsAs expectedTrackNulls
 
-    val vectorizedWhitelist = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, whiteListKeys = Array(emailKey), trackNulls = true)
-    val resultWhitelist = transformAndCollect(ds1, vectorizedWhitelist)
-    resultWhitelist(0) shouldBe resultWhitelist(1)
-    resultWhitelist(2) shouldBe resultWhitelist(3)
-    resultWhitelist should contain theSameElementsAs expectedTrackNulls
+    val vectorizedAllowlist = f1.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, cleanKeys = CleanKeys, allowListKeys = Array(emailKey), trackNulls = true)
+    val resultAllowlist = transformAndCollect(ds1, vectorizedAllowlist)
+    resultAllowlist(0) shouldBe resultAllowlist(1)
+    resultAllowlist(2) shouldBe resultAllowlist(3)
+    resultAllowlist should contain theSameElementsAs expectedTrackNulls
   }
 
   Spec[RichEmailFeature] should "vectorize Emails correctly" in {

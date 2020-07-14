@@ -55,8 +55,8 @@ class FilterIntegralMapTest extends OpTransformerSpec[IntegralMap, FilterMap[Int
     IntegralMap(Map("Knight" -> 5))
   )
 
-  it should "filter by whitelisted keys" in {
-    transformer.setWhiteListKeys(Array("Arthur", "Knight"))
+  it should "filter by allowlisted keys" in {
+    transformer.setAllowListKeys(Array("Arthur", "Knight"))
     val filtered = transformer.transform(inputData).collect(transformer.getOutput())
 
     val dataExpected = Array(
@@ -68,10 +68,10 @@ class FilterIntegralMapTest extends OpTransformerSpec[IntegralMap, FilterMap[Int
     filtered should contain theSameElementsAs dataExpected
   }
 
-  it should "filter by blacklisted keys" in {
+  it should "filter by denylisted keys" in {
     transformer.setInput(f1Int)
-      .setWhiteListKeys(Array[String]())
-      .setBlackListKeys(Array("Arthur", "Knight"))
+      .setAllowListKeys(Array[String]())
+      .setDenyListKeys(Array("Arthur", "Knight"))
     val filtered = transformer.transform(inputData).collect(transformer.getOutput())
 
     val dataExpected = Array(

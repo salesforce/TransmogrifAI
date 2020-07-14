@@ -156,9 +156,9 @@ class RealMapVectorizerTest
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
   }
 
-  it should "correctly whitelist keys" in {
+  it should "correctly allowlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setWhiteListKeys(Array("a", "b", "z")).setTrackNulls(false).fit(inputData)
+      .setCleanKeys(true).setAllowListKeys(Array("a", "b", "z")).setTrackNulls(false).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)
@@ -179,9 +179,9 @@ class RealMapVectorizerTest
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
-  it should "track nulls with whitelist keys" in {
+  it should "track nulls with allowlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setWhiteListKeys(Array("a", "b", "z")).setTrackNulls(true).fit(inputData)
+      .setCleanKeys(true).setAllowListKeys(Array("a", "b", "z")).setTrackNulls(true).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)
@@ -206,7 +206,7 @@ class RealMapVectorizerTest
 
   it should "correctly backlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setBlackListKeys(Array("a", "z")).setTrackNulls(false).fit(inputData)
+      .setCleanKeys(true).setDenyListKeys(Array("a", "z")).setTrackNulls(false).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -228,7 +228,7 @@ class RealMapVectorizerTest
 
   it should "track nulls with backlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setBlackListKeys(Array("a", "z")).setTrackNulls(true).fit(inputData)
+      .setCleanKeys(true).setDenyListKeys(Array("a", "z")).setTrackNulls(true).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)

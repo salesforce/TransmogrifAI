@@ -69,11 +69,11 @@ private[op] trait OpWorkflowCore {
   // raw features generated after data is read in and aggregated
   protected var rawFeatures: Array[OPFeature] = Array[OPFeature]()
 
-  // features that have been blacklisted from use in dag
-  protected var blacklistedFeatures: Array[OPFeature] = Array[OPFeature]()
+  // features that have been denylisted from use in dag
+  protected var denylistedFeatures: Array[OPFeature] = Array[OPFeature]()
 
-  // map keys that were blacklisted from use in dag
-  protected var blacklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
+  // map keys that were denylisted from use in dag
+  protected var denylistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
 
   // raw feature filter results calculated in raw feature filter
   protected var rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
@@ -201,18 +201,18 @@ private[op] trait OpWorkflowCore {
   }
 
   /**
-   * Get the list of raw features which have been blacklisted
+   * Get the list of raw features which have been denylisted
    *
-   * @return blacklisted features
+   * @return denylisted features
    */
-  final def getBlacklist(): Array[OPFeature] = blacklistedFeatures
+  final def getDenylist(): Array[OPFeature] = denylistedFeatures
 
   /**
-   * Get the list of Map Keys which have been blacklisted
+   * Get the list of Map Keys which have been denylisted
    *
-   * @return blacklisted map keys
+   * @return denylisted map keys
    */
-  final def getBlacklistMapKeys(): Map[String, Set[String]] = blacklistedMapKeys
+  final def getDenylistMapKeys(): Map[String, Set[String]] = denylistedMapKeys
 
   /**
    * Get the parameter settings passed into the workflow
