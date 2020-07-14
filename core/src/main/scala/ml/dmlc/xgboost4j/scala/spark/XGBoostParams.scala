@@ -30,15 +30,12 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import com.salesforce.op.stages.impl.preparators.CorrelationLevel.findValues
 import enumeratum.{Enum, EnumEntry}
 import ml.dmlc.xgboost4j.LabeledPoint
 import ml.dmlc.xgboost4j.scala.Booster
 import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
-
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * Hack to access [[XGBoostClassifierParams]]
