@@ -142,8 +142,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
 
     val blocklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
-    wf.setDenylist(blocklist, Seq.empty)
-    wf.getDenylist() should contain theSameElementsAs blocklist
+    wf.setBlocklist(blocklist, Seq.empty)
+    wf.getBlocklist() should contain theSameElementsAs blocklist
     wf.getRawFeatures() should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
     wf.getResultFeatures().flatMap(_.rawFeatures).distinct.sortBy(_.name) should contain theSameElementsAs
@@ -211,7 +211,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .withRawFeatureFilter(Option(dataReader), None)
 
     val error = intercept[RuntimeException](
-      wf.setDenylist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
+      wf.setBlocklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     )
     error.getMessage.contains("creation of required result feature (height-weight_4-stagesApplied_Real")
   }
@@ -221,7 +221,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .setResultFeatures(whyNotNormed, weight)
       .withRawFeatureFilter(Option(dataReader), None, resultFeatureRetentionPolicy = ResultFeatureRetention.AtLeastOne)
 
-    wf.setDenylist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
+    wf.setBlocklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     wf.getResultFeatures().map(_.name) shouldEqual Seq(weight).map(_.name)
   }
 

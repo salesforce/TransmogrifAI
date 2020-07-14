@@ -95,15 +95,15 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       stages <- loadStages(json, workflowOpt, path)
       resolvedFeatures <- resolveFeatures(json, stages)
       resultFeatures <- resolveResultFeatures(json, resolvedFeatures)
-      blocklist <- resolveDenylist(json, workflowOpt, resolvedFeatures, path)
-      blocklistMapKeys <- resolveDenylistMapKeys(json)
+      blocklist <- resolveBlocklist(json, workflowOpt, resolvedFeatures, path)
+      blocklistMapKeys <- resolveBlocklistMapKeys(json)
       rffResults <- resolveRawFeatureFilterResults(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
-      .setDenylist(blocklist)
-      .setDenylistMapKeys(blocklistMapKeys)
+      .setBlocklist(blocklist)
+      .setBlocklistMapKeys(blocklistMapKeys)
       .setRawFeatureFilterResults(rffResults)
   }
 
@@ -166,28 +166,28 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     features.filter(f => resultIds.contains(f.uid))
   }
 
-  private def resolveDenylist
+  private def resolveBlocklist
   (
     json: JValue,
     wfOpt: Option[OpWorkflow],
     features: Array[OPFeature],
     path: String
   ): Try[Array[OPFeature]] = {
-    if ((json \ DenylistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
+    if ((json \ BlocklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
       for {
         feats <- wfOpt
-          .map(wf => Success(wf.getAllFeatures() ++ wf.getDenylist()))
-          .getOrElse(loadStages(json, DenylistedStages, path).map(_._2))
+          .map(wf => Success(wf.getAllFeatures() ++ wf.getBlocklist()))
+          .getOrElse(loadStages(json, BlocklistedStages, path).map(_._2))
         allFeatures = features ++ feats
-        blocklistIds = (json \ DenylistedFeaturesUids.entryName).extract[Array[String]]
+        blocklistIds = (json \ BlocklistedFeaturesUids.entryName).extract[Array[String]]
       } yield blocklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
     } else {
       Success(Array.empty[OPFeature])
     }
   }
 
-  private def resolveDenylistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
-    (json \ DenylistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
+  private def resolveBlocklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
+    (json \ BlocklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
       case Some(blockMapKeys) => blockMapKeys.map { case (k, vs) => k -> vs.toSet }
       case None => Map.empty
     }

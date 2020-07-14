@@ -275,9 +275,9 @@ class OpWorkflowModelReaderWriterTest
     )
     val wfM = wf.train()
     wfM.save(saveFlowPathStable)
-    wf.getDenylist().map(_.name) should contain theSameElementsAs
+    wf.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
-    wf.getDenylistMapKeys() shouldBe
+    wf.getBlocklistMapKeys() shouldBe
       Map(booleanMap.name -> Set("Male"), stringMap.name -> Set("Male"), numericMap.name -> Set("Male"))
 
     val wfMR = wf.loadModel(saveFlowPathStable).setReader(wfM.getReader())
@@ -290,7 +290,7 @@ class OpWorkflowModelReaderWriterTest
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
       Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
-    wfM.getDenylist().map(_.name) should contain theSameElementsAs
+    wfM.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
   }
 
@@ -300,7 +300,7 @@ class OpWorkflowModelReaderWriterTest
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
       Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
-    wfM.getDenylist().map(_.name) should contain theSameElementsAs
+    wfM.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
   }
 
@@ -318,7 +318,7 @@ class OpWorkflowModelReaderWriterTest
 
   it should "load a old version of a saved model" in new OldVectorizedFlow {
     val wfM = wf.loadModel("src/test/resources/OldModelVersion")
-    wfM.getDenylist().isEmpty shouldBe true
+    wfM.getBlocklist().isEmpty shouldBe true
   }
 
   it should "load a old version of a saved model (v0.5.1)" in new OldVectorizedFlow {
@@ -353,10 +353,10 @@ class OpWorkflowModelReaderWriterTest
     wf1.uid shouldBe wf2.uid
     assert(wf1.getParameters(), wf2.getParameters())
     assert(wf1.getResultFeatures(), wf2.getResultFeatures())
-    assert(wf1.getDenylist(), wf2.getDenylist())
+    assert(wf1.getBlocklist(), wf2.getBlocklist())
     assert(wf1.getRawFeatures(), wf2.getRawFeatures())
     assert(wf1.getStages(), wf2.getStages())
-    wf1.getDenylistMapKeys() shouldBe  wf2.getDenylistMapKeys()
+    wf1.getBlocklistMapKeys() shouldBe  wf2.getBlocklistMapKeys()
     RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
@@ -368,8 +368,8 @@ class OpWorkflowModelReaderWriterTest
     wfm1.getReader() shouldBe wfm2.getReader()
     assert(wfm1.getResultFeatures(), wfm2.getResultFeatures())
     assert(wfm1.getRawFeatures(), wfm2.getRawFeatures())
-    assert(wfm1.getDenylist(), wfm2.getDenylist())
-    wfm1.getDenylistMapKeys() shouldBe wfm2.getDenylistMapKeys()
+    assert(wfm1.getBlocklist(), wfm2.getBlocklist())
+    wfm1.getBlocklistMapKeys() shouldBe wfm2.getBlocklistMapKeys()
     assert(wfm1.getStages(), wfm2.getStages())
     RawFeatureFilterResultsComparison.compare(wfm1.getRawFeatureFilterResults(), wfm2.getRawFeatureFilterResults())
   }

@@ -76,12 +76,12 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     this
   }
 
-  protected[op] def setDenylist(features: Array[OPFeature]): this.type = {
+  protected[op] def setBlocklist(features: Array[OPFeature]): this.type = {
     blocklistedFeatures = features
     this
   }
 
-  protected[op] def setDenylistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
+  protected[op] def setBlocklistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
     blocklistedMapKeys = mapKeys
     this
   }
@@ -138,7 +138,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Updated instance of feature
    */
   def getUpdatedFeatures(features: Array[OPFeature]): Array[OPFeature] = {
-    val allFeatures = getRawFeatures() ++ getDenylist() ++ getStages().map(_.getOutput())
+    val allFeatures = getRawFeatures() ++ getBlocklist() ++ getStages().map(_.getOutput())
     features.map { f =>
       allFeatures.find(_.sameOrigin(f))
         .getOrElse(throw new IllegalArgumentException(s"feature $f is not a part of this workflow"))
@@ -175,7 +175,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
         val parentStageIds = feature.traverse[Set[String]](Set.empty[String])((s, f) => s + f.originStage.uid)
         val modelStages = stages.filter(s => parentStageIds.contains(s.uid))
         ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams,
-          getDenylist(), getDenylistMapKeys(), getRawFeatureFilterResults())
+          getBlocklist(), getBlocklistMapKeys(), getRawFeatureFilterResults())
     }
   }
 
@@ -440,8 +440,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     val copy =
       new OpWorkflowModel(uid = uid, trainingParams = trainingParams.copy())
         .setFeatures(copyFeatures(resultFeatures))
-        .setDenylist(copyFeatures(blocklistedFeatures))
-        .setDenylistMapKeys(blocklistedMapKeys)
+        .setBlocklist(copyFeatures(blocklistedFeatures))
+        .setBlocklistMapKeys(blocklistedMapKeys)
         .setRawFeatureFilterResults(rawFeatureFilterResults.copy())
         .setStages(stages.map(_.copy(ParamMap.empty)))
         .setParameters(parameters.copy())

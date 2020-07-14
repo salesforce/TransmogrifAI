@@ -205,14 +205,14 @@ private[op] trait OpWorkflowCore {
    *
    * @return blocklisted features
    */
-  final def getDenylist(): Array[OPFeature] = blocklistedFeatures
+  final def getBlocklist(): Array[OPFeature] = blocklistedFeatures
 
   /**
    * Get the list of Map Keys which have been blocklisted
    *
    * @return blocklisted map keys
    */
-  final def getDenylistMapKeys(): Map[String, Set[String]] = blocklistedMapKeys
+  final def getBlocklistMapKeys(): Map[String, Set[String]] = blocklistedMapKeys
 
   /**
    * Get the parameter settings passed into the workflow
