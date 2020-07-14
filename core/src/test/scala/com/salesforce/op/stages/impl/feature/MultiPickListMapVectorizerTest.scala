@@ -459,7 +459,7 @@ class MultiPickListMapVectorizerTest
     result shouldBe expected
   }
 
-  it should "correctly denylist keys" in {
+  it should "correctly blocklist keys" in {
     val fitted = estimator.setAllowListKeys(Array()).setTrackNulls(false)
       .setDenyListKeys(Array("a", "x")).fit(inputData)
     val vector = fitted.getOutput()
@@ -480,7 +480,7 @@ class MultiPickListMapVectorizerTest
     result shouldBe expected
   }
 
-  it should "track nulls with denylist keys" in {
+  it should "track nulls with blocklist keys" in {
     val fitted = estimator.setAllowListKeys(Array()).setTrackNulls(true)
       .setDenyListKeys(Array("a", "x")).fit(inputData)
     val vector = fitted.getOutput()

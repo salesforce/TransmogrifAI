@@ -147,10 +147,10 @@ class EmailVectorizerTest
     result shouldBe expectedMulti
   }
 
-  it should "use allowlisted/ignore denylisted keys in EmailMap" in {
+  it should "use allowlisted/ignore blocklisted keys in EmailMap" in {
     val (ds1, f1) = TestFeatureBuilder(emailMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, denyListKeys = Array(emailKey2), trackNulls = false)
+      cleanText = CleanText, cleanKeys = CleanKeys, blockListKeys = Array(emailKey2), trackNulls = false)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)
@@ -165,12 +165,12 @@ class EmailVectorizerTest
     resultAllowlist should contain theSameElementsAs expectedEmailMap
   }
 
-  it should "track nulls with allowlisted/ignore denylisted keys in EmailMap" in {
+  it should "track nulls with allowlisted/ignore blocklisted keys in EmailMap" in {
 
 
     val (ds1, f1) = TestFeatureBuilder(emailMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, denyListKeys = Array(emailKey2), trackNulls = true)
+      cleanText = CleanText, cleanKeys = CleanKeys, blockListKeys = Array(emailKey2), trackNulls = true)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)

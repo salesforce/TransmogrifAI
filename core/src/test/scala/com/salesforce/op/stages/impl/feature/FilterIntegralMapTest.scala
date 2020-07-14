@@ -68,7 +68,7 @@ class FilterIntegralMapTest extends OpTransformerSpec[IntegralMap, FilterMap[Int
     filtered should contain theSameElementsAs dataExpected
   }
 
-  it should "filter by denylisted keys" in {
+  it should "filter by blocklisted keys" in {
     transformer.setInput(f1Int)
       .setAllowListKeys(Array[String]())
       .setDenyListKeys(Array("Arthur", "Knight"))

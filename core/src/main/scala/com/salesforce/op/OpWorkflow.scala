@@ -111,27 +111,27 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
 
   /**
-   * Will set the denylisted features variable and if list is non-empty it will
-   * @param features list of features to denylist
+   * Will set the blocklisted features variable and if list is non-empty it will
+   * @param features list of features to blocklist
    * @param distributions feature distributions calculated in raw feature filter
    */
   private[op] def setDenylist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
-    // TODO: Figure out a way to keep track of raw features that aren't explicitly denylisted, but can't be used
-    // TODO: because they're inputs into an explicitly denylisted feature. Eg. "height" in ModelInsightsTest
+    // TODO: Figure out a way to keep track of raw features that aren't explicitly blocklisted, but can't be used
+    // TODO: because they're inputs into an explicitly blocklisted feature. Eg. "height" in ModelInsightsTest
 
-    def finalResultFeaturesCheck(resultFeatures: Array[OPFeature], denylisted: List[OPFeature]): Unit = {
+    def finalResultFeaturesCheck(resultFeatures: Array[OPFeature], blocklisted: List[OPFeature]): Unit = {
       if (resultFeaturePolicy == ResultFeatureRetention.Strict) {
-        resultFeatures.foreach{ f => if (denylisted.contains(f)) {
-          throw new IllegalArgumentException(s"Denylist of features (${denylisted.map(_.name).mkString(", ")})" +
+        resultFeatures.foreach{ f => if (blocklisted.contains(f)) {
+          throw new IllegalArgumentException(s"Denylist of features (${blocklisted.map(_.name).mkString(", ")})" +
             s" from RawFeatureFilter contained the result feature ${f.name}") } }
       } else if (resultFeaturePolicy == ResultFeatureRetention.AtLeastOne) {
-        if (resultFeatures.forall(denylisted.contains)) throw new IllegalArgumentException(s"Denylist of features" +
-          s" (${denylisted.map(_.name).mkString(", ")}) from RawFeatureFilter removed all result features")
+        if (resultFeatures.forall(blocklisted.contains)) throw new IllegalArgumentException(s"Denylist of features" +
+          s" (${blocklisted.map(_.name).mkString(", ")}) from RawFeatureFilter removed all result features")
       } else throw new IllegalArgumentException(s"result feature retention policy $resultFeaturePolicy not supported")
     }
 
-    denylistedFeatures = features
-    if (denylistedFeatures.nonEmpty) {
+    blocklistedFeatures = features
+    if (blocklistedFeatures.nonEmpty) {
       val allDenylisted: MList[OPFeature] = MList(getDenylist(): _*)
       val allUpdated: MList[OPFeature] = MList.empty
 
@@ -139,15 +139,15 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       finalResultFeaturesCheck(initialResultFeatures, allDenylisted.toList)
 
       val initialStages = getStages() // ordered by DAG so dont need to recompute DAG
-      // for each stage remove anything denylisted from the inputs and update any changed input features
+      // for each stage remove anything blocklisted from the inputs and update any changed input features
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
-        val denylistRemoved = inFeatures
+        val blocklistRemoved = inFeatures
           .filterNot { f => allDenylisted.exists(bl => bl.sameOrigin(f)) }
           .map { f =>
             if (f.isRaw) f.withDistributions(distributions.collect { case d if d.name == f.name => d }) else f
           }
-        val inputsChanged = denylistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
+        val inputsChanged = blocklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
         Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
           case Success(out) => allUpdated += out
@@ -158,7 +158,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         }
       }
 
-      // Update the whole DAG with the denylisted features expunged
+      // Update the whole DAG with the blocklisted features expunged
       val updatedResultFeatures = initialResultFeatures
         .filterNot(allDenylisted.contains)
         .map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
@@ -168,7 +168,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
 
   protected[op] def setDenylistMapKeys(mapKeys: Map[String, Set[String]]): Unit = {
-    denylistedMapKeys = mapKeys
+    blocklistedMapKeys = mapKeys
   }
 
   /**

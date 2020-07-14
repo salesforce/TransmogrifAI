@@ -36,7 +36,7 @@ import com.salesforce.op.stages.base.unary.UnaryTransformer
 
 import scala.reflect.runtime.universe.TypeTag
 
-/** Filters maps by keys provided in a allowlist or denylist
+/** Filters maps by keys provided in a allowlist or blocklist
  *
  * @param uid uid for instance
  * @param tti type tag for input

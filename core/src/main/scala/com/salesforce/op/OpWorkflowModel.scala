@@ -77,12 +77,12 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   protected[op] def setDenylist(features: Array[OPFeature]): this.type = {
-    denylistedFeatures = features
+    blocklistedFeatures = features
     this
   }
 
   protected[op] def setDenylistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
-    denylistedMapKeys = mapKeys
+    blocklistedMapKeys = mapKeys
     this
   }
 
@@ -440,8 +440,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     val copy =
       new OpWorkflowModel(uid = uid, trainingParams = trainingParams.copy())
         .setFeatures(copyFeatures(resultFeatures))
-        .setDenylist(copyFeatures(denylistedFeatures))
-        .setDenylistMapKeys(denylistedMapKeys)
+        .setDenylist(copyFeatures(blocklistedFeatures))
+        .setDenylistMapKeys(blocklistedMapKeys)
         .setRawFeatureFilterResults(rawFeatureFilterResults.copy())
         .setStages(stages.map(_.copy(ParamMap.empty)))
         .setParameters(parameters.copy())

@@ -146,10 +146,10 @@ class URLVectorizerTest
     result shouldBe expectedMulti
   }
 
-  it should "use allowlisted/ignore denylisted keys in UrlMap" in {
+  it should "use allowlisted/ignore blocklisted keys in UrlMap" in {
     val (ds1, f1) = TestFeatureBuilder(urlMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, denyListKeys = Array(urlKey2), trackNulls = false)
+      cleanText = CleanText, cleanKeys = CleanKeys, blockListKeys = Array(urlKey2), trackNulls = false)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)
@@ -164,10 +164,10 @@ class URLVectorizerTest
     resultallowlist should contain theSameElementsAs expectedUrlMap
   }
 
-  it should "track nulls allowlisted/ignore denylisted keys in UrlMap" in {
+  it should "track nulls allowlisted/ignore blocklisted keys in UrlMap" in {
     val (ds1, f1) = TestFeatureBuilder(urlMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, denyListKeys = Array(urlKey2), trackNulls = true)
+      cleanText = CleanText, cleanKeys = CleanKeys, blockListKeys = Array(urlKey2), trackNulls = true)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)

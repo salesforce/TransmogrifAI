@@ -130,7 +130,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     wf.rawFeatureFilter.get.isInstanceOf[RawFeatureFilter[_]] shouldBe true
   }
 
-  it should "correctly remove denylisted features when possible" in {
+  it should "correctly remove blocklisted features when possible" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val checked = survivedNum.sanityCheck(fv)
@@ -141,9 +141,9 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     wf.getRawFeatures() should contain theSameElementsAs
       Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
 
-    val denylist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
-    wf.setDenylist(denylist, Seq.empty)
-    wf.getDenylist() should contain theSameElementsAs denylist
+    val blocklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
+    wf.setDenylist(blocklist, Seq.empty)
+    wf.getDenylist() should contain theSameElementsAs blocklist
     wf.getRawFeatures() should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
     wf.getResultFeatures().flatMap(_.rawFeatures).distinct.sortBy(_.name) should contain theSameElementsAs
@@ -169,7 +169,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     data.first().getAs[Vector](1).size shouldEqual OpVectorMetadata("", data.schema(1).metadata).columns.size
   }
 
-  it should "allow you to interact with updated features when things are denylisted and" +
+  it should "allow you to interact with updated features when things are blocklisted and" +
     " features should have distributions" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
@@ -205,7 +205,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     data.select(whyNotNormed2.name, prob2.name).count() shouldBe 6
   }
 
-  it should "throw an error when it is not possible to remove denylisted features" in {
+  it should "throw an error when it is not possible to remove blocklisted features" in {
     val wf = new OpWorkflow()
       .setResultFeatures(whyNotNormed)
       .withRawFeatureFilter(Option(dataReader), None)

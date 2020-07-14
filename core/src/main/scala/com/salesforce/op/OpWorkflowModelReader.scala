@@ -95,15 +95,15 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       stages <- loadStages(json, workflowOpt, path)
       resolvedFeatures <- resolveFeatures(json, stages)
       resultFeatures <- resolveResultFeatures(json, resolvedFeatures)
-      denylist <- resolveDenylist(json, workflowOpt, resolvedFeatures, path)
-      denylistMapKeys <- resolveDenylistMapKeys(json)
+      blocklist <- resolveDenylist(json, workflowOpt, resolvedFeatures, path)
+      blocklistMapKeys <- resolveDenylistMapKeys(json)
       rffResults <- resolveRawFeatureFilterResults(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
-      .setDenylist(denylist)
-      .setDenylistMapKeys(denylistMapKeys)
+      .setDenylist(blocklist)
+      .setDenylistMapKeys(blocklistMapKeys)
       .setRawFeatureFilterResults(rffResults)
   }
 
@@ -179,8 +179,8 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
           .map(wf => Success(wf.getAllFeatures() ++ wf.getDenylist()))
           .getOrElse(loadStages(json, DenylistedStages, path).map(_._2))
         allFeatures = features ++ feats
-        denylistIds = (json \ DenylistedFeaturesUids.entryName).extract[Array[String]]
-      } yield denylistIds.flatMap(uid => allFeatures.find(_.uid == uid))
+        blocklistIds = (json \ DenylistedFeaturesUids.entryName).extract[Array[String]]
+      } yield blocklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
     } else {
       Success(Array.empty[OPFeature])
     }
@@ -188,7 +188,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
 
   private def resolveDenylistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
     (json \ DenylistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
-      case Some(denyMapKeys) => denyMapKeys.map { case (k, vs) => k -> vs.toSet }
+      case Some(blockMapKeys) => blockMapKeys.map { case (k, vs) => k -> vs.toSet }
       case None => Map.empty
     }
   }

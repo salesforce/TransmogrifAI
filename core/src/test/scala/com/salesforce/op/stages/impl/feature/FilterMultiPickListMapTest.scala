@@ -75,7 +75,7 @@ class FilterMultiPickListMapTest extends OpTransformerSpec[MultiPickListMap, Fil
     filtered should contain theSameElementsAs dataExpected
   }
 
-  it should "filter denylisted keys" in {
+  it should "filter blocklisted keys" in {
     transformer
       .setAllowListKeys(Array[String]())
       .setDenyListKeys(Array("Arthur", "Knight"))

@@ -49,17 +49,17 @@ trait RichMapFeature {
   implicit class RichMapFeature[T <: OPMap[_] : TypeTag](val f: FeatureLike[T]) {
 
     /**
-     * Filters map by allowlisted and denylisted keys
+     * Filters map by allowlisted and blocklisted keys
      *
      * @param allowList allowlisted keys
-     * @param denyList  denylisted keys
+     * @param blockList blocklisted keys
      * @return filtered OPMap feature
      */
-    def filter(allowList: Seq[String], denyList: Seq[String]): FeatureLike[T] = {
+    def filter(allowList: Seq[String], blockList: Seq[String]): FeatureLike[T] = {
       f.transformWith(
         new FilterMap[T]()
           .setAllowListKeys(allowList.toSet.toArray)
-          .setDenyListKeys(denyList.toSet.toArray)
+          .setDenyListKeys(blockList.toSet.toArray)
       )
     }
   }
@@ -82,7 +82,7 @@ trait RichMapFeature {
      * @param cleanText         clean text before pivoting
      * @param cleanKeys         clean map keys before pivoting
      * @param allowListKeys     keys to allowlist
-     * @param denyListKeys      keys to denylist
+     * @param blockListKeys      keys to blocklist
      * @param trackNulls        option to keep track of values that were missing
      * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
@@ -94,7 +94,7 @@ trait RichMapFeature {
       cleanText: Boolean,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[T]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
@@ -106,7 +106,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setMinSupport(minSupport)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
@@ -144,7 +144,7 @@ trait RichMapFeature {
      * @param cleanText         clean text before pivoting
      * @param cleanKeys         clean map keys before pivoting
      * @param allowListKeys     keys to allowlist
-     * @param denyListKeys      keys to denylist
+     * @param blockListKeys     keys to blocklist
      * @param typeHint          optional hint for MIME type detector
      * @param trackNulls        option to keep track of values that were missing
      * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
@@ -157,7 +157,7 @@ trait RichMapFeature {
       cleanText: Boolean,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       typeHint: Option[String] = None,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[Base64Map]] = Array.empty,
@@ -173,7 +173,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setMinSupport(minSupport)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
@@ -195,7 +195,7 @@ trait RichMapFeature {
      * @param cleanKeys                clean map keys before pivoting
      * @param shouldPrependFeatureName whether or not to prepend feature name hash to the tokens before hashing
      * @param allowListKeys            keys to allowlist
-     * @param denyListKeys             keys to denylist
+     * @param blockListKeys            keys to blocklist
      * @param trackNulls               option to keep track of values that were missing
      * @param trackTextLen             option to add a column containing the text length to the feature vector
      * @param numHashes                size of hash space
@@ -208,7 +208,7 @@ trait RichMapFeature {
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       shouldPrependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
@@ -221,7 +221,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setPrependFeatureName(shouldPrependFeatureName)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
         .setNumFeatures(numHashes)
         .setHashSpaceStrategy(hashSpaceStrategy)
@@ -352,7 +352,7 @@ trait RichMapFeature {
      * @param cleanKeys                clean map keys before pivoting
      * @param shouldPrependFeatureName whether or not to prepend feature name hash to the tokens before hashing
      * @param allowListKeys            keys to allowlist
-     * @param denyListKeys             keys to denylist
+     * @param blockListKeys            keys to blocklist
      * @param trackNulls               option to keep track of values that were missing
      * @param trackTextLen             option to keep track of text lengths
      * @param numHashes                size of hash space
@@ -365,7 +365,7 @@ trait RichMapFeature {
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       shouldPrependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
@@ -378,7 +378,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setPrependFeatureName(shouldPrependFeatureName)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
         .setNumFeatures(numHashes)
         .setHashSpaceStrategy(hashSpaceStrategy)
@@ -508,7 +508,7 @@ trait RichMapFeature {
      * @param cleanText         clean text before pivoting
      * @param cleanKeys         clean map keys before pivoting
      * @param allowListKeys     keys to allowlist
-     * @param denyListKeys      keys to denylist
+     * @param blockListKeys     keys to blocklist
      * @param trackNulls        option to keep track of values that were missing
      * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
@@ -520,7 +520,7 @@ trait RichMapFeature {
       cleanText: Boolean,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
@@ -532,7 +532,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
@@ -557,7 +557,7 @@ trait RichMapFeature {
      * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      */
     def autoBucketize(
       label: FeatureLike[RealNN],
@@ -566,7 +566,7 @@ trait RichMapFeature {
       minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty
+      blockListKeys: Array[String] = Array.empty
     ): FeatureLike[OPVector] = {
       new DecisionTreeNumericMapBucketizer[Double, T]()
         .setInput(label, f)
@@ -575,7 +575,7 @@ trait RichMapFeature {
         .setMinInfoGain(minInfoGain)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys).getOutput()
+        .setDenyListKeys(blockListKeys).getOutput()
     }
 
     /**
@@ -585,7 +585,7 @@ trait RichMapFeature {
      * @param defaultValue  value to give missing keys on pivot
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      * @param trackNulls    option to keep track of values that were missing
      * @param label         optional label column to be passed into autoBucketizer if present
      * @param trackInvalid  option to keep track of invalid values,
@@ -599,7 +599,7 @@ trait RichMapFeature {
       fillWithMean: Boolean = TransmogrifierDefaults.FillWithMean,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
@@ -614,14 +614,14 @@ trait RichMapFeature {
             .setDefaultValue(defaultValue)
             .setCleanKeys(cleanKeys)
             .setAllowListKeys(allowListKeys)
-            .setDenyListKeys(denyListKeys)
+            .setDenyListKeys(blockListKeys)
             .setTrackNulls(trackNulls)
             .getOutput()
         case Some(lbl) =>
           autoBucketize(
             label = lbl, trackNulls = trackNulls, trackInvalid = trackInvalid,
             minInfoGain = minInfoGain, cleanKeys = cleanKeys,
-            allowListKeys = allowListKeys, denyListKeys = denyListKeys
+            allowListKeys = allowListKeys, blockListKeys = blockListKeys
           )
       }
     }
@@ -645,7 +645,7 @@ trait RichMapFeature {
      * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      */
     def autoBucketize(
       label: FeatureLike[RealNN],
@@ -654,7 +654,7 @@ trait RichMapFeature {
       minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty
+      blockListKeys: Array[String] = Array.empty
     ): FeatureLike[OPVector] = {
       new DecisionTreeNumericMapBucketizer[Long, T]()
         .setInput(label, f)
@@ -663,7 +663,7 @@ trait RichMapFeature {
         .setMinInfoGain(minInfoGain)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys).getOutput()
+        .setDenyListKeys(blockListKeys).getOutput()
     }
 
     /**
@@ -673,7 +673,7 @@ trait RichMapFeature {
      * @param defaultValue  value to give missing keys on pivot
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      * @param trackNulls    option to keep track of values that were missing
      * @param label         optional label column to be passed into autoBucketizer if present
      * @param trackInvalid  option to keep track of invalid values,
@@ -687,7 +687,7 @@ trait RichMapFeature {
       fillWithMode: Boolean = TransmogrifierDefaults.FillWithMode,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
@@ -702,14 +702,14 @@ trait RichMapFeature {
             .setDefaultValue(defaultValue)
             .setCleanKeys(cleanKeys)
             .setAllowListKeys(allowListKeys)
-            .setDenyListKeys(denyListKeys)
+            .setDenyListKeys(blockListKeys)
             .setTrackNulls(trackNulls)
             .getOutput()
         case Some(lbl) =>
           autoBucketize(
             label = lbl, trackNulls = trackNulls, trackInvalid = trackInvalid,
             minInfoGain = minInfoGain, cleanKeys = cleanKeys,
-            allowListKeys = allowListKeys, denyListKeys = denyListKeys
+            allowListKeys = allowListKeys, blockListKeys = blockListKeys
           )
       }
     }
@@ -737,7 +737,7 @@ trait RichMapFeature {
      * @param timePeriod The time period to extract from the timestamp
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      * @param others        Other features of same type
      * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
@@ -746,14 +746,14 @@ trait RichMapFeature {
       timePeriod: TimePeriod = TimePeriod.HourOfDay,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[DateMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       new DateMapToUnitCircleVectorizer[DateMap]()
         .setInput(f +: others)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTimePeriod(timePeriod)
         .getOutput()
     }
@@ -765,7 +765,7 @@ trait RichMapFeature {
      * @param defaultValue     value to give missing keys on pivot
      * @param cleanKeys        clean text before pivoting
      * @param allowListKeys    keys to allowlist
-     * @param denyListKeys     keys to denylist
+     * @param blockListKeys    keys to blocklist
      * @param trackNulls       option to keep track of values that were missing
      * @param referenceDate    reference date to subtract off before converting to vector
      * @param circularDateReps list of all the circular date representations that should be included in feature vector
@@ -776,7 +776,7 @@ trait RichMapFeature {
       defaultValue: Double,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate,
       circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
@@ -784,7 +784,7 @@ trait RichMapFeature {
     ): FeatureLike[OPVector] = {
 
       val timePeriods = circularDateReps.map {
-        tp => f.toUnitCircle(tp, cleanKeys, allowListKeys, denyListKeys, others)
+        tp => f.toUnitCircle(tp, cleanKeys, allowListKeys, blockListKeys, others)
       }
 
       val time = new DateMapVectorizer()
@@ -792,7 +792,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setReferenceDate(referenceDate)
         .getOutput()
@@ -823,7 +823,7 @@ trait RichMapFeature {
      * @param timePeriod    The time period to extract from the timestamp
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      * @param others        Other features of same type
      * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
@@ -832,14 +832,14 @@ trait RichMapFeature {
       timePeriod: TimePeriod = TimePeriod.HourOfDay,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[DateTimeMap]] = Array.empty
     ): FeatureLike[OPVector] = {
       new DateMapToUnitCircleVectorizer[DateTimeMap]()
         .setInput(f +: others)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTimePeriod(timePeriod)
         .getOutput()
     }
@@ -850,7 +850,7 @@ trait RichMapFeature {
      * @param defaultValue     value to give missing keys on pivot
      * @param cleanKeys        clean text before pivoting
      * @param allowListKeys    keys to allowlist
-     * @param denyListKeys     keys to denylist
+     * @param blockListKeys    keys to blocklist
      * @param trackNulls       option to keep track of values that were missing
      * @param referenceDate    reference date to subtract off before converting to vector
      * @param circularDateReps list of all the circular date representations that should be included in feature vector
@@ -861,7 +861,7 @@ trait RichMapFeature {
       defaultValue: Double,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate,
       circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
@@ -869,7 +869,7 @@ trait RichMapFeature {
     ): FeatureLike[OPVector] = {
 
       val timePeriods = circularDateReps.map {
-        tp => f.toUnitCircle(tp, cleanKeys, allowListKeys, denyListKeys, others)
+        tp => f.toUnitCircle(tp, cleanKeys, allowListKeys, blockListKeys, others)
       }
 
       val time = new DateMapVectorizer()
@@ -877,7 +877,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setReferenceDate(referenceDate)
         .getOutput()
@@ -900,7 +900,7 @@ trait RichMapFeature {
      * @param defaultValue  value to give missing keys on pivot
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      * @param trackNulls    option to keep track of values that were missing
      *
      * @return an OPVector feature
@@ -909,7 +909,7 @@ trait RichMapFeature {
       defaultValue: Double,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[BinaryMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
     ): FeatureLike[OPVector] = {
@@ -918,7 +918,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .getOutput()
     }
@@ -938,7 +938,7 @@ trait RichMapFeature {
      * @param defaultValue  value to give missing keys on pivot
      * @param cleanKeys     clean text before pivoting
      * @param allowListKeys keys to allowlist
-     * @param denyListKeys  keys to denylist
+     * @param blockListKeys keys to blocklist
      * @param trackNulls    option to keep track of values that were missing
      *
      * @return an OPVector feature
@@ -947,7 +947,7 @@ trait RichMapFeature {
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       defaultValue: Geolocation = TransmogrifierDefaults.DefaultGeolocation,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[GeolocationMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
     ): FeatureLike[OPVector] = {
@@ -956,7 +956,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(denyListKeys)
+        .setDenyListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .getOutput()
     }
@@ -1005,7 +1005,7 @@ trait RichMapFeature {
       fillValue: Double = TransmogrifierDefaults.FillValue,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[PhoneMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
     ): FeatureLike[OPVector] = {
@@ -1030,7 +1030,7 @@ trait RichMapFeature {
      * @param cleanText         clean text after email split but before pivoting
      * @param cleanKeys         clean map keys before pivoting
      * @param allowListKeys     keys to allowlist
-     * @param denyListKeys      keys to denylist
+     * @param blockListKeys     keys to blocklist
      * @param trackNulls        option to keep track of values that were missing
      * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
@@ -1042,7 +1042,7 @@ trait RichMapFeature {
       cleanText: Boolean,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[EmailMap]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
@@ -1053,7 +1053,7 @@ trait RichMapFeature {
 
       domains.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, cleanKeys = cleanKeys,
-        allowListKeys = allowListKeys, denyListKeys = denyListKeys,
+        allowListKeys = allowListKeys, blockListKeys = blockListKeys,
         others = domains.tail, trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }
@@ -1075,7 +1075,7 @@ trait RichMapFeature {
      * @param cleanText         clean text after email split but before pivoting
      * @param cleanKeys         clean map keys before pivoting
      * @param allowListKeys     keys to allowlist
-     * @param denyListKeys      keys to denylist
+     * @param blockListKeys     keys to blocklist
      * @param trackNulls        option to keep track of values that were missing
      * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
@@ -1087,7 +1087,7 @@ trait RichMapFeature {
       cleanText: Boolean,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       allowListKeys: Array[String] = Array.empty,
-      denyListKeys: Array[String] = Array.empty,
+      blockListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[URLMap]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
@@ -1098,7 +1098,7 @@ trait RichMapFeature {
 
       domains.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, cleanKeys = cleanKeys,
-        allowListKeys = allowListKeys, denyListKeys = denyListKeys,
+        allowListKeys = allowListKeys, blockListKeys = blockListKeys,
         others = domains.tail, trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }

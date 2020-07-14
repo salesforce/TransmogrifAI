@@ -80,9 +80,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
     val FN = OpWorkflowModelReadWriteShared.FieldNames
     (FN.Uid.entryName -> model.uid) ~
       (FN.ResultFeaturesUids.entryName -> resultFeaturesJArray) ~
-      (FN.DenylistedFeaturesUids.entryName -> denylistFeaturesJArray()) ~
-      (FN.DenylistedMapKeys.entryName -> denylistMapKeys()) ~
-      (FN.DenylistedStages.entryName -> denylistedStagesJArray(path)) ~
+      (FN.DenylistedFeaturesUids.entryName -> blocklistFeaturesJArray()) ~
+      (FN.DenylistedMapKeys.entryName -> blocklistMapKeys()) ~
+      (FN.DenylistedStages.entryName -> blocklistedStagesJArray(path)) ~
       (FN.Stages.entryName -> stagesJArray(path)) ~
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
       (FN.Parameters.entryName -> model.getParameters().toJson(pretty = false)) ~
@@ -94,10 +94,10 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   private def resultFeaturesJArray(): JArray =
     JArray(model.getResultFeatures().map(_.uid).map(JString).toList)
 
-  private def denylistFeaturesJArray(): JArray =
+  private def blocklistFeaturesJArray(): JArray =
     JArray(model.getDenylist().map(_.uid).map(JString).toList)
 
-  private def denylistMapKeys(): JObject =
+  private def blocklistMapKeys(): JObject =
     JObject(model.getDenylistMapKeys().map { case (k, vs) => k -> JArray(vs.map(JString).toList) }.toList)
 
   /**
@@ -112,14 +112,14 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   }
 
   /**
-   * Serialize all the denylisted model stages
+   * Serialize all the blocklisted model stages
    *
    * @param path path to store the spark params for stages
    * @return array of serialized stages
    */
-  private def denylistedStagesJArray(path: String): JArray = {
-    val denylistStages = model.getDenylist().map(_.originStage)
-    stagesJArray(denylistStages, path)
+  private def blocklistedStagesJArray(path: String): JArray = {
+    val blocklistStages = model.getDenylist().map(_.originStage)
+    stagesJArray(blocklistStages, path)
   }
 
   /**
@@ -165,9 +165,9 @@ private[op] object OpWorkflowModelReadWriteShared {
     val values = findValues
     case object Uid extends FieldNames("uid")
     case object ResultFeaturesUids extends FieldNames("resultFeaturesUids")
-    case object DenylistedFeaturesUids extends FieldNames("denylistedFeaturesUids")
-    case object DenylistedMapKeys extends FieldNames("denylistedMapKeys")
-    case object DenylistedStages extends FieldNames("denylistedStages")
+    case object DenylistedFeaturesUids extends FieldNames("blocklistedFeaturesUids")
+    case object DenylistedMapKeys extends FieldNames("blocklistedMapKeys")
+    case object DenylistedStages extends FieldNames("blocklistedStages")
     case object Stages extends FieldNames("stages")
     case object AllFeatures extends FieldNames("allFeatures")
     case object Parameters extends FieldNames("parameters")

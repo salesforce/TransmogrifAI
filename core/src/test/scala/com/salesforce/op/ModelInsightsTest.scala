@@ -690,10 +690,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
 
     /**
-     * Currently, raw features that aren't explicitly denylisted, but are not used because they are inputs to
-     * explicitly denylisted features are not present as raw features in the model, nor in ModelInsights. For example,
-     * weight is explicitly denylisted here, which means that height will not be added as a raw feature even though
-     * it's not explicitly denylisted itself.
+     * Currently, raw features that aren't explicitly blocklisted, but are not used because they are inputs to
+     * explicitly blocklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blocklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blocklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
 

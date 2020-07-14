@@ -268,7 +268,7 @@ class OpWorkflowModelReaderWriterTest
     assert(wfMR, wfM)
   }
 
-  it should "save a workflow model that has a RawFeatureFilter with correct denylists" in new VectorizedFlow {
+  it should "save a workflow model that has a RawFeatureFilter with correct blocklists" in new VectorizedFlow {
     wf.withRawFeatureFilter(trainingReader = Some(dataReader), scoringReader = Some(simpleReader),
       bins = 10, minFillRate = 0.1, maxFillDifference = 0.1, maxFillRatioDiff = 2,
       maxJSDivergence = 0.2, maxCorrelation = 0.9, minScoringRows = 0

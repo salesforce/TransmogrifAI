@@ -602,23 +602,23 @@ trait MapPivotParams extends Params {
 
   final def setAllowListKeys(keys: Array[String]): this.type = set(allowListKeys, keys)
 
-  final val denyListKeys = new StringArrayParam(
-    parent = this, name = "denyListKeys", doc = "list of map keys to exclude from pivot"
+  final val blockListKeys = new StringArrayParam(
+    parent = this, name = "blockListKeys", doc = "list of map keys to exclude from pivot"
   )
-  setDefault(denyListKeys, Array[String]())
+  setDefault(blockListKeys, Array[String]())
 
-  final def setDenyListKeys(keys: Array[String]): this.type = set(denyListKeys, keys)
+  final def setDenyListKeys(keys: Array[String]): this.type = set(blockListKeys, keys)
 
   protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
     val map = cleanMap[V](m, shouldCleanKey, shouldCleanValue)
-    val (allowList, denyList) = (
+    val (allowList, blockList) = (
       $(allowListKeys).map(cleanTextFn(_, shouldCleanKey)),
-      $(denyListKeys).map(cleanTextFn(_, shouldCleanKey))
+      $(blockListKeys).map(cleanTextFn(_, shouldCleanKey))
     )
     if (allowList.nonEmpty) {
-      map.filter { case (k, v) => allowList.contains(k) && !denyList.contains(k) }
-    } else if (denyList.nonEmpty) {
-      map.filter { case (k, v) => !denyList.contains(k) }
+      map.filter { case (k, v) => allowList.contains(k) && !blockList.contains(k) }
+    } else if (blockList.nonEmpty) {
+      map.filter { case (k, v) => !blockList.contains(k) }
     } else {
       map
     }

@@ -1,7 +1,7 @@
 {
   "uid" : "OpWorkflow_000000000008",
   "resultFeaturesUids" : [ "Real_000000000007" ],
-  "denylistedFeaturesUids" : [ ],
+  "blocklistedFeaturesUids" : [ ],
   "stages" : [ {
     "timestamp" : 1534375865758,
     "sparkVersion" : "2.2.1",
