@@ -179,10 +179,10 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-    modelsAndParameters = modelsAndParams, splitter = None
+      modelsAndParameters = modelsAndParams, splitter = None
     ).setInput(survivedNum, features).getOutput()
     val workflow = new OpWorkflow().setReader(dataReader)
-    .setResultFeatures(prediction, survivedNum, indexed, deindexed)
+      .setResultFeatures(prediction, survivedNum, indexed, deindexed)
     lazy val model = workflow.train()
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
@@ -190,8 +190,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   }
 
   private def genRawDataAndScore(model: OpWorkflowModel, prediction: FeatureLike[Prediction]) = {
-    lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
-    lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
+    val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
+    val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
     (rawData, expectedScores)
   }
 
@@ -200,5 +200,6 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
 class Labelizer(uid: String = UID[Labelizer]) extends UnaryTransformer[RealNN, RealNN]("labelizer", uid) {
   override def outputIsResponse: Boolean = true
+
   def transformFn: RealNN => RealNN = v => v.value.map(x => if (x > 0.0) 1.0 else 0.0).toRealNN(0.0)
 }
