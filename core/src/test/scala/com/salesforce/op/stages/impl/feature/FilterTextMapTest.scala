@@ -71,7 +71,7 @@ class FilterTextMapTest extends OpTransformerSpec[TextMap, FilterMap[TextMap]] {
   it should "filter blocklisted keys" in {
     transformer.setInput(f1)
       .setAllowListKeys(Array[String]())
-      .setDenyListKeys(Array("Arthur", "Knight"))
+      .setBlockListKeys(Array("Arthur", "Knight"))
     val filtered = transformer.transform(inputData).collect(transformer.getOutput)
 
     val dataExpected = Array(

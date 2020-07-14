@@ -78,7 +78,7 @@ class FilterMultiPickListMapTest extends OpTransformerSpec[MultiPickListMap, Fil
   it should "filter blocklisted keys" in {
     transformer
       .setAllowListKeys(Array[String]())
-      .setDenyListKeys(Array("Arthur", "Knight"))
+      .setBlockListKeys(Array("Arthur", "Knight"))
 
     val filtered = transformer.transform(inputData).collect(transformer.getOutput())
 
@@ -99,7 +99,7 @@ class FilterMultiPickListMapTest extends OpTransformerSpec[MultiPickListMap, Fil
       .setCleanText(false)
       .setCleanKeys(false)
       .setAllowListKeys(Array("Arthur", "Knight"))
-      .setDenyListKeys(Array())
+      .setBlockListKeys(Array())
     val filtered = transformer.transform(inputData).collect(transformer.getOutput())
 
     val dataExpected = Array(
@@ -115,7 +115,7 @@ class FilterMultiPickListMapTest extends OpTransformerSpec[MultiPickListMap, Fil
       .setCleanKeys(true)
       .setCleanText(true)
       .setAllowListKeys(Array("Arthur", "Knight"))
-      .setDenyListKeys(Array())
+      .setBlockListKeys(Array())
     val filtered = transformer.transform(inputData).collect(transformer.getOutput())
 
     val dataExpected = Array(

@@ -206,7 +206,7 @@ class RealMapVectorizerTest
 
   it should "correctly backlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setDenyListKeys(Array("a", "z")).setTrackNulls(false).fit(inputData)
+      .setCleanKeys(true).setBlockListKeys(Array("a", "z")).setTrackNulls(false).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -228,7 +228,7 @@ class RealMapVectorizerTest
 
   it should "track nulls with backlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setDenyListKeys(Array("a", "z")).setTrackNulls(true).fit(inputData)
+      .setCleanKeys(true).setBlockListKeys(Array("a", "z")).setTrackNulls(true).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)

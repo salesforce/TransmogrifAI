@@ -387,7 +387,7 @@ class TextMapPivotVectorizerTest
   }
 
   it should "correctly blocklist keys" in {
-    val fitted = vectorizer.setTrackNulls(false).setAllowListKeys(Array()).setDenyListKeys(Array("a", "x"))
+    val fitted = vectorizer.setTrackNulls(false).setAllowListKeys(Array()).setBlockListKeys(Array("a", "x"))
       .fit(inputData)
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
@@ -405,7 +405,7 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls with blocklist keys" in {
-    val fitted = vectorizer.setTrackNulls(true).setAllowListKeys(Array()).setDenyListKeys(Array("a", "x"))
+    val fitted = vectorizer.setTrackNulls(true).setAllowListKeys(Array()).setBlockListKeys(Array("a", "x"))
       .fit(inputData)
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()

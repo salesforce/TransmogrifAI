@@ -211,7 +211,7 @@ class IntegralMapVectorizerTest
 
   it should "correctly backlist keys" in {
     val vectorizer = new IntegralMapVectorizer[IntegralMap]()
-      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(false).setDenyListKeys(Array("a", "z")).fit(inputData)
+      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(false).setBlockListKeys(Array("a", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)
@@ -237,7 +237,7 @@ class IntegralMapVectorizerTest
 
   it should "track nulls with backlist keys" in {
     val vectorizer = new IntegralMapVectorizer[IntegralMap]()
-      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(true).setDenyListKeys(Array("a", "z")).fit(inputData)
+      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(true).setBlockListKeys(Array("a", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)

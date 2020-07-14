@@ -607,7 +607,7 @@ trait MapPivotParams extends Params {
   )
   setDefault(blockListKeys, Array[String]())
 
-  final def setDenyListKeys(keys: Array[String]): this.type = set(blockListKeys, keys)
+  final def setBlockListKeys(keys: Array[String]): this.type = set(blockListKeys, keys)
 
   protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
     val map = cleanMap[V](m, shouldCleanKey, shouldCleanValue)

@@ -230,7 +230,7 @@ class GeolocationMapVectorizerTest
 
   it should "correctly backlist keys" in {
     val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).setTrackNulls(false)
-      .setDenyListKeys(Array("a", "z")).fit(inputData)
+      .setBlockListKeys(Array("a", "z")).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)
@@ -258,7 +258,7 @@ class GeolocationMapVectorizerTest
 
   it should "track nulls with backlist keys" in {
     val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).setTrackNulls(true)
-      .setDenyListKeys(Array("a", "z")).fit(inputData)
+      .setBlockListKeys(Array("a", "z")).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)

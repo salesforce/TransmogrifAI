@@ -59,7 +59,7 @@ trait RichMapFeature {
       f.transformWith(
         new FilterMap[T]()
           .setAllowListKeys(allowList.toSet.toArray)
-          .setDenyListKeys(blockList.toSet.toArray)
+          .setBlockListKeys(blockList.toSet.toArray)
       )
     }
   }
@@ -82,7 +82,7 @@ trait RichMapFeature {
      * @param cleanText         clean text before pivoting
      * @param cleanKeys         clean map keys before pivoting
      * @param allowListKeys     keys to allowlist
-     * @param blockListKeys      keys to blocklist
+     * @param blockListKeys     keys to blocklist
      * @param trackNulls        option to keep track of values that were missing
      * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
@@ -106,7 +106,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setMinSupport(minSupport)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
@@ -173,7 +173,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setMinSupport(minSupport)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
@@ -221,7 +221,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setPrependFeatureName(shouldPrependFeatureName)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
         .setNumFeatures(numHashes)
         .setHashSpaceStrategy(hashSpaceStrategy)
@@ -378,7 +378,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setPrependFeatureName(shouldPrependFeatureName)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
         .setNumFeatures(numHashes)
         .setHashSpaceStrategy(hashSpaceStrategy)
@@ -532,7 +532,7 @@ trait RichMapFeature {
         .setCleanText(cleanText)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
@@ -575,7 +575,7 @@ trait RichMapFeature {
         .setMinInfoGain(minInfoGain)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys).getOutput()
+        .setBlockListKeys(blockListKeys).getOutput()
     }
 
     /**
@@ -614,7 +614,7 @@ trait RichMapFeature {
             .setDefaultValue(defaultValue)
             .setCleanKeys(cleanKeys)
             .setAllowListKeys(allowListKeys)
-            .setDenyListKeys(blockListKeys)
+            .setBlockListKeys(blockListKeys)
             .setTrackNulls(trackNulls)
             .getOutput()
         case Some(lbl) =>
@@ -663,7 +663,7 @@ trait RichMapFeature {
         .setMinInfoGain(minInfoGain)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys).getOutput()
+        .setBlockListKeys(blockListKeys).getOutput()
     }
 
     /**
@@ -702,7 +702,7 @@ trait RichMapFeature {
             .setDefaultValue(defaultValue)
             .setCleanKeys(cleanKeys)
             .setAllowListKeys(allowListKeys)
-            .setDenyListKeys(blockListKeys)
+            .setBlockListKeys(blockListKeys)
             .setTrackNulls(trackNulls)
             .getOutput()
         case Some(lbl) =>
@@ -753,7 +753,7 @@ trait RichMapFeature {
         .setInput(f +: others)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTimePeriod(timePeriod)
         .getOutput()
     }
@@ -792,7 +792,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setReferenceDate(referenceDate)
         .getOutput()
@@ -839,7 +839,7 @@ trait RichMapFeature {
         .setInput(f +: others)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTimePeriod(timePeriod)
         .getOutput()
     }
@@ -877,7 +877,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .setReferenceDate(referenceDate)
         .getOutput()
@@ -918,7 +918,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .getOutput()
     }
@@ -956,7 +956,7 @@ trait RichMapFeature {
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setAllowListKeys(allowListKeys)
-        .setDenyListKeys(blockListKeys)
+        .setBlockListKeys(blockListKeys)
         .setTrackNulls(trackNulls)
         .getOutput()
     }

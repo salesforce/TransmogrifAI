@@ -71,7 +71,7 @@ class FilterIntegralMapTest extends OpTransformerSpec[IntegralMap, FilterMap[Int
   it should "filter by blocklisted keys" in {
     transformer.setInput(f1Int)
       .setAllowListKeys(Array[String]())
-      .setDenyListKeys(Array("Arthur", "Knight"))
+      .setBlockListKeys(Array("Arthur", "Knight"))
     val filtered = transformer.transform(inputData).collect(transformer.getOutput())
 
     val dataExpected = Array(
