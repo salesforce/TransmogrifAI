@@ -89,7 +89,7 @@ case object OpXGBoost {
      * Converts feature score map into a vector
      *
      * @param featureVectorSize size of feature vectors the xgboost model is trained on
-     * @param importanceType    type of feature importance to calculate ["gain, "cover", "total_gain", "total_cover"]
+     * @param importanceType    type of feature importance to calculate [Gain, Cover, TotalGain, TotalCover]
      * @return vector containing feature scores
      */
     def getFeatureScoreVector(
