@@ -101,7 +101,7 @@ New features / updates:
  Dependency updates:
 - Bump shadowjar plugin to 5.0.0 [#306](https://github.com/salesforce/TransmogrifAI/pull/306)
 - Bump Apache Tika to 1.21 [#331](https://github.com/salesforce/TransmogrifAI/pull/331)
-- Enable CicleCI version 2.1 [#353](https://github.com/salesforce/TransmogrifAI/pull/353)
+- Enable CircleCI version 2.1 [#353](https://github.com/salesforce/TransmogrifAI/pull/353)
 
 ## 0.5.3
 
