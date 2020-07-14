@@ -210,6 +210,43 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Error shouldBe 0.0
   }
 
+  it should "produce correct thresholded metrics" in {
+    val metrics = testEvaluator.evaluateAll(transformedData)
+    val count = metrics.TP + metrics.FP + metrics.TN + metrics.FN
+
+    // Check that the lengths of all the thresholded metrics agree
+    val numTresholds = metrics.thresholds.length
+    metrics.truePostitivesByThreshold.length shouldBe numTresholds
+    metrics.falsePositivesByThreshold.length shouldBe numTresholds
+    metrics.trueNegativesByThreshold.length shouldBe numTresholds
+    metrics.falseNegativesByThreshold.length shouldBe numTresholds
+    metrics.falsePositiveRateByThreshold.length shouldBe numTresholds
+    metrics.precisionByThreshold.length shouldBe numTresholds
+    metrics.recallByThreshold.length shouldBe numTresholds
+
+    // Check that the confusion matrix element counts are consistent
+    metrics.truePostitivesByThreshold.zip(metrics.falsePositivesByThreshold).zip(metrics.trueNegativesByThreshold)
+      .zip(metrics.falseNegativesByThreshold).map{
+      case (((tp, fp), tn), fn) => tp + fp + tn + fn
+    }.forall(_ == count) shouldBe true
+
+    // Check that the precision by threshold is correctly reproduced
+    metrics.truePostitivesByThreshold.zip(metrics.falsePositivesByThreshold).zip(metrics.precisionByThreshold).map{
+      case ((tp, fp), precision) => tp / (tp + fp) - precision
+    }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
+
+    // Check that the recall by threshold is correctly reproduced
+    metrics.truePostitivesByThreshold.zip(metrics.falseNegativesByThreshold).zip(metrics.recallByThreshold).map{
+      case ((tp, fn), recall) => tp / (tp + fn) - recall
+    }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
+
+    // Check that the false positive rate threshold is correctly reproduced
+    metrics.falsePositivesByThreshold.zip(metrics.trueNegativesByThreshold)
+      .zip(metrics.falsePositiveRateByThreshold).map{
+      case ((fp, tn), fpr) => fp / (fp + tn) - fpr
+    }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
+  }
+
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {
     val metric = rdd.map(row => (
       if (row.getDouble(0) > 0.0 && row.getDouble(1) > 0.0) 1 else 0, // True Positive

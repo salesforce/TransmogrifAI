@@ -54,7 +54,10 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
       validationResults = Seq(ModelEvaluation("test4", "test5", "test6", SingleMetric("test7", 0.1), Map.empty)),
       trainEvaluation = BinaryClassificationMetrics(Precision = 0.1, Recall = 0.2, F1 = 0.3, AuROC = 0.4,
         AuPR = 0.5, Error = 0.6, TP = 0.7, TN = 0.8, FP = 0.9, FN = 1.0, thresholds = Seq(1.1),
-        precisionByThreshold = Seq(1.2), recallByThreshold = Seq(1.3), falsePositiveRateByThreshold = Seq(1.4)),
+        precisionByThreshold = Seq(1.2), recallByThreshold = Seq(1.3), falsePositiveRateByThreshold = Seq(1.4),
+        truePostitivesByThreshold = Seq(1.0), falsePositivesByThreshold = Seq(0.0),
+        trueNegativesByThreshold = Seq(1.0), falseNegativesByThreshold = Seq(0.0)
+      ),
       holdoutEvaluation = Option(RegressionMetrics(RootMeanSquaredError = 1.3, MeanSquaredError = 1.4, R2 = 1.5,
         MeanAbsoluteError = 1.6))
     )
