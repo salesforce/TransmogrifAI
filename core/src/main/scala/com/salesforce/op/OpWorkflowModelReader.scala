@@ -166,6 +166,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     features.filter(f => resultIds.contains(f.uid))
   }
 
+  // TODO: ensure backwards compatibility with "blacklist"
   private def resolveBlocklist
   (
     json: JValue,
@@ -186,6 +187,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     }
   }
 
+  // TODO: ensure backwards compatibility with "blacklist"
   private def resolveBlocklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
     (json \ BlocklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
       case Some(blockMapKeys) => blockMapKeys.map { case (k, vs) => k -> vs.toSet }
