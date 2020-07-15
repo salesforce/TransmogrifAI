@@ -196,15 +196,10 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   }
 
   private def resolveBlocklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
-    // For backward compatibility. The relevant field name is determined
-    // by the max length of the blocklisted map keys found for each name.
-    val potentialNames = Seq(json \ BlocklistedMapKeys.entryName, json \ OldBlocklistedMapKeys.entryName)
-    potentialNames.map {
-      _.extractOpt[Map[String, List[String]]] match {
-        case Some(blockMapKeys) => blockMapKeys.map { case (k, vs) => k -> vs.toSet }
-        case None => Map[String, Set[String]]()
-      }
-    }.maxBy(_.size)
+    // For backward compatibility we combine new and deprecated keys.
+    Seq(json \ BlocklistedMapKeys.entryName, json \ OldBlocklistedMapKeys.entryName)
+      .flatMap(_.extractOpt[Map[String, List[String]]])
+      .flatMap(_.map { case (k, vs) => k -> vs.toSet }).toMap
   }
 
   private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {
