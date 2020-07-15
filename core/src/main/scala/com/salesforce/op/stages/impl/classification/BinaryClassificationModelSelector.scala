@@ -60,7 +60,7 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
      * off by default
      */
     val modelTypesToUse: Seq[BinaryClassificationModelsToTry] = Seq(
-      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpGBTClassifier
+      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpXGBoostClassifier
     )
 
     /**
@@ -122,9 +122,15 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       val xgb = new OpXGBoostClassifier()
       val xgbParams = new ParamGridBuilder()
         .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+        .addGrid(xgb.numEarlyStoppingRounds, DefaultSelectorParams.EarlyStopping)
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
-        .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(xgb.gamma, DefaultSelectorParams.BinaryClassXGBGamma)
+        .addGrid(xgb.maxDepth, DefaultSelectorParams.BinaryClassMaxDepthXGB)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
+        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
+        .addGrid(xgb.maximizeEvaluationMetrics, DefaultSelectorParams.MaximizeEvaluationMetrics)
+        .addGrid(xgb.evalMetric, DefaultSelectorParams.BinaryClassXGBEvaluationMetric)
+        .addGrid(xgb.objective, DefaultSelectorParams.BinaryClassXGBObjective)
 
       Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams,
         nb -> nbParams, dt -> dtParams, xgb -> xgbParams)
