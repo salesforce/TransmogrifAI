@@ -17,7 +17,7 @@ val dis = FeatureBuilder.RealNN[BostonHouse].extract(_.dis.toRealNN).asPredictor
 val rad = FeatureBuilder.Integral[BostonHouse].extract(_.rad.toIntegral).asPredictor
 val tax = FeatureBuilder.RealNN[BostonHouse].extract(_.tax.toRealNN).asPredictor
 val ptratio = FeatureBuilder.RealNN[BostonHouse].extract(_.ptratio.toRealNN).asPredictor
-val b = FeatureBuilder.RealNN[BostonHouse].extract(_.aa.toRealNN).asPredictor
+val b = FeatureBuilder.RealNN[BostonHouse].extract(_.b.toRealNN).asPredictor
 val lstat = FeatureBuilder.RealNN[BostonHouse].extract(_.lstat.toRealNN).asPredictor
 val medv = FeatureBuilder.RealNN[BostonHouse].extract(_.medv.toRealNN).asResponse
 

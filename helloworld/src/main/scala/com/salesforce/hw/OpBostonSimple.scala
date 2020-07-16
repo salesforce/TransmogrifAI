@@ -55,7 +55,7 @@ import org.apache.spark.sql.SparkSession
  * @param rad     index of accessibility to radial highways
  * @param tax     full-value property-tax rate per $10,000
  * @param ptratio pupil-teacher ratio by town
- * @param b       1000(Bk - 0.63)**2 where x is the proportion of blacks by town
+ * @param b       1000(Bk - 0.63)**2 where Bk is the proportion of blacks by town
  * @param lstat   % lower status of the population
  * @param medv    median value of owner-occupied homes in $1000's
  */
