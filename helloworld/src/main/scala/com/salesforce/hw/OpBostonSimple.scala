@@ -55,7 +55,7 @@ import org.apache.spark.sql.SparkSession
  * @param rad     index of accessibility to radial highways
  * @param tax     full-value property-tax rate per $10,000
  * @param ptratio pupil-teacher ratio by town
- * @param aa      1000(x - 0.63)**2 where x is the proportion of African Americans by town
+ * @param b       1000(Bk - 0.63)**2 where x is the proportion of blacks by town
  * @param lstat   % lower status of the population
  * @param medv    median value of owner-occupied homes in $1000's
  */
@@ -73,7 +73,7 @@ case class BostonHouse
   rad: Int,
   tax: Double,
   ptratio: Double,
-  aa: Double,
+  b: Double,
   lstat: Double,
   medv: Double
 )
@@ -116,13 +116,13 @@ object OpBostonSimple {
     val rad = FeatureBuilder.Integral[BostonHouse].extract(_.rad.toIntegral).asPredictor
     val tax = FeatureBuilder.RealNN[BostonHouse].extract(_.tax.toRealNN).asPredictor
     val ptratio = FeatureBuilder.RealNN[BostonHouse].extract(_.ptratio.toRealNN).asPredictor
-    val aa = FeatureBuilder.RealNN[BostonHouse].extract(_.aa.toRealNN).asPredictor
+    val b = FeatureBuilder.RealNN[BostonHouse].extract(_.b.toRealNN).asPredictor
     val lstat = FeatureBuilder.RealNN[BostonHouse].extract(_.lstat.toRealNN).asPredictor
     val medv = FeatureBuilder.RealNN[BostonHouse].extract(_.medv.toRealNN).asResponse
 
 
     // Define a feature of type vector containing all the predictors you'd like to use
-    val features = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, aa, lstat).transmogrify()
+    val features = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b, lstat).transmogrify()
 
     val label = medv
 

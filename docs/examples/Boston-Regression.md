@@ -17,7 +17,7 @@ val dis = FeatureBuilder.RealNN[BostonHouse].extract(_.dis.toRealNN).asPredictor
 val rad = FeatureBuilder.Integral[BostonHouse].extract(_.rad.toIntegral).asPredictor
 val tax = FeatureBuilder.RealNN[BostonHouse].extract(_.tax.toRealNN).asPredictor
 val ptratio = FeatureBuilder.RealNN[BostonHouse].extract(_.ptratio.toRealNN).asPredictor
-val aa = FeatureBuilder.RealNN[BostonHouse].extract(_.aa.toRealNN).asPredictor
+val b = FeatureBuilder.RealNN[BostonHouse].extract(_.aa.toRealNN).asPredictor
 val lstat = FeatureBuilder.RealNN[BostonHouse].extract(_.lstat.toRealNN).asPredictor
 val medv = FeatureBuilder.RealNN[BostonHouse].extract(_.medv.toRealNN).asResponse
 
@@ -25,7 +25,7 @@ val medv = FeatureBuilder.RealNN[BostonHouse].extract(_.medv.toRealNN).asRespons
 **Feature Engineering**
 
 ```scala
-val features = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, aa, lstat).transmogrify()
+val features = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b, lstat).transmogrify()
 val label = medv
 val checkedFeatures = label.sanityCheck(features, removeBadFeatures = true)
 ```
