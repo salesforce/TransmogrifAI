@@ -111,64 +111,64 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
 
   /**
-   * Will set the blacklisted features variable and if list is non-empty it will
-   * @param features list of features to blacklist
+   * Will set the blocklisted features variable and if list is non-empty it will
+   * @param features list of features to blocklist
    * @param distributions feature distributions calculated in raw feature filter
    */
-  private[op] def setBlacklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
-    // TODO: Figure out a way to keep track of raw features that aren't explicitly blacklisted, but can't be used
-    // TODO: because they're inputs into an explicitly blacklisted feature. Eg. "height" in ModelInsightsTest
+  private[op] def setBlocklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
+    // TODO: Figure out a way to keep track of raw features that aren't explicitly blocklisted, but can't be used
+    // TODO: because they're inputs into an explicitly blocklisted feature. Eg. "height" in ModelInsightsTest
 
-    def finalResultFeaturesCheck(resultFeatures: Array[OPFeature], blacklisted: List[OPFeature]): Unit = {
+    def finalResultFeaturesCheck(resultFeatures: Array[OPFeature], blocklisted: List[OPFeature]): Unit = {
       if (resultFeaturePolicy == ResultFeatureRetention.Strict) {
-        resultFeatures.foreach{ f => if (blacklisted.contains(f)) {
-          throw new IllegalArgumentException(s"Blacklist of features (${blacklisted.map(_.name).mkString(", ")})" +
+        resultFeatures.foreach{ f => if (blocklisted.contains(f)) {
+          throw new IllegalArgumentException(s"Blocklist of features (${blocklisted.map(_.name).mkString(", ")})" +
             s" from RawFeatureFilter contained the result feature ${f.name}") } }
       } else if (resultFeaturePolicy == ResultFeatureRetention.AtLeastOne) {
-        if (resultFeatures.forall(blacklisted.contains)) throw new IllegalArgumentException(s"Blacklist of features" +
-          s" (${blacklisted.map(_.name).mkString(", ")}) from RawFeatureFilter removed all result features")
+        if (resultFeatures.forall(blocklisted.contains)) throw new IllegalArgumentException(s"Blocklist of features" +
+          s" (${blocklisted.map(_.name).mkString(", ")}) from RawFeatureFilter removed all result features")
       } else throw new IllegalArgumentException(s"result feature retention policy $resultFeaturePolicy not supported")
     }
 
-    blacklistedFeatures = features
-    if (blacklistedFeatures.nonEmpty) {
-      val allBlacklisted: MList[OPFeature] = MList(getBlacklist(): _*)
+    blocklistedFeatures = features
+    if (blocklistedFeatures.nonEmpty) {
+      val allBlocklisted: MList[OPFeature] = MList(getBlocklist(): _*)
       val allUpdated: MList[OPFeature] = MList.empty
 
       val initialResultFeatures = getResultFeatures()
-      finalResultFeaturesCheck(initialResultFeatures, allBlacklisted.toList)
+      finalResultFeaturesCheck(initialResultFeatures, allBlocklisted.toList)
 
       val initialStages = getStages() // ordered by DAG so dont need to recompute DAG
-      // for each stage remove anything blacklisted from the inputs and update any changed input features
+      // for each stage remove anything blocklisted from the inputs and update any changed input features
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
-        val blacklistRemoved = inFeatures
-          .filterNot { f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+        val blocklistRemoved = inFeatures
+          .filterNot { f => allBlocklisted.exists(bl => bl.sameOrigin(f)) }
           .map { f =>
             if (f.isRaw) f.withDistributions(distributions.collect { case d if d.name == f.name => d }) else f
           }
-        val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
+        val inputsChanged = blocklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
         Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
           case Success(out) => allUpdated += out
           case Failure(e) =>
             log.info(s"Issue updating inputs for stage $stg: $e")
-            allBlacklisted += oldOutput
-            finalResultFeaturesCheck(initialResultFeatures, allBlacklisted.toList)
+            allBlocklisted += oldOutput
+            finalResultFeaturesCheck(initialResultFeatures, allBlocklisted.toList)
         }
       }
 
-      // Update the whole DAG with the blacklisted features expunged
+      // Update the whole DAG with the blocklisted features expunged
       val updatedResultFeatures = initialResultFeatures
-        .filterNot(allBlacklisted.contains)
+        .filterNot(allBlocklisted.contains)
         .map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
       setResultFeatures(updatedResultFeatures: _*)
     }
   }
 
 
-  protected[op] def setBlacklistMapKeys(mapKeys: Map[String, Set[String]]): Unit = {
-    blacklistedMapKeys = mapKeys
+  protected[op] def setBlocklistMapKeys(mapKeys: Map[String, Set[String]]): Unit = {
+    blocklistedMapKeys = mapKeys
   }
 
   /**
@@ -253,8 +253,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
             rf.generateFilteredRaw(rawFeatures, parameters)
 
           setRawFeatureFilterResults(rawFeatureFilterResults)
-          setBlacklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
-          setBlacklistMapKeys(mapKeysToDrop)
+          setBlocklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
+          setBlocklistMapKeys(mapKeysToDrop)
           cleanedData
       }
     }
@@ -366,8 +366,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         .setStages(fittedStages)
         .setFeatures(newResultFeatures)
         .setParameters(getParameters())
-        .setBlacklist(getBlacklist())
-        .setBlacklistMapKeys(getBlacklistMapKeys())
+        .setBlocklist(getBlocklist())
+        .setBlocklistMapKeys(getBlocklistMapKeys())
         .setRawFeatureFilterResults(getRawFeatureFilterResults())
 
     reader.map(model.setReader).getOrElse(model)

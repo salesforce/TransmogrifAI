@@ -511,12 +511,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "have feature insights for features that are removed by the raw feature filter" in {
     val insights = modelWithRFF.modelInsights(predWithMaps)
 
-    modelWithRFF.getBlacklist() should contain theSameElementsAs Array(age, description, genderPL, weight)
+    modelWithRFF.getBlocklist() should contain theSameElementsAs Array(age, description, genderPL, weight)
     val heightIn = insights.features.find(_.featureName == age.name).get
     heightIn.derivedFeatures.size shouldBe 1
     heightIn.derivedFeatures.head.excluded shouldBe Some(true)
 
-    modelWithRFF.getBlacklistMapKeys() should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
+    modelWithRFF.getBlocklistMapKeys() should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
     val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
     val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
     mapDerivedIn.size shouldBe 3
@@ -690,10 +690,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
 
     /**
-     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
-     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
-     * it's not explicitly blacklisted itself.
+     * Currently, raw features that aren't explicitly blocklisted, but are not used because they are inputs to
+     * explicitly blocklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blocklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blocklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
 

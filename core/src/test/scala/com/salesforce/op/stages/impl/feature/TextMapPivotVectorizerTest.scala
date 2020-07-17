@@ -352,8 +352,8 @@ class TextMapPivotVectorizerTest
     result shouldBe expected
   }
 
-  it should "correctly whitelist keys" in {
-    val fitted = vectorizer.setTopK(10).setTrackNulls(false).setWhiteListKeys(Array("a", "x")).fit(inputData)
+  it should "correctly allowlist keys" in {
+    val fitted = vectorizer.setTopK(10).setTrackNulls(false).setAllowListKeys(Array("a", "x")).fit(inputData)
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
@@ -369,8 +369,8 @@ class TextMapPivotVectorizerTest
     result shouldBe expected
   }
 
-  it should "track nulls with whitelist keys" in {
-    val fitted = vectorizer.setTopK(10).setTrackNulls(true).setWhiteListKeys(Array("a", "x")).fit(inputData)
+  it should "track nulls with allowlist keys" in {
+    val fitted = vectorizer.setTopK(10).setTrackNulls(true).setAllowListKeys(Array("a", "x")).fit(inputData)
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
@@ -386,8 +386,8 @@ class TextMapPivotVectorizerTest
     result shouldBe expected
   }
 
-  it should "correctly blacklist keys" in {
-    val fitted = vectorizer.setTrackNulls(false).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
+  it should "correctly blocklist keys" in {
+    val fitted = vectorizer.setTrackNulls(false).setAllowListKeys(Array()).setBlockListKeys(Array("a", "x"))
       .fit(inputData)
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
@@ -404,8 +404,8 @@ class TextMapPivotVectorizerTest
     result shouldBe expected
   }
 
-  it should "track nulls with blacklist keys" in {
-    val fitted = vectorizer.setTrackNulls(true).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
+  it should "track nulls with blocklist keys" in {
+    val fitted = vectorizer.setTrackNulls(true).setAllowListKeys(Array()).setBlockListKeys(Array("a", "x"))
       .fit(inputData)
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()

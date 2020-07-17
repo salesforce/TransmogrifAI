@@ -267,7 +267,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     exclusionReasons.filter(_.excluded).map { _.name }.toSet shouldEqual Set("A", "B", "C", "D")
   }
 
-  it should "correctly clean the dataframe returned and give the features to blacklist" in {
+  it should "correctly clean the dataframe returned and give the features to blocklist" in {
     val params = new OpParams()
     val survPred = survived.copy(isResponse = false)
     val features: Array[OPFeature] =
