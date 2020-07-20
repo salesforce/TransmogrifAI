@@ -75,6 +75,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
       new ParamGridBuilder()
         .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
         .addGrid(xgb.numRound, Array(10))
+        .addGrid(xgb.numClass, Array(2))
         .addGrid(xgb.objective, DefaultSelectorParams.BinaryClassXGBObjective)
         .addGrid(xgb.evalMetric, DefaultSelectorParams.BinaryClassXGBEvaluationMetric)
         .build()
