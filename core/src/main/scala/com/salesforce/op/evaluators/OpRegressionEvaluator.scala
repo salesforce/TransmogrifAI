@@ -30,6 +30,7 @@
 
 package com.salesforce.op.evaluators
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import com.salesforce.op.utils.spark.RichEvaluator._
 import org.apache.spark.ml.evaluation.RegressionEvaluator
@@ -63,9 +64,17 @@ private[op] class OpRegressionEvaluator
     val mse = getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataUse, default = 0.0)
     val r2 = getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataUse, default = 0.0)
     val mae = getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataUse, default = 0.0)
+    val thresholdMetrics = getThresholdMetrics(dataUse)
 
     val metrics = RegressionMetrics(
-      RootMeanSquaredError = rmse, MeanSquaredError = mse, R2 = r2, MeanAbsoluteError = mae
+      RootMeanSquaredError = rmse,
+      MeanSquaredError = mse,
+      R2 = r2,
+      MeanAbsoluteError = mae,
+      thresholds = thresholdMetrics.map(_.threshold),
+      correctPredictionsByThreshold = thresholdMetrics.map(_.correctPredictions.toDouble),
+      overPredictionsByThreshold = thresholdMetrics.map(_.overPredictions.toDouble),
+      underPredictionsByThreshold = thresholdMetrics.map(_.underPredictions.toDouble)
     )
 
     log.info("Evaluated metrics: {}", metrics.toString)
@@ -86,6 +95,12 @@ private[op] class OpRegressionEvaluator
       .setMetricName(metricName.sparkEntryName)
       .evaluateOrDefault(dataUse, default = default)
   }
+
+  final protected def getThresholdMetrics(dataset: Dataset[_]): Seq[RegressionThresholdMetric] = {
+    // TODO: implement
+    Seq()
+  }
+
 }
 
 
@@ -102,5 +117,31 @@ case class RegressionMetrics
   RootMeanSquaredError: Double,
   MeanSquaredError: Double,
   R2: Double,
-  MeanAbsoluteError: Double
+  MeanAbsoluteError: Double,
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  thresholds: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  correctPredictionsByThreshold: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  overPredictionsByThreshold: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  underPredictionsByThreshold: Seq[Double]
 ) extends EvaluationMetrics
+
+
+/**
+ * Regression metric that expresses the number of correct / over- /under-predictions
+ * for an error threshold
+ *
+ * @param threshold
+ * @param correctPredictions
+ * @param overPredictions
+ * @param underPredictions
+ */
+case class RegressionThresholdMetric
+(
+  threshold: Double,
+  correctPredictions: Int,
+  overPredictions: Int,
+  underPredictions: Int
+)
