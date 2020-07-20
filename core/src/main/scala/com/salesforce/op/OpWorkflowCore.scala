@@ -69,11 +69,11 @@ private[op] trait OpWorkflowCore {
   // raw features generated after data is read in and aggregated
   protected var rawFeatures: Array[OPFeature] = Array[OPFeature]()
 
-  // features that have been blacklisted from use in dag
-  protected var blacklistedFeatures: Array[OPFeature] = Array[OPFeature]()
+  // features that have been blocklisted from use in dag
+  protected var blocklistedFeatures: Array[OPFeature] = Array[OPFeature]()
 
-  // map keys that were blacklisted from use in dag
-  protected var blacklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
+  // map keys that were blocklisted from use in dag
+  protected var blocklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
 
   // raw feature filter results calculated in raw feature filter
   protected var rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
@@ -201,18 +201,18 @@ private[op] trait OpWorkflowCore {
   }
 
   /**
-   * Get the list of raw features which have been blacklisted
+   * Get the list of raw features which have been blocklisted
    *
-   * @return blacklisted features
+   * @return blocklisted features
    */
-  final def getBlacklist(): Array[OPFeature] = blacklistedFeatures
+  final def getBlocklist(): Array[OPFeature] = blocklistedFeatures
 
   /**
-   * Get the list of Map Keys which have been blacklisted
+   * Get the list of Map Keys which have been blocklisted
    *
-   * @return blacklisted map keys
+   * @return blocklisted map keys
    */
-  final def getBlacklistMapKeys(): Map[String, Set[String]] = blacklistedMapKeys
+  final def getBlocklistMapKeys(): Map[String, Set[String]] = blocklistedMapKeys
 
   /**
    * Get the parameter settings passed into the workflow
