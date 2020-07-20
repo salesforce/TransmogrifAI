@@ -33,17 +33,16 @@ package com.salesforce.op.evaluators
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{AppendedClues, FlatSpec}
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
+class OpRegressionEvaluatorTest extends FlatSpec with AppendedClues with TestSparkContext {
 
   val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
@@ -86,22 +85,33 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   it should "evaluate the metrics from a model selector" in {
     val model = testEstimator.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
-    val metrics = testEvaluator.evaluateAll(transformedData).toMetadata()
+    val metrics = testEvaluator.evaluateAll(transformedData)
 
-    assert(metrics.getDouble(RegressionEvalMetrics.RootMeanSquaredError.toString) <= 1E-12, "rmse should be close to 0")
-    assert(metrics.getDouble(RegressionEvalMetrics.MeanSquaredError.toString) <= 1E-24, "mse should be close to 0")
-    assert(metrics.getDouble(RegressionEvalMetrics.R2.toString) == 1.0, "R2 should equal 1.0")
-    assert(metrics.getDouble(RegressionEvalMetrics.MeanAbsoluteError.toString) <= 1E-12, "mae should be close to 0")
+    metrics.RootMeanSquaredError should be <= 1E-12 withClue "rmse should be close to 0"
+    metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
+    metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
+    metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
+    assertThresholdsNotEmpty(metrics)
   }
 
   it should "evaluate the metrics from a single model" in {
     val model = testEstimator2.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
-    val metrics = testEvaluator2.evaluateAll(transformedData).toMetadata()
+    val metrics = testEvaluator2.evaluateAll(transformedData)
 
-    assert(metrics.getDouble(RegressionEvalMetrics.RootMeanSquaredError.toString) <= 1E-12, "rmse should be close to 0")
-    assert(metrics.getDouble(RegressionEvalMetrics.MeanSquaredError.toString) <= 1E-24, "mse should be close to 0")
-    assert(metrics.getDouble(RegressionEvalMetrics.R2.toString) == 1.0, "R2 should equal 1.0")
-    assert(metrics.getDouble(RegressionEvalMetrics.MeanAbsoluteError.toString) <= 1E-12, "mae should be close to 0")
+    metrics.RootMeanSquaredError should be <= 1E-12 withClue "rmse should be close to 0"
+    metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
+    metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
+    metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
+    assertThresholdsNotEmpty(metrics)
   }
+
+  private def assertThresholdsNotEmpty(metrics: RegressionMetrics) = {
+    metrics.thresholds should not be empty withClue "there should be thresholds"
+    metrics.correctPredictionsByThreshold should not be empty withClue
+      "there should be correct predictions per threshold"
+    metrics.overPredictionsByThreshold should not be empty withClue "there should be overpredictions per threshold"
+    metrics.underPredictionsByThreshold should not be empty withClue "there should be underpredictions per threshold"
+  }
+
 }
