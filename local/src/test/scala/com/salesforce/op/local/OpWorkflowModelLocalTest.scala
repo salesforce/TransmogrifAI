@@ -73,7 +73,11 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   val xgb = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
     case (xgb: OpXGBoostClassifier, _) => xgb ->
       new ParamGridBuilder()
-        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad).build()
+        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
+        .addGrid(xgb.numRound, Array(10))
+        .addGrid(xgb.objective, DefaultSelectorParams.BinaryClassXGBObjective)
+        .addGrid(xgb.evalMetric, DefaultSelectorParams.BinaryClassXGBEvaluationMetric)
+        .build()
   }
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
