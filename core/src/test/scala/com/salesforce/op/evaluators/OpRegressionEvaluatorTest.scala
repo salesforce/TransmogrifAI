@@ -38,11 +38,11 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
-import org.scalatest.{AppendedClues, FlatSpec}
+import org.scalatest.{AppendedClues, Assertion, FunSpec}
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class OpRegressionEvaluatorTest extends FlatSpec with AppendedClues with TestSparkContext {
+class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSparkContext {
 
   val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
@@ -77,41 +77,95 @@ class OpRegressionEvaluatorTest extends FlatSpec with AppendedClues with TestSpa
   val testEvaluator2 = new OpRegressionEvaluator().setLabelCol(label).setPredictionCol(prediction2)
 
 
-  Spec[OpRegressionEvaluator] should "copy" in {
-    val testEvaluatorCopy = testEvaluator.copy(ParamMap())
-    testEvaluatorCopy.uid shouldBe testEvaluator.uid
+  describe(Spec[OpRegressionEvaluator]) {
+    it("should copy") {
+      val testEvaluatorCopy = testEvaluator.copy(ParamMap())
+      testEvaluatorCopy.uid shouldBe testEvaluator.uid
+    }
+
+    it("should evaluate the metrics from a model selector") {
+      val model = testEstimator.fit(ds)
+      val transformedData = model.setInput(label, features).transform(ds)
+      val metrics = testEvaluator.evaluateAll(transformedData)
+
+      metrics.RootMeanSquaredError should be <= 1E-12 withClue "rmse should be close to 0"
+      metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
+      metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
+      metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
+      assertHistogramNotEmpty(metrics)
+    }
+
+    it("should evaluate the metrics from a single model") {
+      val model = testEstimator2.fit(ds)
+      val transformedData = model.setInput(label, features).transform(ds)
+      val metrics = testEvaluator2.evaluateAll(transformedData)
+
+      metrics.RootMeanSquaredError should be <= 1E-12 withClue "rmse should be close to 0"
+      metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
+      metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
+      metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
+      assertHistogramNotEmpty(metrics)
+    }
+
+    describe(", in handling percentage error histogram,") {
+
+      it("should fail on empty bins") {
+        intercept[java.lang.IllegalArgumentException](new OpRegressionEvaluator()
+          .setRelativeErrorHistogramBins(Array())
+        )
+      }
+
+      it("should fail on unsorted bins") {
+        intercept[java.lang.IllegalArgumentException](new OpRegressionEvaluator()
+          .setRelativeErrorHistogramBins(Array(1.0, 0.0, 2.0))
+        )
+      }
+
+      it("should allow setting the histogram bins") {
+        val data =
+        val evaluator = new OpRegressionEvaluator()
+          .setLabelCol("label")
+          .setPredictionCol("prediction")
+          .evaluateAll(data)
+        val expectedBins = Array()
+        val expectedCounts = Array()
+      }
+
+      it("should fail on incorrect scaled cutoff values") {
+        intercept[java.lang.IllegalArgumentException](new OpRegressionEvaluator()
+          .setScaledErrorCutoff(-1.0))
+      }
+
+      it("should allow setting the scaled cutoff value") {}
+
+      it("should fail on incorrect values for the smart cutoff value ratio") {
+        intercept[java.lang.IllegalArgumentException](new OpRegressionEvaluator()
+          .setSmartCutoffRatio(-1.0))
+      }
+
+      it("should allow smartly setting the cutoff value") {}
+
+      it("should allow setting the ratio for the smart cutoff value calculation") {}
+
+      it("should ignore data values outside the bins") {}
+
+      it("should have a number of total counts equal to the data point count") {}
+
+      it("should ignore NaNs in the labels") {}
+
+      it("should result in N-1 counts for N bins") {}
+
+      it("should calculate the correct histogram") {}
+
+      it("should calculate the correct histogram in case of zero or negative labels") {}
+
+    }
+
   }
 
-  it should "evaluate the metrics from a model selector" in {
-    val model = testEstimator.fit(ds)
-    val transformedData = model.setInput(label, features).transform(ds)
-    val metrics = testEvaluator.evaluateAll(transformedData)
-
-    metrics.RootMeanSquaredError should be <= 1E-12 withClue "rmse should be close to 0"
-    metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
-    metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
-    metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
-    assertThresholdsNotEmpty(metrics)
-  }
-
-  it should "evaluate the metrics from a single model" in {
-    val model = testEstimator2.fit(ds)
-    val transformedData = model.setInput(label, features).transform(ds)
-    val metrics = testEvaluator2.evaluateAll(transformedData)
-
-    metrics.RootMeanSquaredError should be <= 1E-12 withClue "rmse should be close to 0"
-    metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
-    metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
-    metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
-    assertThresholdsNotEmpty(metrics)
-  }
-
-  private def assertThresholdsNotEmpty(metrics: RegressionMetrics) = {
-    metrics.thresholds should not be empty withClue "there should be thresholds"
-    metrics.correctPredictionsByThreshold should not be empty withClue
-      "there should be correct predictions per threshold"
-    metrics.overPredictionsByThreshold should not be empty withClue "there should be overpredictions per threshold"
-    metrics.underPredictionsByThreshold should not be empty withClue "there should be underpredictions per threshold"
+  private def assertHistogramNotEmpty(metrics: RegressionMetrics): Assertion = {
+    metrics.relativeErrorHistogramBins should not be empty withClue "there should be histogram bins"
+    metrics.relativeErrorHistogramCounts should not be empty withClue "there should be histogram counts"
   }
 
 }
