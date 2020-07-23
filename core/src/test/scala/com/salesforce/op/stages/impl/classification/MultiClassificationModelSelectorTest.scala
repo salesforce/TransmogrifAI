@@ -306,14 +306,14 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
       largerBetter = false,
       evaluateFn = crossEntropyFun
     )
-    val customEvaluators = Seq(crossEntropy)
+
     val testEstimator =
       MultiClassificationModelSelector
         .withCrossValidation(
           Option(DataCutter(42, reserveTestFraction = 0.2, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
           numFolds = 4,
           validationMetric = Evaluators.MultiClassification.precision(),
-          trainTestEvaluators = customEvaluators,
+          trainTestEvaluators = Seq(crossEntropy),
           seed = 10L,
           modelsAndParameters = models
         )
@@ -329,9 +329,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     val trainMetaData = metaData.trainEvaluation.toJson(false)
     val holdOutMetaData = metaData.holdoutEvaluation.get.toJson(false)
-
-    // check that the default evaluator(s) got added to the list of evaluators
-    testEstimator.evaluators.length should be > customEvaluators.size
 
     testEstimator.evaluators.foreach {
       case _: OpMultiClassificationEvaluator => {

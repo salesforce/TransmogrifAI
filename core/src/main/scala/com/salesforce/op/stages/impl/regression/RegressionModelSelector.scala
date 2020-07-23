@@ -136,8 +136,8 @@ case object RegressionModelSelector extends ModelSelectorFactory {
    * @param dataSplitter        instance that will split the data into training set and test set
    * @param numFolds            number of folds for cross validation (>= 2)
    * @param validationMetric    metric name in evaluation: RMSE, R2 etc
-   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is
-   *                            the standard OpRegressionEvaluator.
+   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
+   *                            and default evaluator is added to this list (here Evaluators.Regression)
    * @param seed                random seed
    * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
    *                            so that the jobs can be run concurrently
@@ -155,7 +155,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     dataSplitter: Option[DataSplitter] = Option(DataSplitter()),
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpRegressionEvaluatorBase[_ <: EvaluationMetrics] = Evaluators.Regression.rmse(),
-    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq(new OpRegressionEvaluator),
+    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = Defaults.modelTypesToUse,
@@ -165,12 +165,9 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, evaluator = validationMetric, parallelism = parallelism, maxWait = maxWait
     )
-    // For backwards compatibility, make sure evaluators always include the defaults
-    val allEvaluators = addDefaultEvaluators(trainTestEvaluators, Seq(new OpRegressionEvaluator))
-
     selector(cv,
       splitter = dataSplitter,
-      trainTestEvaluators = allEvaluators,
+      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
       modelDefaults = Defaults
@@ -184,8 +181,8 @@ case object RegressionModelSelector extends ModelSelectorFactory {
    * @param dataSplitter        instance that will split the data into training set and test set
    * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
    * @param validationMetric    metric name in evaluation: RMSE, R2 etc
-   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is
-   *                            the standard OpRegressionEvaluator.
+   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
+   *                            and default evaluator is added to this list (here Evaluators.Regression)
    * @param seed                random seed
    * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
    *                            so that the jobs can be run concurrently
@@ -203,7 +200,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     dataSplitter: Option[DataSplitter] = Option(DataSplitter()),
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpRegressionEvaluatorBase[_ <: EvaluationMetrics] = Evaluators.Regression.rmse(),
-    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq(new OpRegressionEvaluator),
+    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = Defaults.modelTypesToUse,
@@ -213,12 +210,9 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
     )
-    // For backwards compatibility, make sure evaluators always include the defaults
-    val allEvaluators = addDefaultEvaluators(trainTestEvaluators, Seq(new OpRegressionEvaluator))
-
     selector(ts,
       splitter = dataSplitter,
-      trainTestEvaluators = allEvaluators,
+      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
       modelDefaults = Defaults

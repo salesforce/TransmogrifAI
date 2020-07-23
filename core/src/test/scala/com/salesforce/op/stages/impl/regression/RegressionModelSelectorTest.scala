@@ -398,11 +398,10 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
         median.head
       }
     )
-    val customEvaluators = Seq(medianAbsoluteError)
     val testEstimator =
       RegressionModelSelector
         .withCrossValidation(numFolds = 4, validationMetric = medianAbsoluteError,
-          trainTestEvaluators = customEvaluators, seed = 11L, modelsAndParameters = models)
+          trainTestEvaluators = Seq(medianAbsoluteError), seed = 11L, modelsAndParameters = models)
         .setInput(label, features)
     val model = testEstimator.fit(data)
 
@@ -411,9 +410,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     val trainMetaData = metaData.trainEvaluation
     val holdOutMetaData = metaData.holdoutEvaluation.get
-
-    // check that the default evaluator(s) got added to the list of evaluators
-    testEstimator.evaluators.length should be > customEvaluators.size
 
     testEstimator.evaluators.foreach {
       case evaluator: OpRegressionEvaluator => {

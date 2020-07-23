@@ -121,8 +121,8 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
    * @param splitter            instance that will split the data
    * @param numFolds            number of folds for cross validation (>= 2)
    * @param validationMetric    metric name in evaluation: Accuracy, Precision, Recall or F1
-   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is
-   *                            the standard OpMultiClassificationEvaluator.
+   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
+   *                            and default evaluator is added to this list (here OpMultiClassificationEvaluator)
    * @param seed                random seed
    * @param stratify            whether or not stratify cross validation. Caution : setting that param to true might
    *                            impact the runtime
@@ -143,8 +143,7 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics] =
     Evaluators.MultiClassification.error(),
-    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq(
-      new OpMultiClassificationEvaluator),
+    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
@@ -156,12 +155,9 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
       numFolds = numFolds, seed = seed, evaluator = validationMetric, stratify = stratify, parallelism = parallelism,
       maxWait = maxWait
     )
-    // For backwards compatibility, make sure evaluators always include the defaults
-    val allEvaluators = addDefaultEvaluators(trainTestEvaluators, Seq(new OpMultiClassificationEvaluator))
-
     selector(cv,
       splitter = splitter,
-      trainTestEvaluators = allEvaluators,
+      trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
       modelDefaults = Defaults
@@ -174,8 +170,8 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
    * @param splitter            instance that will split the data
    * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
    * @param validationMetric    metric name in evaluation: AuROC or AuPR
-   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is
-   *                            the standard OpMultiClassificationEvaluator.
+   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
+   *                            and default evaluator is added to this list (here OpMultiClassificationEvaluator)
    * @param seed                random seed
    * @param stratify            whether or not stratify train validation split.
    *                            Caution : setting that param to true might impact the runtime
@@ -196,8 +192,7 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics] =
     Evaluators.MultiClassification.error(),
-    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq(
-      new OpMultiClassificationEvaluator),
+    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
@@ -208,12 +203,9 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
-    // For backwards compatibility, make sure evaluators always include the defaults
-    val allEvaluators = addDefaultEvaluators(trainTestEvaluators, Seq(new OpMultiClassificationEvaluator))
-
     selector(ts,
       splitter = splitter,
-      trainTestEvaluators = allEvaluators,
+      trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
       modelDefaults = Defaults
