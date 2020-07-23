@@ -270,7 +270,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
   trait SimpleEvaluationFixture {
     val dataset = Seq(EvalRow(0.0, Map("prediction" -> 0.1))).toDS()
   }
-  
+
   trait RealisticEvaluationFixture {
     val dataset = Seq(
       EvalRow(-10.0, Map("prediction" -> -11.0)),
@@ -306,7 +306,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
       EvalRow(1.0, Map("prediction" -> 1.0))
     ).toDS()
   }
-  
+
   trait EstimatorBasedEvaluationFixture {
     val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
       Seq(
@@ -324,11 +324,11 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
         map(v => v._1.toRealNN -> v._2.toOPVector)
     )
     val label = rawLabel.copy(isResponse = true)
-  
+
     val testEstimator = new OpLinearRegression().setInput(label, features)
     val prediction = testEstimator.getOutput()
     val testEvaluator = new OpRegressionEvaluator().setLabelCol(label).setPredictionCol(prediction)
-  
+
     val lr = new OpLogisticRegression()
     val testEstimatorSelector = RegressionModelSelector.withTrainValidationSplit(dataSplitter = None, trainRatio = 0.5,
       modelsAndParameters = Seq(lr -> new ParamGridBuilder().addGrid(lr.regParam, Array(0.0)).build()))
