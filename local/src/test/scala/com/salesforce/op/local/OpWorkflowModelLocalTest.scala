@@ -32,17 +32,21 @@ package com.salesforce.op.local
 
 import java.nio.file.Paths
 
-import com.salesforce.op.features.Feature
+import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression, OpXGBoostClassifier}
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
+import com.salesforce.op.stages.impl.selector.DefaultSelectorParams
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
+import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomList, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.{OpWorkflow, OpWorkflowModel, UID}
+import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions._
@@ -66,32 +70,27 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   val logReg = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
     case (lg: OpLogisticRegression, _) => lg -> new ParamGridBuilder().build()
   }
-
-  val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-    modelsAndParameters = logReg, splitter = None
-  ).setInput(survivedNum, features).getOutput()
-
-  val workflow = new OpWorkflow().setReader(dataReader)
-    .setResultFeatures(prediction, survivedNum, indexed, deindexed)
-
-  lazy val model = workflow.train()
-  lazy val modelLocation = {
-    val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
-    model.save(path)
-    path
+  // note: xgb needs to treat missing value as 0.0
+  val xgb = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
+    case (xgb: OpXGBoostClassifier, _) => xgb ->
+      new ParamGridBuilder()
+        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
+        .addGrid(xgb.objective, DefaultSelectorParams.BinaryClassXGBObjective)
+        .addGrid(xgb.evalMetric, DefaultSelectorParams.BinaryClassXGBEvaluationMetric)
+        .build()
   }
-  lazy val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
-  lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
+
+  lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
+  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
+  lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
+  lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel, xgbPred)
   lazy val modelLocation2 = {
     Paths.get(tempDir.toString, "op-runner-local-test-model-2").toFile.getCanonicalFile.toString
   }
 
   Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark" in {
-    val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
-    scoreFn shouldBe a[ScoreFunction]
-    scoreFn shouldBe a[ScoreFunction]
-    val scores = rawData.map(scoreFn)
-    assert(scores, expectedScores)
+    assertLoadModelAndScore(modelLocation, rawData, expectedScores, prediction)
+    assertLoadModelAndScore(xgbModelLocation, rawDataXGB, expectedXGBScores, xgbPred)
   }
 
   it should "produce scores without Spark in timely fashion" in {
@@ -104,7 +103,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
       val start = System.currentTimeMillis()
       val scores = rawData.map(scoreFn)
       elapsed += System.currentTimeMillis() - start
-      assert(scores, expectedScores)
+      assert(scores, expectedScores, prediction)
     }
     log.info(s"Scored ${expectedScores.length * numOfRuns} records in ${elapsed}ms")
     log.info(s"Average time per record: ${elapsed.toDouble / (expectedScores.length * numOfRuns)}ms")
@@ -153,7 +152,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   private def assert(
     scores: Array[Map[String, Any]],
-    expectedScores: Array[(Prediction, RealNN, RealNN, Text)]
+    expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
+    prediction: FeatureLike[Prediction]
   ): Unit = {
     scores.length shouldBe expectedScores.length
     for {
@@ -169,10 +169,41 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     }
   }
 
+  private def assertLoadModelAndScore(
+    modelLocation: String,
+    rawData: Array[Map[String, Any]],
+    expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
+    prediction: FeatureLike[Prediction]
+  ): Unit = {
+    val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
+    scoreFn shouldBe a[ScoreFunction]
+    val scores = rawData.map(scoreFn)
+    assert(scores, expectedScores, prediction)
+  }
+
+  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
+    val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
+      modelsAndParameters = modelsAndParams, splitter = Some(DataSplitter(seed = 42))
+    ).setInput(survivedNum, features).getOutput()
+    val workflow = new OpWorkflow().setReader(dataReader)
+      .setResultFeatures(prediction, survivedNum, indexed, deindexed)
+    lazy val model = workflow.train()
+    val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
+    model.save(path)
+    (path, model, prediction)
+  }
+
+  private def genRawDataAndScore(model: OpWorkflowModel, prediction: FeatureLike[Prediction]) = {
+    val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
+    val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
+    (rawData, expectedScores)
+  }
+
 }
 
 
 class Labelizer(uid: String = UID[Labelizer]) extends UnaryTransformer[RealNN, RealNN]("labelizer", uid) {
   override def outputIsResponse: Boolean = true
+
   def transformFn: RealNN => RealNN = v => v.value.map(x => if (x > 0.0) 1.0 else 0.0).toRealNN(0.0)
 }
