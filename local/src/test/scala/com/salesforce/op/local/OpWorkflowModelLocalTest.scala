@@ -40,6 +40,7 @@ import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSe
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
+import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomList, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -182,7 +183,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
 
   private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-      modelsAndParameters = modelsAndParams, splitter = None
+      modelsAndParameters = modelsAndParams, splitter = Some(DataSplitter(seed = 42))
     ).setInput(survivedNum, features).getOutput()
     val workflow = new OpWorkflow().setReader(dataReader)
       .setResultFeatures(prediction, survivedNum, indexed, deindexed)
