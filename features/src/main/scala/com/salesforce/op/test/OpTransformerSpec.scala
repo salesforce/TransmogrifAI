@@ -115,6 +115,7 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
   final override lazy val stage = transformer
 
   it should "be json writable/readable" in {
+    transformer.transform(inputData) // needs to have been called so the params on wrapped stages are set to save
     val loaded = writeAndRead(transformer)
     assert(loaded, transformer)
   }

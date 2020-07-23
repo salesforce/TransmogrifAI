@@ -383,7 +383,7 @@ class OpXGBoostClassificationModel
   private lazy val treeLimit = model.getTreeLimit
   private lazy val missing = model.getMissing
 
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
+  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {
     val data = processMissingValues(Iterator(features.value.asXGB), missing)
     val dm = new DMatrix(dataIter = data)
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)

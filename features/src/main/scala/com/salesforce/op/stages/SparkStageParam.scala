@@ -32,7 +32,7 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.hadoop.fs.Path
-import org.apache.spark.ml.{PipelineStage, Transformer}
+import org.apache.spark.ml.{PipelineStage, SparkDefaultParamsReadWrite, Transformer}
 import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
 import org.apache.spark.util.SparkUtils
@@ -116,7 +116,8 @@ class SparkStageParam[S <: PipelineStage with Params]
       case (Some(p), Some(stageUid)) =>
         savePath = Option(p)
         val dirBundle = {
-          for {bundle <- managed(BundleFile(s"file:$p/${stageUid}"))} yield {
+          for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
+            println(bundle.loadSparkBundle())
             bundle.loadSparkBundle() match {
               case Failure(exception) => throw new Exception(s"Failed to load model from path $p" +
                 s" because of: $exception")
@@ -124,7 +125,6 @@ class SparkStageParam[S <: PipelineStage with Params]
             }
           }
           }.opt
-       // println("loaded value is", dirBundle.get)
         dirBundle.map(_.root.asInstanceOf[S]).orElse{
           val stagePath = new Path(p, stageUid).toString
           val className = (json \ "className").extract[String]
