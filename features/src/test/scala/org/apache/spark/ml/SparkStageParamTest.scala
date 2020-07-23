@@ -72,9 +72,7 @@ class SparkStageParamTest extends FlatSpec with TestSparkContext with BeforeAndA
     param.savePath = Option(savePath)
     param.sbc = Option(SparkBundleContext().withDataset(dataset))
     val jsonOut = param.jsonEncode(Option(stage))
-    println(jsonOut)
     val parsed = parse(jsonOut).asInstanceOf[JObject]
-    println(parsed)
     val updated = parsed ~ ("path" -> savePath) // inject path for decoding
 
     updated shouldBe JObject(
