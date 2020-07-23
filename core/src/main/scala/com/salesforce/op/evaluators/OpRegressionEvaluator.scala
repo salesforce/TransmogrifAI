@@ -120,8 +120,10 @@ private[op] class OpRegressionEvaluator
       MeanSquaredError = mse,
       R2 = r2,
       MeanAbsoluteError = mae,
-      signedPercentageErrorHistogramBins = $(signedPercentageErrorHistogramBins).toArray,
-      signedPercentageErrorHistogramCounts = histogram.map(_.toDouble)
+      SignedPercentageErrorHistogram = SignedPercentageErrorHistogram(
+        bins = $(signedPercentageErrorHistogramBins).toArray,
+        counts = histogram
+      )
     )
 
     log.info("Evaluated metrics: {}", metrics.toString)
@@ -201,8 +203,7 @@ private[op] class OpRegressionEvaluator
  * @param MeanSquaredError
  * @param R2
  * @param MeanAbsoluteError
- * @param signedPercentageErrorHistogramBins
- * @param signedPercentageErrorHistogramCounts
+ * @param SignedPercentageErrorHistogram
  */
 case class RegressionMetrics
 (
@@ -210,8 +211,20 @@ case class RegressionMetrics
   MeanSquaredError: Double,
   R2: Double,
   MeanAbsoluteError: Double,
+  SignedPercentageErrorHistogram: SignedPercentageErrorHistogram
+) extends EvaluationMetrics
+
+
+/**
+ * Histogram of signed percentage errors
+ *
+ * @param bins Histogram bins, where for example [-1, 0, 1] refer to bins [-1, 0), [0, 1]
+ * @param counts Histogram counts (length of bins parameter - 1)
+ */
+case class SignedPercentageErrorHistogram
+(
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
-  signedPercentageErrorHistogramBins: Seq[Double],
-  @JsonDeserialize(contentAs = classOf[java.lang.Double])
-  signedPercentageErrorHistogramCounts: Seq[Double]
+  bins: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  counts: Seq[Long]
 ) extends EvaluationMetrics

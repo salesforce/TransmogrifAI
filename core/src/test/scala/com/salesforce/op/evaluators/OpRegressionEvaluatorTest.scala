@@ -159,13 +159,13 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(spark.emptyDataset[EvalRow])
-            metrics.signedPercentageErrorHistogramCounts shouldBe Array.fill(bins.length - 1)(0)
+            metrics.SignedPercentageErrorHistogram.counts shouldBe Array.fill(bins.length - 1)(0L)
           }
 
           it("should have a number of total counts equal to the data point count") {
             val metrics = newEvaluator()
               .evaluateAll(dataset)
-            metrics.signedPercentageErrorHistogramCounts.sum shouldBe dataset.count()
+            metrics.SignedPercentageErrorHistogram.counts.sum shouldBe dataset.count()
           }
 
           it("should return the bins as set") {
@@ -173,7 +173,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(dataset)
-            metrics.signedPercentageErrorHistogramBins shouldBe bins
+            metrics.SignedPercentageErrorHistogram.bins shouldBe bins
           }
 
           it("should result in N-1 counts for N bins") {
@@ -181,7 +181,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(dataset)
-            metrics.signedPercentageErrorHistogramCounts.size shouldBe bins.length - 1
+            metrics.SignedPercentageErrorHistogram.counts.size shouldBe bins.length - 1
           }
 
           it("should do correct scaled error calculation with a custom cutoff") {
@@ -191,7 +191,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
               )
               .setScaledErrorCutoff(10000.0) // Squeezes everything into center bins
               .evaluateAll(dataset)
-            metrics.signedPercentageErrorHistogramCounts shouldBe Array(0.0, 0.0, 4.0, 6.0, 0.0, 0.0)
+            metrics.SignedPercentageErrorHistogram.counts shouldBe Array(0L, 0L, 4L, 6L, 0L, 0L)
           }
 
           it("should do correct smart cutoff value calculation and allow getting the result") {
@@ -222,13 +222,13 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(Array(-10.0, 0.0, 10.0))
               .evaluateAll(dataset)
-            metrics.signedPercentageErrorHistogramCounts shouldBe Array(1.0, 3.0)
+            metrics.SignedPercentageErrorHistogram.counts shouldBe Array(1L, 3L)
           }
 
           it("should ignore NaNs in the labels and predictions") {
             val metrics = newEvaluator()
               .evaluateAll(datasetWithNaNs)
-            metrics.signedPercentageErrorHistogramCounts.sum shouldBe 3.0
+            metrics.SignedPercentageErrorHistogram.counts.sum shouldBe 3L
           }
 
           it("should calculate the correct histogram in case of zero or negative labels") {
@@ -236,7 +236,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(dataset)
-            metrics.signedPercentageErrorHistogramCounts shouldBe Array(1.0, 2.0, 1.0, 3.0, 2.0, 1.0)
+            metrics.SignedPercentageErrorHistogram.counts shouldBe Array(1L, 2L, 1L, 3L, 2L, 1L)
           }
 
           it("should calculate the correct histogram in case of perfect predictions") {
@@ -244,7 +244,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(datasetPerfect)
-            metrics.signedPercentageErrorHistogramCounts shouldBe Array(0.0, 0.0, datasetPerfect.count(), 0.0)
+            metrics.SignedPercentageErrorHistogram.counts shouldBe Array(0L, 0L, datasetPerfect.count().toLong, 0L)
           }
 
         }
@@ -261,8 +261,8 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
   }
 
   private def checkMetricsNonEmpty(metrics: RegressionMetrics): Assertion = {
-    metrics.signedPercentageErrorHistogramBins should not be empty
-    metrics.signedPercentageErrorHistogramCounts should not be empty
+    metrics.SignedPercentageErrorHistogram.bins should not be empty
+    metrics.SignedPercentageErrorHistogram.counts should not be empty
   }
 
   // Fixtures
