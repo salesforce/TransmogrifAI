@@ -35,8 +35,6 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.sql.types.Metadata
 
-import scala.util.Try
-
 
 /**
  * Trait for all different kinds of evaluation metrics
@@ -181,6 +179,8 @@ object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
   case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error", false)
   case object R2 extends RegressionEvalMetric("r2", "r2", true)
   case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error", false)
+  case object SignedPercentageErrorHistogram extends RegressionEvalMetric("signedpercentageerrorhistogram",
+    "signed percentage error histogram", false)
 }
 
 
