@@ -36,7 +36,7 @@ import com.salesforce.op.utils.spark.RichEvaluator._
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
+import org.apache.spark.mllib.evaluation.{MulticlassMetrics, RichBinaryClassificationMetrics}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
@@ -49,8 +49,8 @@ import org.slf4j.LoggerFactory
  * Default evaluation returns AUROC
  *
  * @param name           name of default metric
- * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
+ * @param numBins        max number of thresholds to track for thresholded metrics
  */
 
 private[op] class OpBinaryClassificationEvaluator
@@ -100,14 +100,13 @@ private[op] class OpBinaryClassificationEvaluator
       val recall = if (tp + fn == 0.0) 0.0 else tp / (tp + fn)
       val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
       val error = if (tp + fp + tn + fn == 0.0) 0.0 else (fp + fn) / (tp + fp + tn + fn)
-      val count = tp + fp + tn + fn
 
       val scoreAndLabels =
         dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map {
           case Row(prob: Vector, label: Double) => (prob(1), label)
           case Row(prob: Double, label: Double) => (prob, label)
         }
-      val sparkMLMetrics = new SparkMLBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
+      val sparkMLMetrics = new RichBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
       val thresholds = sparkMLMetrics.thresholds().collect()
       val precisionByThreshold = sparkMLMetrics.precisionByThreshold().collect().map(_._2)
       val recallByThreshold = sparkMLMetrics.recallByThreshold().collect().map(_._2)
@@ -115,22 +114,13 @@ private[op] class OpBinaryClassificationEvaluator
       val aUROC = sparkMLMetrics.areaUnderROC()
       val aUPR = sparkMLMetrics.areaUnderPR()
 
-      // Solutions can be checked with any system of equations solver. For Wolfram Alpha, input:
-      // inv {{(1-P), -P, 0, 0}, {(1-R), 0, 0, -R}, {0, 1-"Fpr", -"Fpr", 0}, {1,1,1,1}} * {0, 0, 0, "Count"}
-      val (tupPos, tupNeg) = thresholds.zipWithIndex.map{ case (_, i) => {
-        val denom = 1.0 / recallByThreshold(i) + (1.0 / precisionByThreshold(i) - 1.0) / falsePositiveRateByThreshold(i)
-        val prefactor = count / denom
-        val tpByThreshold = math.round(prefactor).toDouble
-        val fpByThreshold = math.round(prefactor * (1.0 / precisionByThreshold(i) - 1.0)).toDouble
-        val tnByThreshold = math.round(prefactor * (1.0 / falsePositiveRateByThreshold(i) - 1.0) *
-          (1.0 / precisionByThreshold(i) - 1.0))toDouble
-        val fnByThreshold = math.round(prefactor * (1.0 / recallByThreshold(i) - 1.0)).toDouble
-
-        ((tpByThreshold, fpByThreshold), (tnByThreshold, fnByThreshold))
-      }}.unzip
-      val (tpByThreshold, fpByThreshold) = tupPos.unzip
-      val (tnByThreshold, fnByThreshold) = tupNeg.unzip
-
+      val confusionMatrixByThreshold = sparkMLMetrics.confusionMatrixByThreshold().collect()
+      val (copiedTupPos, copiedTupNeg) = confusionMatrixByThreshold.map(c => {
+          ((c._2.numTruePositives.toDouble, c._2.numFalsePositives.toDouble),
+            (c._2.numTrueNegatives.toDouble, c._2.numFalseNegatives.toDouble))
+        }).unzip
+      val (tpByThreshold, fpByThreshold) = copiedTupPos.unzip
+      val (tnByThreshold, fnByThreshold) = copiedTupNeg.unzip
 
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,

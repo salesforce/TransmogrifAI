@@ -49,6 +49,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext {
+  val numRecs = 100 // Number or records to use in threshold metrics tests
 
   val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
@@ -210,8 +211,64 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Error shouldBe 0.0
   }
 
-  it should "produce correct thresholded metrics" in {
-    val metrics = testEvaluator.evaluateAll(transformedData)
+  /* Thresholds are defined on the probability piece of the prediction (specifically, the probability to be positive
+     which is the second element of the probability array here), so we manually create a dataset where whenever
+     records classified as positive (threshold <= probability) the label is negative for certain threshold ranges. */
+  it should "produce correct thresholded metrics when there are no positive labels" in {
+    val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
+      (0 to numRecs).map(x =>
+        (RealNN(0.0), Prediction(
+          prediction = 1.0, // prediction field not used here, doesn't need to agree with prob
+          rawPrediction = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs),
+          probability = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs)))
+      )
+    )
+    val labelSynth = rawLabelSynth.copy(isResponse = true)
+
+    val testEvaluatorSynth = new OpBinaryClassificationEvaluator()
+      .setLabelCol(labelSynth)
+      .setPredictionCol(predictionSynth)
+    val metrics = testEvaluatorSynth.evaluateAll(dsSynth)
+    checkThresholdMetrics(metrics)
+  }
+
+  it should "produce correct thresholded metrics when there are no negative labels" in {
+    val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
+      (0 to numRecs).map(x =>
+        (RealNN(1.0), Prediction(
+          prediction = 1.0, // prediction field not used here, doesn't need to agree with prob
+          rawPrediction = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs),
+          probability = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs)))
+      )
+    )
+    val labelSynth = rawLabelSynth.copy(isResponse = true)
+
+    val testEvaluatorSynth = new OpBinaryClassificationEvaluator()
+      .setLabelCol(labelSynth)
+      .setPredictionCol(predictionSynth)
+    val metrics = testEvaluatorSynth.evaluateAll(dsSynth)
+    checkThresholdMetrics(metrics)
+  }
+
+  it should "produce correct thresholded metrics when there are random labels" in {
+    val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
+      (0 to numRecs).map(x =>
+        (RealNN(math.round(math.random)), Prediction(
+          prediction = 1.0, // prediction field not used here, doesn't need to agree with prob
+          rawPrediction = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs),
+          probability = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs)))
+      )
+    )
+    val labelSynth = rawLabelSynth.copy(isResponse = true)
+
+    val testEvaluatorSynth = new OpBinaryClassificationEvaluator()
+      .setLabelCol(labelSynth)
+      .setPredictionCol(predictionSynth)
+    val metrics = testEvaluatorSynth.evaluateAll(dsSynth)
+    checkThresholdMetrics(metrics)
+  }
+
+  private[op] def checkThresholdMetrics(metrics: BinaryClassificationMetrics): Unit = {
     val count = metrics.TP + metrics.FP + metrics.TN + metrics.FN
 
     // Check that the lengths of all the thresholded metrics agree
@@ -230,20 +287,21 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
       case (((tp, fp), tn), fn) => tp + fp + tn + fn
     }.forall(_ == count) shouldBe true
 
-    // Check that the precision by threshold is correctly reproduced
+    // Check that the precision by threshold is correctly reproduced. Note, there will always be at least one
+    // predicted positive at every threshold, so we don't need a guard for the denominator here
     metrics.truePostitivesByThreshold.zip(metrics.falsePositivesByThreshold).zip(metrics.precisionByThreshold).map{
       case ((tp, fp), precision) => tp / (tp + fp) - precision
     }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
 
     // Check that the recall by threshold is correctly reproduced
     metrics.truePostitivesByThreshold.zip(metrics.falseNegativesByThreshold).zip(metrics.recallByThreshold).map{
-      case ((tp, fn), recall) => tp / (tp + fn) - recall
+      case ((tp, fn), recall) => (if (tp + fn == 0) 0.0 else tp / (tp + fn)) - recall
     }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
 
     // Check that the false positive rate threshold is correctly reproduced
     metrics.falsePositivesByThreshold.zip(metrics.trueNegativesByThreshold)
       .zip(metrics.falsePositiveRateByThreshold).map{
-      case ((fp, tn), fpr) => fp / (fp + tn) - fpr
+      case ((fp, tn), fpr) => (if (fp + tn == 0) 0.0 else fp / (fp + tn)) - fpr
     }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
   }
 
