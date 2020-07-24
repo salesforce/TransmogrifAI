@@ -70,7 +70,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
           metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
           metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
           metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
-          checkMetricsNonEmpty(metrics)
+          checkHistogramNonEmpty(metrics)
         }
 
         it("a single model") {
@@ -82,7 +82,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
           metrics.MeanSquaredError should be <= 1E-24 withClue "mse should be close to 0"
           metrics.R2 shouldBe 1.0 withClue "R2 should equal 1.0"
           metrics.MeanAbsoluteError should be <= 1E-12 withClue "mae should be close to 0"
-          checkMetricsNonEmpty(metrics)
+          checkHistogramNonEmpty(metrics)
         }
       }
     }
@@ -124,28 +124,28 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(Array(-100.0, 0.0, 100.0))
               .evaluateAll(dataset)
-            checkMetricsNonEmpty(metrics)
+            checkHistogramNonEmpty(metrics)
           }
 
           it("should allow setting the scaled cutoff value") {
             val metrics = newEvaluator()
               .setScaledErrorCutoff(1.0)
               .evaluateAll(dataset)
-            checkMetricsNonEmpty(metrics)
+            checkHistogramNonEmpty(metrics)
           }
 
           it("should allow smartly setting the cutoff value") {
             val metrics = newEvaluator()
               .setSmartCutoff(true)
               .evaluateAll(dataset)
-            checkMetricsNonEmpty(metrics)
+            checkHistogramNonEmpty(metrics)
           }
 
           it("should allow setting the ratio for the smart cutoff value calculation") {
             val metrics = newEvaluator()
               .setSmartCutoffRatio(1.0)
               .evaluateAll(dataset)
-            checkMetricsNonEmpty(metrics)
+            checkHistogramNonEmpty(metrics)
           }
 
         }
@@ -260,7 +260,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
       .setPredictionCol("prediction")
   }
 
-  private def checkMetricsNonEmpty(metrics: RegressionMetrics): Assertion = {
+  private def checkHistogramNonEmpty(metrics: RegressionMetrics): Assertion = {
     metrics.SignedPercentageErrorHistogram.bins should not be empty
     metrics.SignedPercentageErrorHistogram.counts should not be empty
   }
