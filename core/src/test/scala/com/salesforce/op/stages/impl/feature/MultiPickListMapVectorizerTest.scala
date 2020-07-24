@@ -417,8 +417,8 @@ class MultiPickListMapVectorizerTest
     result shouldBe expected
   }
 
-  it should "correctly whitelist keys" in {
-    val fitted = estimator.setTrackNulls(false).setInput(top, bot).setTopK(10).setWhiteListKeys(Array("a", "x"))
+  it should "correctly allowlist keys" in {
+    val fitted = estimator.setTrackNulls(false).setInput(top, bot).setTopK(10).setAllowListKeys(Array("a", "x"))
       .fit(inputData)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(inputData)
@@ -438,8 +438,8 @@ class MultiPickListMapVectorizerTest
     result shouldBe expected
   }
 
-  it should "track nulls with whitelist keys" in {
-    val fitted = estimator.setTrackNulls(true).setInput(top, bot).setTopK(10).setWhiteListKeys(Array("a", "x"))
+  it should "track nulls with allowlist keys" in {
+    val fitted = estimator.setTrackNulls(true).setInput(top, bot).setTopK(10).setAllowListKeys(Array("a", "x"))
       .fit(inputData)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(inputData)
@@ -459,9 +459,9 @@ class MultiPickListMapVectorizerTest
     result shouldBe expected
   }
 
-  it should "correctly blacklist keys" in {
-    val fitted = estimator.setWhiteListKeys(Array()).setTrackNulls(false)
-      .setBlackListKeys(Array("a", "x")).fit(inputData)
+  it should "correctly blocklist keys" in {
+    val fitted = estimator.setAllowListKeys(Array()).setTrackNulls(false)
+      .setBlockListKeys(Array("a", "x")).fit(inputData)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
@@ -480,9 +480,9 @@ class MultiPickListMapVectorizerTest
     result shouldBe expected
   }
 
-  it should "track nulls with blacklist keys" in {
-    val fitted = estimator.setWhiteListKeys(Array()).setTrackNulls(true)
-      .setBlackListKeys(Array("a", "x")).fit(inputData)
+  it should "track nulls with blocklist keys" in {
+    val fitted = estimator.setAllowListKeys(Array()).setTrackNulls(true)
+      .setBlockListKeys(Array("a", "x")).fit(inputData)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()

@@ -154,10 +154,10 @@ class IntegralMapVectorizerTest
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
   }
 
-  it should "correctly whitelist keys" in {
+  it should "correctly allowlist keys" in {
     val vectorizer =
       new IntegralMapVectorizer[IntegralMap]().setInput(m1, m2).setCleanKeys(true).setTrackNulls(false)
-        .setWhiteListKeys(Array("a", "b", "z")).fit(inputData)
+        .setAllowListKeys(Array("a", "b", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)
@@ -181,10 +181,10 @@ class IntegralMapVectorizerTest
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
-  it should "correctly track nulls with whitelist keys" in {
+  it should "correctly track nulls with allowlist keys" in {
     val vectorizer =
       new IntegralMapVectorizer[IntegralMap]().setInput(m1, m2).setCleanKeys(true).setTrackNulls(true)
-        .setWhiteListKeys(Array("a", "b", "z")).fit(inputData)
+        .setAllowListKeys(Array("a", "b", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)
@@ -211,7 +211,7 @@ class IntegralMapVectorizerTest
 
   it should "correctly backlist keys" in {
     val vectorizer = new IntegralMapVectorizer[IntegralMap]()
-      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(false).setBlackListKeys(Array("a", "z")).fit(inputData)
+      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(false).setBlockListKeys(Array("a", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)
@@ -237,7 +237,7 @@ class IntegralMapVectorizerTest
 
   it should "track nulls with backlist keys" in {
     val vectorizer = new IntegralMapVectorizer[IntegralMap]()
-      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(true).setBlackListKeys(Array("a", "z")).fit(inputData)
+      .setInput(m1, m2).setCleanKeys(true).setTrackNulls(true).setBlockListKeys(Array("a", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
     val result = transformed.collect(vector)

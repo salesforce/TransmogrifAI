@@ -32,6 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
+import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
@@ -95,15 +96,15 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       stages <- loadStages(json, workflowOpt, path)
       resolvedFeatures <- resolveFeatures(json, stages)
       resultFeatures <- resolveResultFeatures(json, resolvedFeatures)
-      blacklist <- resolveBlacklist(json, workflowOpt, resolvedFeatures, path)
-      blacklistMapKeys <- resolveBlacklistMapKeys(json)
+      blocklist <- resolveBlocklist(json, workflowOpt, resolvedFeatures, path)
+      blocklistMapKeys <- resolveBlocklistMapKeys(json)
       rffResults <- resolveRawFeatureFilterResults(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
-      .setBlacklist(blacklist)
-      .setBlacklistMapKeys(blacklistMapKeys)
+      .setBlocklist(blocklist)
+      .setBlocklistMapKeys(blocklistMapKeys)
       .setRawFeatureFilterResults(rffResults)
   }
 
@@ -166,31 +167,39 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     features.filter(f => resultIds.contains(f.uid))
   }
 
-  private def resolveBlacklist
+  private def resolveBlocklist
   (
     json: JValue,
     wfOpt: Option[OpWorkflow],
     features: Array[OPFeature],
     path: String
   ): Try[Array[OPFeature]] = {
-    if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
-      for {
-        feats <- wfOpt
-          .map(wf => Success(wf.getAllFeatures() ++ wf.getBlacklist()))
-          .getOrElse(loadStages(json, BlacklistedStages, path).map(_._2))
-        allFeatures = features ++ feats
-        blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[Array[String]]
-      } yield blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
-    } else {
-      Success(Array.empty[OPFeature])
-    }
+    // For backward compatibility. The relevant field name is determined
+    // by the max length of the blocklist found for each name.
+    val potentialNames = Seq(
+      (json \ BlocklistedFeaturesUids.entryName, BlocklistedStages),
+      (json \ OldBlocklistedFeaturesUids.entryName, OldBlocklistedStages)
+    )
+    potentialNames.map { names =>
+      if (names._1 != JNothing) { // for backwards compatibility
+        for {
+          feats <- wfOpt
+            .map(wf => Success(wf.getAllFeatures() ++ wf.getBlocklist()))
+            .getOrElse(loadStages(json, names._2, path).map(_._2))
+          allFeatures = features ++ feats
+          blocklistIds = names._1.extract[Array[String]]
+        } yield blocklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
+      } else {
+        Success(Array.empty[OPFeature])
+      }
+    }.maxBy(_.getOrElse(Array()).length)
   }
 
-  private def resolveBlacklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
-    (json \ BlacklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
-      case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
-      case None => Map.empty
-    }
+  private def resolveBlocklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
+    // For backward compatibility we combine new and deprecated keys.
+    Seq(json \ BlocklistedMapKeys.entryName, json \ OldBlocklistedMapKeys.entryName)
+      .flatMap(_.extractOpt[Map[String, List[String]]])
+      .flatMap(_.map { case (k, vs) => k -> vs.toSet }).toMap
   }
 
   private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {

@@ -55,8 +55,8 @@ class FilterTextMapTest extends OpTransformerSpec[TextMap, FilterMap[TextMap]] {
     TextMap(Map("Knight" -> "Ni"))
   )
 
-  it should "filter whitelisted keys" in {
-    transformer.setWhiteListKeys(Array("Arthur", "Knight"))
+  it should "filter allowlisted keys" in {
+    transformer.setAllowListKeys(Array("Arthur", "Knight"))
 
     val filtered = transformer.transform(inputData).collect(transformer.getOutput)
     val dataExpected = Array(
@@ -68,10 +68,10 @@ class FilterTextMapTest extends OpTransformerSpec[TextMap, FilterMap[TextMap]] {
     filtered should contain theSameElementsAs dataExpected
   }
 
-  it should "filter blacklisted keys" in {
+  it should "filter blocklisted keys" in {
     transformer.setInput(f1)
-      .setWhiteListKeys(Array[String]())
-      .setBlackListKeys(Array("Arthur", "Knight"))
+      .setAllowListKeys(Array[String]())
+      .setBlockListKeys(Array("Arthur", "Knight"))
     val filtered = transformer.transform(inputData).collect(transformer.getOutput)
 
     val dataExpected = Array(
@@ -91,7 +91,7 @@ class FilterTextMapTest extends OpTransformerSpec[TextMap, FilterMap[TextMap]] {
   }
 
   it should "filter correctly when using shortcut" in {
-    val filtered = f1.filter(whiteList = Seq("Arthur", "Knight"), blackList = Seq())
+    val filtered = f1.filter(allowList = Seq("Arthur", "Knight"), blockList = Seq())
 
     filtered.name shouldBe filtered.originStage.getOutputFeatureName
     filtered.originStage shouldBe a[FilterMap[_]]
