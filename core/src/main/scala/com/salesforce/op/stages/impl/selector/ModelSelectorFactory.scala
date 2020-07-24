@@ -107,9 +107,9 @@ trait ModelSelectorFactory {
     evaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]],
     defaultEvaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]]
   ): Seq[OpEvaluatorBase[_ <: EvaluationMetrics]] = {
-    defaultEvaluators.filter {
-      e => !evaluators.exists(_.isInstanceOf[e.type])
-    } ++ evaluators
+    defaultEvaluators.foldLeft(evaluators) {
+      case (total, default) if !total.exists(_.isInstanceOf[default.type]) => default +: total
+    }
   }
 
 }
