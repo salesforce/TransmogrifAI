@@ -283,30 +283,42 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     thresholdMetrics.recallByThreshold.length shouldBe numTresholds
 
     // Check that the confusion matrix element counts are consistent
-    thresholdMetrics.truePositivesByThreshold.zip(thresholdMetrics.falsePositivesByThreshold)
-      .zip(thresholdMetrics.trueNegativesByThreshold)
-      .zip(thresholdMetrics.falseNegativesByThreshold).map{
-      case (((tp, fp), tn), fn) => tp + fp + tn + fn
-    }.forall(_ == count) shouldBe true
+    Seq(
+      thresholdMetrics.truePositivesByThreshold,
+      thresholdMetrics.falsePositivesByThreshold,
+      thresholdMetrics.trueNegativesByThreshold,
+      thresholdMetrics.falseNegativesByThreshold
+    ).transpose
+      .map { case Seq(tp, fp, tn, fn) => tp + fp + tn + fn }
+      .forall(_ == count) shouldBe true
 
     // Check that the precision by threshold is correctly reproduced. Note, there will always be at least one
     // predicted positive at every threshold, so we don't need a guard for the denominator here
-    thresholdMetrics.truePositivesByThreshold.zip(thresholdMetrics.falsePositivesByThreshold)
-      .zip(thresholdMetrics.precisionByThreshold).map{
-      case ((tp, fp), precision) => tp * 1.0 / (tp + fp) - precision
-    }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
+    Seq(
+      thresholdMetrics.truePositivesByThreshold.map(_.toDouble),
+      thresholdMetrics.falsePositivesByThreshold.map(_.toDouble),
+      thresholdMetrics.precisionByThreshold
+    ).transpose
+      .map { case Seq(tp, fp, precision) => tp / (tp + fp) - precision }
+      .foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
 
     // Check that the recall by threshold is correctly reproduced
-    thresholdMetrics.truePositivesByThreshold.zip(thresholdMetrics.falseNegativesByThreshold)
-      .zip(thresholdMetrics.recallByThreshold).map{
-      case ((tp, fn), recall) => (if (tp + fn == 0) 0.0 else tp * 1.0 / (tp + fn)) - recall
-    }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
+    Seq(
+      thresholdMetrics.truePositivesByThreshold.map(_.toDouble),
+      thresholdMetrics.falseNegativesByThreshold.map(_.toDouble),
+      thresholdMetrics.recallByThreshold
+    ).transpose
+      .map { case Seq(tp, fn, recall) => (if (tp + fn == 0) 0.0 else tp / (tp + fn)) - recall }
+      .foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
 
     // Check that the false positive rate threshold is correctly reproduced
-    thresholdMetrics.falsePositivesByThreshold.zip(thresholdMetrics.trueNegativesByThreshold)
-      .zip(thresholdMetrics.falsePositiveRateByThreshold).map{
-      case ((fp, tn), fpr) => (if (fp + tn == 0) 0.0 else fp * 1.0 / (fp + tn)) - fpr
-    }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
+    Seq(
+      thresholdMetrics.falsePositivesByThreshold.map(_.toDouble),
+      thresholdMetrics.trueNegativesByThreshold.map(_.toDouble),
+      thresholdMetrics.falsePositiveRateByThreshold
+    ).transpose
+      .map { case Seq(fp, tn, fpr) => (if (fp + tn == 0) 0.0 else fp / (fp + tn)) - fpr }
+      .foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
   }
 
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {

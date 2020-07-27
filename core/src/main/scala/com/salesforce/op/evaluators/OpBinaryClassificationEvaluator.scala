@@ -36,9 +36,7 @@ import com.salesforce.op.utils.spark.RichEvaluator._
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.evaluation.binary.{BinaryConfusionMatrix, BinaryConfusionMatrixImpl, BinaryLabelCounter}
 import org.apache.spark.mllib.evaluation.{MulticlassMetrics, RichBinaryClassificationMetrics}
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
@@ -65,87 +63,6 @@ private[op] class OpBinaryClassificationEvaluator
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
   def getDefaultMetric: BinaryClassificationMetrics => Double = _.AuROC
-
-  def getConfusionMatrixByThreshold(scoreLabelsWeight: RDD[(Double, (Double, Double))]):
-  RDD[(Double, BinaryConfusionMatrix)] = {
-    // Create a bin for each distinct score value, count weighted positives and
-    // negatives within each bin, and then sort by score values in descending order.
-    val counts = scoreLabelsWeight.combineByKey(
-      createCombiner = (labelAndWeight: (Double, Double)) =>
-        new BinaryLabelCounter(0L, 0L) += labelAndWeight._1.toLong,
-      mergeValue = (c: BinaryLabelCounter, labelAndWeight: (Double, Double)) => c += labelAndWeight._1.toLong,
-      mergeCombiners = (c1: BinaryLabelCounter, c2: BinaryLabelCounter) => c1 += c2
-    ).sortByKey(ascending = false)
-
-    val binnedCounts =
-    // Only down-sample if bins is > 0
-      if (numBins == 0) {
-        // Use original directly
-        counts
-      } else {
-        val countsSize = counts.count()
-        // Group the iterator into chunks of about countsSize / numBins points,
-        // so that the resulting number of bins is about numBins
-        val grouping = countsSize / numBins
-        if (grouping < 2) {
-          // numBins was more than half of the size; no real point in down-sampling to bins
-          logInfo(s"Curve is too small ($countsSize) for $numBins bins to be useful")
-          counts
-        } else {
-          counts.mapPartitions { iter =>
-            if (iter.hasNext) {
-              var score = Double.NaN
-              var agg = new BinaryLabelCounter()
-              var cnt = 0L
-              iter.flatMap { pair =>
-                score = pair._1
-                agg += pair._2
-                cnt += 1
-                if (cnt == grouping) {
-                  // The score of the combined point will be just the last one's score,
-                  // which is also the minimal in each chunk since all scores are already
-                  // sorted in descending.
-                  // The combined point will contain all counts in this chunk. Thus, calculated
-                  // metrics (like precision, recall, etc.) on its score (or so-called threshold)
-                  // are the same as those without sampling.
-                  val ret = (score, agg)
-                  agg = new BinaryLabelCounter()
-                  cnt = 0
-                  Some(ret)
-                } else None
-              } ++ {
-                if (cnt > 0) {
-                  Iterator.single((score, agg))
-                } else Iterator.empty
-              }
-            } else Iterator.empty
-          }
-        }
-      }
-
-    val agg = binnedCounts.values.mapPartitions { iter =>
-      val agg = new BinaryLabelCounter()
-      iter.foreach(agg += _)
-      Iterator(agg)
-    }.collect()
-    val partitionwiseCumulativeCounts =
-      agg.scanLeft(new BinaryLabelCounter())((agg, c) => agg.clone() += c)
-    val totalCount = partitionwiseCumulativeCounts.last
-    logInfo(s"Total counts: $totalCount")
-    val cumulativeCounts = binnedCounts.mapPartitionsWithIndex(
-      (index: Int, iter: Iterator[(Double, BinaryLabelCounter)]) => {
-        val cumCount = partitionwiseCumulativeCounts(index)
-        iter.map { case (score, c) =>
-          cumCount += c
-          (score, cumCount.clone())
-        }
-      }, preservesPartitioning = true)
-    cumulativeCounts.persist()
-    val confusions = cumulativeCounts.map { case (score, cumCount) =>
-      (score, BinaryConfusionMatrixImpl(cumCount, totalCount).asInstanceOf[BinaryConfusionMatrix])
-    }
-    (cumulativeCounts, confusions)
-  }
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationMetrics = {
     val labelColName = getLabelCol
