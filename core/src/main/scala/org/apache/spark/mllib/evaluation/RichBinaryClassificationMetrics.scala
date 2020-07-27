@@ -21,7 +21,6 @@
 
 package org.apache.spark.mllib.evaluation
 
-import org.apache.spark.annotation.Since
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.evaluation.binary._
 import org.apache.spark.rdd.RDD
@@ -44,10 +43,9 @@ import org.apache.spark.sql.{DataFrame, Row}
  *                be smaller as a result, meaning there may be an extra sample at
  *                partition boundaries.
  */
-@Since("1.0.0")
-class RichBinaryClassificationMetrics @Since("3.0.0") (
-  @Since("1.3.0") val scoreAndLabels: RDD[_ <: Product],
-  @Since("1.3.0") val numBins: Int = 1000)
+class RichBinaryClassificationMetrics(
+  val scoreAndLabels: RDD[_ <: Product],
+  val numBins: Int = 1000)
   extends Logging {
 
   val scoreLabelsWeight: RDD[(Double, (Double, Double))] = scoreAndLabels.map {
@@ -65,7 +63,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
   /**
    * Defaults `numBins` to 0.
    */
-  @Since("1.0.0")
   def this(scoreAndLabels: RDD[(Double, Double)]) = this(scoreAndLabels, 0)
 
   /**
@@ -85,7 +82,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
   /**
    * Unpersist intermediate RDDs used in the computation.
    */
-  @Since("1.0.0")
   def unpersist(): Unit = {
     cumulativeCounts.unpersist()
   }
@@ -93,7 +89,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
   /**
    * Returns thresholds in descending order.
    */
-  @Since("1.0.0")
   def thresholds(): RDD[Double] = cumulativeCounts.map(_._1)
 
   /**
@@ -103,7 +98,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
    * @see <a href="http://en.wikipedia.org/wiki/Receiver_operating_characteristic">
    * Receiver operating characteristic (Wikipedia)</a>
    */
-  @Since("1.0.0")
   def roc(): RDD[(Double, Double)] = {
     val rocCurve = createCurve(FalsePositiveRate, Recall)
     val numParts = rocCurve.getNumPartitions
@@ -124,7 +118,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
   /**
    * Computes the area under the receiver operating characteristic (ROC) curve.
    */
-  @Since("1.0.0")
   def areaUnderROC(): Double = AreaUnderCurve.of(roc())
 
   /**
@@ -134,7 +127,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
    * @see <a href="http://en.wikipedia.org/wiki/Precision_and_recall">
    * Precision and recall (Wikipedia)</a>
    */
-  @Since("1.0.0")
   def pr(): RDD[(Double, Double)] = {
     val prCurve = createCurve(Recall, Precision)
     val (_, firstPrecision) = prCurve.first()
@@ -150,7 +142,6 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
   /**
    * Computes the area under the precision-recall curve.
    */
-  @Since("1.0.0")
   def areaUnderPR(): Double = AreaUnderCurve.of(pr())
 
   /**
@@ -159,25 +150,21 @@ class RichBinaryClassificationMetrics @Since("3.0.0") (
    * @return an RDD of (threshold, F-Measure) pairs.
    * @see <a href="http://en.wikipedia.org/wiki/F1_score">F1 score (Wikipedia)</a>
    */
-  @Since("1.0.0")
   def fMeasureByThreshold(beta: Double): RDD[(Double, Double)] = createCurve(FMeasure(beta))
 
   /**
    * Returns the (threshold, F-Measure) curve with beta = 1.0.
    */
-  @Since("1.0.0")
   def fMeasureByThreshold(): RDD[(Double, Double)] = fMeasureByThreshold(1.0)
 
   /**
    * Returns the (threshold, precision) curve.
    */
-  @Since("1.0.0")
   def precisionByThreshold(): RDD[(Double, Double)] = createCurve(Precision)
 
   /**
    * Returns the (threshold, recall) curve.
    */
-  @Since("1.0.0")
   def recallByThreshold(): RDD[(Double, Double)] = createCurve(Recall)
 
   /**

@@ -80,7 +80,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     val metricsMulti = evaluatorMulti.evaluateAll(dsMulti)
 
-    metricsMulti.ThresholdMetrics shouldEqual ThresholdMetrics(
+    metricsMulti.ThresholdMetrics shouldEqual MulticlassThresholdMetrics(
       topNs = defaultTopNs,
       thresholds = defaultThresholds,
       correctCounts = expectedCorrects,
@@ -121,7 +121,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       12 -> Seq(0L, 0L, 0L, numRows, numRows, numRows)
     )
 
-    metricsMulti.ThresholdMetrics shouldEqual ThresholdMetrics(
+    metricsMulti.ThresholdMetrics shouldEqual MulticlassThresholdMetrics(
       topNs = topNs,
       thresholds = thresholds,
       correctCounts = expectedCorrects,

@@ -270,38 +270,42 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
 
   private[op] def checkThresholdMetrics(metrics: BinaryClassificationMetrics): Unit = {
     val count = metrics.TP + metrics.FP + metrics.TN + metrics.FN
+    val thresholdMetrics = metrics.ThresholdMetrics
 
     // Check that the lengths of all the thresholded metrics agree
-    val numTresholds = metrics.thresholds.length
-    metrics.truePostitivesByThreshold.length shouldBe numTresholds
-    metrics.falsePositivesByThreshold.length shouldBe numTresholds
-    metrics.trueNegativesByThreshold.length shouldBe numTresholds
-    metrics.falseNegativesByThreshold.length shouldBe numTresholds
-    metrics.falsePositiveRateByThreshold.length shouldBe numTresholds
-    metrics.precisionByThreshold.length shouldBe numTresholds
-    metrics.recallByThreshold.length shouldBe numTresholds
+    val numTresholds = thresholdMetrics.thresholds.length
+    thresholdMetrics.truePositivesByThreshold.length shouldBe numTresholds
+    thresholdMetrics.falsePositivesByThreshold.length shouldBe numTresholds
+    thresholdMetrics.trueNegativesByThreshold.length shouldBe numTresholds
+    thresholdMetrics.falseNegativesByThreshold.length shouldBe numTresholds
+    thresholdMetrics.falsePositiveRateByThreshold.length shouldBe numTresholds
+    thresholdMetrics.precisionByThreshold.length shouldBe numTresholds
+    thresholdMetrics.recallByThreshold.length shouldBe numTresholds
 
     // Check that the confusion matrix element counts are consistent
-    metrics.truePostitivesByThreshold.zip(metrics.falsePositivesByThreshold).zip(metrics.trueNegativesByThreshold)
-      .zip(metrics.falseNegativesByThreshold).map{
+    thresholdMetrics.truePositivesByThreshold.zip(thresholdMetrics.falsePositivesByThreshold)
+      .zip(thresholdMetrics.trueNegativesByThreshold)
+      .zip(thresholdMetrics.falseNegativesByThreshold).map{
       case (((tp, fp), tn), fn) => tp + fp + tn + fn
     }.forall(_ == count) shouldBe true
 
     // Check that the precision by threshold is correctly reproduced. Note, there will always be at least one
     // predicted positive at every threshold, so we don't need a guard for the denominator here
-    metrics.truePostitivesByThreshold.zip(metrics.falsePositivesByThreshold).zip(metrics.precisionByThreshold).map{
-      case ((tp, fp), precision) => tp / (tp + fp) - precision
+    thresholdMetrics.truePositivesByThreshold.zip(thresholdMetrics.falsePositivesByThreshold)
+      .zip(thresholdMetrics.precisionByThreshold).map{
+      case ((tp, fp), precision) => tp * 1.0 / (tp + fp) - precision
     }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
 
     // Check that the recall by threshold is correctly reproduced
-    metrics.truePostitivesByThreshold.zip(metrics.falseNegativesByThreshold).zip(metrics.recallByThreshold).map{
-      case ((tp, fn), recall) => (if (tp + fn == 0) 0.0 else tp / (tp + fn)) - recall
+    thresholdMetrics.truePositivesByThreshold.zip(thresholdMetrics.falseNegativesByThreshold)
+      .zip(thresholdMetrics.recallByThreshold).map{
+      case ((tp, fn), recall) => (if (tp + fn == 0) 0.0 else tp * 1.0 / (tp + fn)) - recall
     }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
 
     // Check that the false positive rate threshold is correctly reproduced
-    metrics.falsePositivesByThreshold.zip(metrics.trueNegativesByThreshold)
-      .zip(metrics.falsePositiveRateByThreshold).map{
-      case ((fp, tn), fpr) => (if (fp + tn == 0) 0.0 else fp / (fp + tn)) - fpr
+    thresholdMetrics.falsePositivesByThreshold.zip(thresholdMetrics.trueNegativesByThreshold)
+      .zip(thresholdMetrics.falsePositiveRateByThreshold).map{
+      case ((fp, tn), fpr) => (if (fp + tn == 0) 0.0 else fp * 1.0 / (fp + tn)) - fpr
     }.foreach(x => compareWithTol(actual = x, expected = 0.0, tol = 1e-16))
   }
 
