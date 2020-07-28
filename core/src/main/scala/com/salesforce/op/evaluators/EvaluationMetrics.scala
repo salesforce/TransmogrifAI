@@ -179,7 +179,7 @@ object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
   case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error", false)
   case object R2 extends RegressionEvalMetric("r2", "r2", true)
   case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error", false)
-  case object SignedPercentageErrorHistogram extends RegressionEvalMetric("signedpercentageerrorhistogram",
+  case object SignedPercentageErrorHistogram extends RegressionEvalMetric("pctErrorHst",
     "signed percentage error histogram", false)
 }
 

@@ -63,7 +63,7 @@ private[op] class OpRegressionEvaluator
   final val signedPercentageErrorHistogramBins = new DoubleArrayParam(
     parent = this,
     name = "signedPercentageErrorHistogramBins",
-    doc = "sequence of bins for signed percentage error histogram",
+    doc = "the sequence of error percentage bins for the signed percentage error histogram",
     isValid = l => l.nonEmpty && (l sameElements l.sorted)
   )
   setDefault(signedPercentageErrorHistogramBins,
@@ -75,7 +75,7 @@ private[op] class OpRegressionEvaluator
   final val scaledErrorCutoff = new DoubleParam(
     parent = this,
     name = "scaledErrorCutoff",
-    doc = "label value cutoff below which percentage error is implemented as a scaled error " +
+    doc = "the label value cutoff below which percentage error is implemented as a scaled error " +
       "with a fixed denominator to avoid problems with label values around 0",
     isValid = (d: Double) => d > 0.0
   )
