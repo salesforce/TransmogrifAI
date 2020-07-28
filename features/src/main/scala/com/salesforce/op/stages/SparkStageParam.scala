@@ -108,7 +108,6 @@ class SparkStageParam[S <: PipelineStage with Params]
     val json = parse(jsonStr)
     val uid = (json \ "uid").extractOpt[String]
     val path = (json \ "path").extractOpt[String]
-
     path -> uid match {
       case (None, _) | (_, None) | (_, Some(NoUID)) =>
         savePath = None
@@ -117,7 +116,6 @@ class SparkStageParam[S <: PipelineStage with Params]
         savePath = Option(p)
         val dirBundle = {
           for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
-            println(bundle.loadSparkBundle())
             bundle.loadSparkBundle() match {
               case Failure(exception) => throw new Exception(s"Failed to load model from path $p" +
                 s" because of: $exception")

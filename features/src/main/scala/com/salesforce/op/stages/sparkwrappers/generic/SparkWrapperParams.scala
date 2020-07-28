@@ -31,14 +31,12 @@
 package com.salesforce.op.stages.sparkwrappers.generic
 
 import com.salesforce.op.features.FeatureSparkTypes
-import com.salesforce.op.stages.{OpPipelineStage, OpPipelineStageBase, OpTransformer, SparkStageParam}
-import org.apache.spark
-import org.apache.spark.SparkContext
+import com.salesforce.op.stages.{OpPipelineStageBase, SparkStageParam}
 import org.apache.spark.ml.bundle.SparkBundleContext
-import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.ml.param.{Params, StringArrayParam}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 
 /**
@@ -87,10 +85,24 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
    */
   def setStageSavePath(path: String): this.type = {
     sparkMlStage.savePath = Option(path)
-    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(getEmptyDF))
+    val ds = outputDF.getOrElse(getEmptyDF)
+    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(ds))
     this
   }
 
+  /**
+   * XGBoost model save requires a non-empty dataframe to save correctly with Mleap
+   */
+  @transient private var outputDF: Option[DataFrame] = None
+
+  def setOutputDF(df: DataFrame): Unit = {
+    outputDF = Option(df)
+    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(df))
+  }
+
+  /**
+   * Used for saving models in ML leap format
+   */
   private def getEmptyDF: DataFrame = {
     val rawSchema = FeatureSparkTypes.toStructType(getInputFeatures(): _*)
     val spark = SparkSession.active

@@ -35,9 +35,11 @@ import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.OpPipelineStage2
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml._
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import scala.collection.JavaConverters._
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -98,11 +100,23 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
       .set(po, getOutputFeatureName)
       .fit(dataset)
 
-    SparkModelConverter.toOP(model, uid)
+    val wrappedModel = SparkModelConverter.toOP(model, uid)
       .setParent(this)
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
+
+    if (model.isInstanceOf[XGBoostClassificationModel] || model.isInstanceOf[XGBoostClassificationModel]) {
+      wrappedModel.setOutputDF(transformFirst(model, dataset))
+    }
+
+    wrappedModel
+  }
+
+  private def transformFirst(model: Model[_], dataset: Dataset[_]): DataFrame = {
+    val first: java.util.List[Row] = List(dataset.toDF().first()).asJava
+    val smallDF = SparkSession.active.createDataFrame(first, dataset.schema)
+    model.transform(smallDF)
   }
 }
 
