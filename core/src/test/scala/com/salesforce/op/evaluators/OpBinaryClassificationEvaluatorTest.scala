@@ -216,10 +216,14 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   }
 
   private def assertThresholdsNotEmpty(metrics: BinaryClassificationMetrics): Assertion = {
-    metrics.thresholds should not be empty
-    metrics.precisionByThreshold should not be empty
-    metrics.recallByThreshold should not be empty
-    metrics.falsePositiveRateByThreshold should not be empty
+    metrics.ThresholdMetrics.thresholds should not be empty
+    metrics.ThresholdMetrics.precisionByThreshold should not be empty
+    metrics.ThresholdMetrics.recallByThreshold should not be empty
+    metrics.ThresholdMetrics.falsePositiveRateByThreshold should not be empty
+    metrics.ThresholdMetrics.truePositivesByThreshold should not be empty
+    metrics.ThresholdMetrics.falsePositivesByThreshold should not be empty
+    metrics.ThresholdMetrics.trueNegativesByThreshold should not be empty
+    metrics.ThresholdMetrics.falseNegativesByThreshold should not be empty
   }
 
   /* Thresholds are defined on the probability piece of the prediction (specifically, the probability to be positive
