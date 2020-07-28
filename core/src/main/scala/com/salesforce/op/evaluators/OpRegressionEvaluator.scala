@@ -150,14 +150,14 @@ private[op] class OpRegressionEvaluator
 
     // If we need to set the scaledErrorCutoff smartly, use the label data for that
     if (isDefined(smartCutoffRatio)) {
-      val cutoff = calculateSmartCutoff(predictionsAndLabels)
-      log.info(s"Smart scaledErrorCutoff was determined to be: $cutoff")
-      setScaledErrorCutoff(cutoff)
+      val smartCutoff = calculateSmartCutoff(predictionsAndLabels)
+      log.info(s"Smart scaledErrorCutoff was determined to be: $smartCutoff")
+      setScaledErrorCutoff(smartCutoff)
     }
 
-    val scaledErrorCutoff = $(scaledErrorCutoff)
+    val cutoff = $(scaledErrorCutoff)
     val errors: RDD[Double] = predictionsAndLabels
-      .map(x => calculateSignedPercentageError(x._1, x._2, scaledErrorCutoff))
+      .map(x => calculateSignedPercentageError(x._1, x._2, cutoff))
     errors.histogram($(signedPercentageErrorHistogramBins))
   }
 
