@@ -35,13 +35,13 @@ import java.nio.file.Paths
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
+import com.salesforce.op.readers.{AggregateAvroReader}
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression, OpXGBoostClassifier}
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.tuning.DataSplitter
-import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
+import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomList, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
@@ -81,7 +81,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   }
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
-  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
+  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb, dataAllReader)
   lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
   lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel, xgbPred)
   lazy val modelLocation2 = {
@@ -181,11 +181,13 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     assert(scores, expectedScores, prediction)
   }
 
-  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
+  private def buildAndSaveModel(
+    modelsAndParams: Seq[(EstimatorType, Array[ParamMap])], reader: AggregateAvroReader[Passenger] = dataReader
+  ) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
       seed = 42, modelsAndParameters = modelsAndParams
     ).setInput(survivedNum, features).getOutput()
-    val workflow = new OpWorkflow().setReader(dataReader)
+    val workflow = new OpWorkflow().setReader(reader)
       .setResultFeatures(prediction, survivedNum, indexed, deindexed)
     lazy val model = workflow.train()
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString

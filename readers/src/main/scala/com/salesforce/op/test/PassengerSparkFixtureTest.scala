@@ -43,6 +43,7 @@ trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesT
   self: Suite =>
 
   def passengerAvroPath: String = Paths.get(testDataDir, "PassengerData.avro").toString
+  def passengerAllAvroPath: String = Paths.get(testDataDir, "PassengerDataAll.avro").toString
   def passengerCsvPath: String = Paths.get(testDataDir, "PassengerData.csv").toString
   def passengerCsvWithHeaderPath: String = Paths.get(testDataDir, "PassengerDataWithHeader.csv").toString
   def passengerProfileCsvPath: String = Paths.get(testDataDir, "PassengerProfileData.csv").toString
@@ -66,6 +67,13 @@ trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesT
   lazy val dataReader: AggregateAvroReader[Passenger] =
     DataReaders.Aggregate.avro[Passenger](
       path = Some(passengerAvroPath), // Path should be optional so can also pass in as a parameter
+      key = _.getPassengerId.toString, // Entity to score
+      aggregateParams = AggregateParams(Option(_.getRecordDate.toLong), CutOffTime.UnixEpoch(1471046600))
+    )
+
+  lazy val dataAllReader: AggregateAvroReader[Passenger] =
+    DataReaders.Aggregate.avro[Passenger](
+      path = Some(passengerAllAvroPath), // Path should be optional so can also pass in as a parameter
       key = _.getPassengerId.toString, // Entity to score
       aggregateParams = AggregateParams(Option(_.getRecordDate.toLong), CutOffTime.UnixEpoch(1471046600))
     )
