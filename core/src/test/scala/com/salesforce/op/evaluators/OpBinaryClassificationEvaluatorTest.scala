@@ -43,7 +43,7 @@ import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
 
 
@@ -158,6 +158,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     recall shouldBe metrics.Recall
     f1 shouldBe metrics.F1
     1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(flattenedData2) shouldBe metrics.Error
+    assertThresholdsNotEmpty(metrics)
   }
 
   it should "evaluate the metrics with one prediction input" in {
@@ -177,6 +178,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metrics.Precision shouldBe precision
     metrics.Recall shouldBe recall
     metrics.F1 shouldBe f1
+    assertThresholdsNotEmpty(metrics)
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
@@ -193,6 +195,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsZero.Precision shouldBe 0.0
     metricsZero.Recall shouldBe 0.0
     metricsZero.Error shouldBe 0.0
+    assertThresholdsNotEmpty(metricsZero)
   }
 
 
@@ -208,6 +211,14 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Precision shouldBe 1.0
     metricsOne.Recall shouldBe 1.0
     metricsOne.Error shouldBe 0.0
+    assertThresholdsNotEmpty(metricsOne)
+  }
+
+  private def assertThresholdsNotEmpty(metrics: BinaryClassificationMetrics): Assertion = {
+    metrics.thresholds should not be empty
+    metrics.precisionByThreshold should not be empty
+    metrics.recallByThreshold should not be empty
+    metrics.falsePositiveRateByThreshold should not be empty
   }
 
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {
