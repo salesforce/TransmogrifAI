@@ -155,7 +155,8 @@ private[op] class OpRegressionEvaluator
       setScaledErrorCutoff(cutoff)
     }
 
-    val errors: RDD[Double] = predictionsAndLabels.map(x => calculateSignedPercentageError(x._1, x._2))
+    val errors: RDD[Double] = predictionsAndLabels
+      .map(x => calculateSignedPercentageError(x._1, x._2, $(scaledErrorCutoff)))
     errors.histogram($(signedPercentageErrorHistogramBins))
   }
 
@@ -179,8 +180,12 @@ private[op] class OpRegressionEvaluator
    * @param label      Actual value
    * @return Signed percentage error
    */
-  private def calculateSignedPercentageError(prediction: Double, label: Double): Double = {
-    100.0 * (prediction - label) / (label.abs max $(scaledErrorCutoff))
+  private def calculateSignedPercentageError(
+    prediction: Double,
+    label: Double,
+    scaledErrorCutoff: Double
+  ): Double = {
+    100.0 * (prediction - label) / (label.abs max scaledErrorCutoff)
   }
 
 }
