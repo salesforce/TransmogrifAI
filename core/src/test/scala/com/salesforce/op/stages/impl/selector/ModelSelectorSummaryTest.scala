@@ -59,7 +59,8 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
         trueNegativesByThreshold = Seq(1L), falseNegativesByThreshold = Seq(0L))
       ),
       holdoutEvaluation = Option(RegressionMetrics(RootMeanSquaredError = 1.3, MeanSquaredError = 1.4, R2 = 1.5,
-        MeanAbsoluteError = 1.6))
+        MeanAbsoluteError = 1.6, SignedPercentageErrorHistogram = SignedPercentageErrorHistogram(bins = Seq(1.7),
+        counts = Seq(1L))))
     )
 
     val meta = summary.toMetadata()
