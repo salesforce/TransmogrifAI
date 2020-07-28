@@ -134,13 +134,6 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
             checkHistogramNonEmpty(metrics)
           }
 
-          it("should allow smartly setting the cutoff value") {
-            val metrics = newEvaluator()
-              .setSmartCutoff(true)
-              .evaluateAll(dataset)
-            checkHistogramNonEmpty(metrics)
-          }
-
           it("should allow setting the ratio for the smart cutoff value calculation") {
             val metrics = newEvaluator()
               .setSmartCutoffRatio(1.0)
@@ -196,7 +189,7 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
 
           it("should do correct smart cutoff value calculation and allow getting the result") {
             val evaluator = newEvaluator()
-              .setSmartCutoff(true)
+              .setSmartCutoffRatio(0.1)
             evaluator.evaluateAll(dataset)
             val expected = Some(dataset.select(avg(abs($"label"))).map(_.getDouble(0)).first() * 0.1)
             evaluator.getScaledErrorCutoff shouldBe expected
@@ -204,18 +197,9 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
 
           it("should attempt correct smart cutoff value calculation even if all labels are 0") {
             val evaluator = newEvaluator()
-              .setSmartCutoff(true)
+              .setSmartCutoffRatio(0.1)
             evaluator.evaluateAll(datasetWithZeroLabels)
             evaluator.getScaledErrorCutoff shouldBe Option(1E-3)
-          }
-
-          it("should do correct smart cutoff value calculation with a custom ratio") {
-            val evaluator = newEvaluator()
-              .setSmartCutoff(true)
-              .setSmartCutoffRatio(0.2)
-            evaluator.evaluateAll(dataset)
-            val expected = Some(dataset.select(avg(abs($"label"))).map(_.getDouble(0)).first() * 0.2)
-            evaluator.getScaledErrorCutoff shouldBe expected
           }
 
           it("should ignore data values outside the bins") {

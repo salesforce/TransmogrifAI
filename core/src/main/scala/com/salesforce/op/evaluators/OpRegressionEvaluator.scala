@@ -34,7 +34,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import com.salesforce.op.utils.spark.RichEvaluator._
 import org.apache.spark.ml.evaluation.RegressionEvaluator
-import org.apache.spark.ml.param.{BooleanParam, DoubleArrayParam, DoubleParam}
+import org.apache.spark.ml.param.{DoubleArrayParam, DoubleParam}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.functions.col
@@ -84,23 +84,13 @@ private[op] class OpRegressionEvaluator
   def setScaledErrorCutoff(v: Double): this.type = set(scaledErrorCutoff, v)
   def getScaledErrorCutoff: Option[Double] = get(scaledErrorCutoff)
 
-  final val smartCutoff = new BooleanParam(
-    parent = this,
-    name = "smartCutoff",
-    doc = "whether to determine scaledErrorCutoff smartly by looking at the magnitude of the labels"
-  )
-  setDefault(smartCutoff, false)
-
-  def setSmartCutoff(v: Boolean): this.type = set(smartCutoff, v)
-
   final val smartCutoffRatio = new DoubleParam(
     parent = this,
     name = "smartCutoffRatio",
-    doc = "ratio with which to multiply the average absolute magnitude of the data " +
-      "to set scaledErrorCutoff (only used when smartCutoff is true)",
+    doc = "if set, scaledErrorCutoff is determined smartly by taking the average absolute magnitude " +
+      "of the data multiplied with this ratio",
     isValid = (d: Double) => d > 0.0
   )
-  setDefault(smartCutoffRatio, 0.1)
 
   def setSmartCutoffRatio(v: Double): this.type = set(smartCutoffRatio, v)
 
@@ -159,7 +149,7 @@ private[op] class OpRegressionEvaluator
       .map { case Row(prediction: Double, label: Double) => (prediction, label) }
 
     // If we need to set the scaledErrorCutoff smartly, use the label data for that
-    if ($(smartCutoff)) {
+    if (isDefined(smartCutoffRatio)) {
       val cutoff = calculateSmartCutoff(predictionsAndLabels)
       log.info(s"Smart scaledErrorCutoff was determined to be: $cutoff")
       setScaledErrorCutoff(cutoff)
