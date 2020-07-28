@@ -155,8 +155,9 @@ private[op] class OpRegressionEvaluator
       setScaledErrorCutoff(cutoff)
     }
 
+    val scaledErrorCutoff = $(scaledErrorCutoff)
     val errors: RDD[Double] = predictionsAndLabels
-      .map(x => calculateSignedPercentageError(x._1, x._2, $(scaledErrorCutoff)))
+      .map(x => calculateSignedPercentageError(x._1, x._2, scaledErrorCutoff))
     errors.histogram($(signedPercentageErrorHistogramBins))
   }
 
