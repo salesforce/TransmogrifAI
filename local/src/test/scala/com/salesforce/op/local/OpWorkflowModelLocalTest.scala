@@ -60,7 +60,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
   val log = LoggerFactory.getLogger(this.getClass)
   val numRecords = 100
 
-  // First set up the raw features:
+  // First set up the raw features
   val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.2).take(numRecords).toList
   val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.2).take(numRecords).toList
   val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
@@ -73,14 +73,14 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     cityData.zip(countryData).zip(pickListData).zip(currencyData).map {
       case (((ci, co), pi), cu) => (ci, co, pi, cu)
     }
-
   val (rawDF, rawCity, rawCountry, rawPickList, rawCurrency) =
     TestFeatureBuilder("city", "country", "picklist", "currency", generatedData)
-  // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
+
+  // Construct a label with a strong signal so we make sure there's something for the algorithms to learn
   val labelSynth = new PickListLabelizer().setInput(rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
     .copy(isResponse = true)
-  val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
 
+  val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
   val indexed = rawCountry.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
   val deindexed = indexed.deindexed()
 
@@ -97,7 +97,6 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
         .build()
   }
 
-  // lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
   lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
   lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
@@ -227,6 +226,7 @@ class Labelizer(uid: String = UID[Labelizer]) extends UnaryTransformer[RealNN, R
   def transformFn: RealNN => RealNN = v => v.value.map(x => if (x > 0.0) 1.0 else 0.0).toRealNN(0.0)
 }
 
+// Label transformation function to generate a binary response from the generated picklist
 class PickListLabelizer(uid: String = UID[PickListLabelizer])
   extends UnaryTransformer[PickList, RealNN]("picklistLabelizer", uid) {
   override def outputIsResponse: Boolean = true
