@@ -71,13 +71,6 @@ trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesT
       aggregateParams = AggregateParams(Option(_.getRecordDate.toLong), CutOffTime.UnixEpoch(1471046600))
     )
 
-  lazy val dataAllReader: AggregateAvroReader[Passenger] =
-    DataReaders.Aggregate.avro[Passenger](
-      path = Some(passengerAllAvroPath), // Path should be optional so can also pass in as a parameter
-      key = _.getPassengerId.toString, // Entity to score
-      aggregateParams = AggregateParams(Option(_.getRecordDate.toLong), CutOffTime.UnixEpoch(1471046600))
-    )
-
   lazy val profileReader: CSVReader[PassengerProfile] = DataReaders.Simple.csv[PassengerProfile](
     path = Some(passengerProfileCsvPath),
     schema = PassengerProfile.getClassSchema.toString,
