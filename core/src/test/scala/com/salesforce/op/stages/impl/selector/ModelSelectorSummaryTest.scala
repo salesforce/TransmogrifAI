@@ -53,8 +53,11 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
       bestModelType = "test3",
       validationResults = Seq(ModelEvaluation("test4", "test5", "test6", SingleMetric("test7", 0.1), Map.empty)),
       trainEvaluation = BinaryClassificationMetrics(Precision = 0.1, Recall = 0.2, F1 = 0.3, AuROC = 0.4,
-        AuPR = 0.5, Error = 0.6, TP = 0.7, TN = 0.8, FP = 0.9, FN = 1.0, thresholds = Seq(1.1),
-        precisionByThreshold = Seq(1.2), recallByThreshold = Seq(1.3), falsePositiveRateByThreshold = Seq(1.4)),
+        AuPR = 0.5, Error = 0.6, TP = 0.7, TN = 0.8, FP = 0.9, FN = 1.0, BinaryThresholdMetrics(thresholds = Seq(1.1),
+        precisionByThreshold = Seq(1.2), recallByThreshold = Seq(1.3), falsePositiveRateByThreshold = Seq(1.4),
+        truePositivesByThreshold = Seq(1L), falsePositivesByThreshold = Seq(0L),
+        trueNegativesByThreshold = Seq(1L), falseNegativesByThreshold = Seq(0L))
+      ),
       holdoutEvaluation = Option(RegressionMetrics(RootMeanSquaredError = 1.3, MeanSquaredError = 1.4, R2 = 1.5,
         MeanAbsoluteError = 1.6, SignedPercentageErrorHistogram = SignedPercentageErrorHistogram(bins = Seq(1.7),
         counts = Seq(1L))))
@@ -90,7 +93,7 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
       bestModelType = "test3",
       validationResults = Seq.empty,
       trainEvaluation = MultiClassificationMetrics(Precision = 0.1, Recall = 0.2, F1 = 0.3, Error = 0.4,
-        ThresholdMetrics = ThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
+        ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
           correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
           noPredictionCounts = Map(3 -> Seq(300L)))),
       holdoutEvaluation = None
@@ -114,7 +117,7 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
 
   it should "not hide the root cause of JSON parsing errors" in {
     val evalMetrics = MultiClassificationMetrics(Precision = 0.1, Recall = 0.2, F1 = 0.3, Error = 0.4,
-      ThresholdMetrics = ThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
+      ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
         correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
         noPredictionCounts = Map(3 -> Seq(300L))))
 
