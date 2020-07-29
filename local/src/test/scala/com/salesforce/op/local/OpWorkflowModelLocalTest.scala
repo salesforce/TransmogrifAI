@@ -40,9 +40,8 @@ import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSe
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.tuning.DataSplitter
-import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
-import com.salesforce.op.testkit.{RandomList, RandomText}
+import com.salesforce.op.test.{TempDirectoryTest, TestCommon, TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.testkit.{RandomList, RandomReal, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.{OpWorkflow, OpWorkflowModel, UID}
@@ -57,14 +56,32 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest with TestCommon {
-
+class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempDirectoryTest with TestCommon {
   val log = LoggerFactory.getLogger(this.getClass)
+  val numRecords = 100
 
-  val features = Seq(height, weight, gender, description, age).transmogrify()
-  val survivedNum = survived.occurs()
+  // First set up the raw features:
+  val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.2).take(numRecords).toList
+  val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.2).take(numRecords).toList
+  val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+    .withProbabilityOfEmpty(0.2).limit(numRecords)
+  val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+    .withProbabilityOfEmpty(0.2).limit(numRecords)
 
-  val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
+  // Generate the raw features and corresponding dataframe
+  val generatedData: Seq[(City, Country, PickList, Currency)] =
+    cityData.zip(countryData).zip(pickListData).zip(currencyData).map {
+      case (((ci, co), pi), cu) => (ci, co, pi, cu)
+    }
+
+  val (rawDF, rawCity, rawCountry, rawPickList, rawCurrency) =
+    TestFeatureBuilder("city", "country", "picklist", "currency", generatedData)
+  // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
+  val labelSynth = new PickListLabelizer().setInput(rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
+    .copy(isResponse = true)
+  val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
+
+  val indexed = rawCountry.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
   val deindexed = indexed.deindexed()
 
   val logReg = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
@@ -80,6 +97,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
         .build()
   }
 
+  // lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
   lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
   lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
@@ -157,10 +175,10 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
   ): Unit = {
     scores.length shouldBe expectedScores.length
     for {
-      ((score, (predV, survivedV, indexedV, deindexedV)), i) <- scores.zip(expectedScores).zipWithIndex
+      ((score, (predV, labelV, indexedV, deindexedV)), i) <- scores.zip(expectedScores).zipWithIndex
       expected = Map(
         prediction.name -> predV.value,
-        survivedNum.name -> survivedV.value.get,
+        labelSynth.name -> labelV.value.get,
         indexed.name -> indexedV.value.get,
         deindexed.name -> deindexedV.value.orNull
       )
@@ -181,21 +199,22 @@ class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest w
     assert(scores, expectedScores, prediction)
   }
 
-  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]) = {
+  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]):
+  (String, OpWorkflowModel, FeatureLike[Prediction]) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-      modelsAndParameters = modelsAndParams, splitter = Some(DataSplitter(seed = 42))
-    ).setInput(survivedNum, features).getOutput()
-    val workflow = new OpWorkflow().setReader(dataReader)
-      .setResultFeatures(prediction, survivedNum, indexed, deindexed)
+      modelsAndParameters = modelsAndParams
+    ).setInput(labelSynth, genFeatureVector).getOutput()
+    val workflow = new OpWorkflow().setInputDataset(rawDF).setResultFeatures(prediction, labelSynth, indexed, deindexed)
     lazy val model = workflow.train()
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)
   }
 
-  private def genRawDataAndScore(model: OpWorkflowModel, prediction: FeatureLike[Prediction]) = {
-    val rawData = dataReader.generateDataFrame(model.getRawFeatures()).sort(KeyFieldName).collect().map(_.toMap)
-    val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
+  private def genRawDataAndScore(model: OpWorkflowModel, prediction: FeatureLike[Prediction]):
+  (Array[Map[String, Any]], Array[(Prediction, RealNN, RealNN, Text)]) = {
+    val rawData = rawDF.collect().map(_.toMap)
+    val expectedScores = model.score().collect(prediction, labelSynth, indexed, deindexed)
     (rawData, expectedScores)
   }
 
@@ -206,4 +225,14 @@ class Labelizer(uid: String = UID[Labelizer]) extends UnaryTransformer[RealNN, R
   override def outputIsResponse: Boolean = true
 
   def transformFn: RealNN => RealNN = v => v.value.map(x => if (x > 0.0) 1.0 else 0.0).toRealNN(0.0)
+}
+
+class PickListLabelizer(uid: String = UID[PickListLabelizer])
+  extends UnaryTransformer[PickList, RealNN]("picklistLabelizer", uid) {
+  override def outputIsResponse: Boolean = true
+
+  def transformFn: PickList => RealNN = p => p.value match {
+    case Some("A") | Some("B") | Some("C") | Some("D") => RealNN(1.0)
+    case _ => RealNN(0.0)
+  }
 }
