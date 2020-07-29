@@ -78,7 +78,6 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
 
   // Construct a label with a strong signal so we make sure there's something for the algorithms to learn
   val labelSynth = new PickListLabelizer().setInput(rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
-    .copy(isResponse = true)
 
   val genFeatureVector = Seq(rawCity, rawCountry, rawPickList, rawCurrency).transmogrify()
   val indexed = rawCountry.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
