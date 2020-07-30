@@ -86,7 +86,7 @@ class SparkStageParam[S <: PipelineStage with Params]
     (sparkStage, savePath, sbc) match {
       case (Some(stage), Some(p), Some(c)) =>
         for {bundle <- managed(BundleFile(s"file:$p/${stage.uid}"))} {
-          stage.asInstanceOf[Transformer].writeBundle.format(SerializationFormat.Json).save(bundle)(c)
+          stage.asInstanceOf[Transformer].writeBundle.format(SerializationFormat.Json).save(bundle)(c).get
         }
         json(className = stage.getClass.getName, uid = stage.uid)
       case (Some(stage), Some(p), None) =>

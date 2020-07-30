@@ -79,6 +79,16 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
   def getSparkMlStage(): Option[S] = $(sparkMlStage)
 
   /**
+   * XGBoost model save requires a non-empty dataframe to save correctly with Mleap
+   */
+  private var outputDF: Option[DataFrame] = None
+
+  def setOutputDF(df: DataFrame): Unit = {
+    outputDF = Option(df)
+    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(df))
+  }
+
+  /**
    * Sets a save path for wrapped spark stage
    *
    * @param path
@@ -90,15 +100,6 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
     this
   }
 
-  /**
-   * XGBoost model save requires a non-empty dataframe to save correctly with Mleap
-   */
-  @transient private var outputDF: Option[DataFrame] = None
-
-  def setOutputDF(df: DataFrame): Unit = {
-    outputDF = Option(df)
-    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(df))
-  }
 
   /**
    * Used for saving models in ML leap format

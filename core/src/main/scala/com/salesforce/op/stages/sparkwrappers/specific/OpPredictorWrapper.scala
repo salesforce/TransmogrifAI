@@ -106,7 +106,7 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
 
-    if (model.isInstanceOf[XGBoostClassificationModel] || model.isInstanceOf[XGBoostClassificationModel]) {
+    if (model.isInstanceOf[XGBoostClassificationModel] || model.isInstanceOf[XGBoostRegressionModel]) {
       wrappedModel.setOutputDF(transformFirst(model, dataset))
     }
 
