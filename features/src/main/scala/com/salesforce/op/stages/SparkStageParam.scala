@@ -117,7 +117,7 @@ class SparkStageParam[S <: PipelineStage with Params]
         val dirBundle = {
           for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
             bundle.loadSparkBundle() match {
-              case Failure(exception) => println(exception.printStackTrace())
+              case Failure(exception) =>
                 throw new Exception(s"Failed to load model from path $p because of: $exception")
               case Success(mod) => mod
             }
