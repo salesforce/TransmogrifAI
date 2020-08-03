@@ -31,19 +31,19 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import ml.combust.bundle.BundleFile
+import ml.combust.bundle.serializer.SerializationFormat
+import ml.combust.mleap.spark.SparkSupport._
 import org.apache.hadoop.fs.Path
-import org.apache.spark.ml.{PipelineStage, SparkDefaultParamsReadWrite, Transformer}
+import org.apache.spark.ml.bundle.SparkBundleContext
 import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
+import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.util.SparkUtils
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
 import org.json4s.{DefaultFormats, Formats, JString}
-import ml.combust.bundle.BundleFile
-import ml.combust.bundle.serializer.SerializationFormat
-import org.apache.spark.ml.bundle.SparkBundleContext
-import ml.combust.mleap.spark.SparkSupport._
 import resource._
 
 import scala.util.{Failure, Success}
@@ -117,8 +117,8 @@ class SparkStageParam[S <: PipelineStage with Params]
         val dirBundle = {
           for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
             bundle.loadSparkBundle() match {
-              case Failure(exception) => throw new Exception(s"Failed to load model from path $p" +
-                s" because of: $exception")
+              case Failure(exception) => println(exception.printStackTrace())
+                throw new Exception(s"Failed to load model from path $p because of: $exception")
               case Success(mod) => mod
             }
           }

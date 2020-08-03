@@ -107,17 +107,12 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
       .setOutputFeatureName(getOutputFeatureName)
 
     if (model.isInstanceOf[XGBoostClassificationModel] || model.isInstanceOf[XGBoostRegressionModel]) {
-      wrappedModel.setOutputDF(transformFirst(model, dataset))
+      wrappedModel.setOutputDF(model.transform(dataset.limit(1)))
     }
 
     wrappedModel
   }
 
-  private def transformFirst(model: Model[_], dataset: Dataset[_]): DataFrame = {
-    val first: java.util.List[Row] = List(dataset.toDF().first()).asJava
-    val smallDF = SparkSession.active.createDataFrame(first, dataset.schema)
-    model.transform(smallDF)
-  }
 }
 
 abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]

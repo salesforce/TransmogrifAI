@@ -145,7 +145,7 @@ class OpWorkflowModelReaderWriterTest
 
     val vector = RandomVector.dense(RandomReal.uniform[Real](-1.0, 1.0), 20).take(10)
     val (data, vec) = TestFeatureBuilder[OPVector]("vec", vector.toSeq)
-    val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
+    val scaler = new StandardScaler().setWithStd(true).setWithMean(false)
     val scaled = new OpEstimatorWrapper[OPVector, OPVector, StandardScaler, StandardScalerModel](scaler)
       .setInput(vec).getOutput()
     val wf = new OpWorkflow()
@@ -252,7 +252,9 @@ class OpWorkflowModelReaderWriterTest
     val path = "/Users/lmcguire/Desktop/tmp" // saveModelPath
     wfM.save(path)
     val wfMR = wf.loadModel(path).setReader(wfM.getReader())
+    val wfMRnoWF = OpWorkflowModel.load(path).setReader(wfM.getReader())
     assert(wfMR, wfM)
+    assert(wfMRnoWF, wfM)
   }
 
   it should "work for models" in new SingleStageFlow {
