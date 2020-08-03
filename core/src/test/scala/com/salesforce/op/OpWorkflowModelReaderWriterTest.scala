@@ -272,16 +272,16 @@ class OpWorkflowModelReaderWriterTest
     assert(wfMR, wfM)
   }
 
-  it should "save a workflow model that has a RawFeatureFilter with correct blacklists" in new VectorizedFlow {
+  it should "save a workflow model that has a RawFeatureFilter with correct blocklists" in new VectorizedFlow {
     wf.withRawFeatureFilter(trainingReader = Some(dataReader), scoringReader = Some(simpleReader),
       bins = 10, minFillRate = 0.1, maxFillDifference = 0.1, maxFillRatioDiff = 2,
       maxJSDivergence = 0.2, maxCorrelation = 0.9, minScoringRows = 0
     )
     val wfM = wf.train()
     wfM.save(saveFlowPathStable)
-    wf.getBlacklist().map(_.name) should contain theSameElementsAs
+    wf.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
-    wf.getBlacklistMapKeys() shouldBe
+    wf.getBlocklistMapKeys() shouldBe
       Map(booleanMap.name -> Set("Male"), stringMap.name -> Set("Male"), numericMap.name -> Set("Male"))
 
     val wfMR = wf.loadModel(saveFlowPathStable).setReader(wfM.getReader())
@@ -294,7 +294,7 @@ class OpWorkflowModelReaderWriterTest
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
       Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
-    wfM.getBlacklist().map(_.name) should contain theSameElementsAs
+    wfM.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
   }
 
@@ -304,7 +304,7 @@ class OpWorkflowModelReaderWriterTest
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
       Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
-    wfM.getBlacklist().map(_.name) should contain theSameElementsAs
+    wfM.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
   }
 
@@ -322,15 +322,22 @@ class OpWorkflowModelReaderWriterTest
 
   it should "load a old version of a saved model" in new OldVectorizedFlow {
     val wfM = wf.loadModel("src/test/resources/OldModelVersion")
-    wfM.getBlacklist().isEmpty shouldBe true
+    wfM.getBlocklist().isEmpty shouldBe true
   }
 
-  it should "load a old version of a saved model (v0.5.1)" in new OldVectorizedFlow {
+  it should "load an old version of a saved model (v0.5.1)" in new OldVectorizedFlow {
     // note: in these old models, raw feature filter config will be set to the config defaults
     // but we never re-initialize raw feature filter when loading a model (only scoring, no training)
     val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1")
     wfM.getRawFeatureFilterResults().rawFeatureFilterMetrics shouldBe empty
     wfM.getRawFeatureFilterResults().exclusionReasons shouldBe empty
+  }
+
+  it should "load an old version of a saved model (v0.7.1)" in new VectorizedFlow {
+    // note: in these old models, "blocklist" was still called "blacklist"
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_7_1")
+    wfM.getBlocklistMapKeys() should not be empty
+    wfM.getBlocklist() should not be empty
   }
 
   def assert(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
@@ -357,10 +364,10 @@ class OpWorkflowModelReaderWriterTest
     wf1.uid shouldBe wf2.uid
     assert(wf1.getParameters(), wf2.getParameters())
     assert(wf1.getResultFeatures(), wf2.getResultFeatures())
-    assert(wf1.getBlacklist(), wf2.getBlacklist())
+    assert(wf1.getBlocklist(), wf2.getBlocklist())
     assert(wf1.getRawFeatures(), wf2.getRawFeatures())
     assert(wf1.getStages(), wf2.getStages())
-    wf1.getBlacklistMapKeys() shouldBe  wf2.getBlacklistMapKeys()
+    wf1.getBlocklistMapKeys() shouldBe  wf2.getBlocklistMapKeys()
     RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
@@ -372,8 +379,8 @@ class OpWorkflowModelReaderWriterTest
     wfm1.getReader() shouldBe wfm2.getReader()
     assert(wfm1.getResultFeatures(), wfm2.getResultFeatures())
     assert(wfm1.getRawFeatures(), wfm2.getRawFeatures())
-    assert(wfm1.getBlacklist(), wfm2.getBlacklist())
-    wfm1.getBlacklistMapKeys() shouldBe wfm2.getBlacklistMapKeys()
+    assert(wfm1.getBlocklist(), wfm2.getBlocklist())
+    wfm1.getBlocklistMapKeys() shouldBe wfm2.getBlocklistMapKeys()
     assert(wfm1.getStages(), wfm2.getStages())
     RawFeatureFilterResultsComparison.compare(wfm1.getRawFeatureFilterResults(), wfm2.getRawFeatureFilterResults())
   }

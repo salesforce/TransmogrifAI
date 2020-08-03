@@ -89,7 +89,7 @@ New features / updates:
 - Improve WeekOfMonth in date transformers [#323](https://github.com/salesforce/TransmogrifAI/pull/323)
 - Improved datetime unit transformer shortcuts - Part 2 [#319](https://github.com/salesforce/TransmogrifAI/pull/319)
 - Correctly pass main class for CLI sub project [#321](https://github.com/salesforce/TransmogrifAI/pull/321)
-- Serialize blacklisted map keys with the model + updated access on workflow/model members [#320](https://github.com/salesforce/TransmogrifAI/pull/320)
+- Serialize blocklisted map keys with the model + updated access on workflow/model members [#320](https://github.com/salesforce/TransmogrifAI/pull/320)
 - Improved datetime unit transformer shortcuts [#316](https://github.com/salesforce/TransmogrifAI/pull/316)
 - Improved OpScalarStandardScalerTest [#317](https://github.com/salesforce/TransmogrifAI/pull/317)
 - improved PercentileCalibratorTest [#318](https://github.com/salesforce/TransmogrifAI/pull/318)
@@ -101,7 +101,7 @@ New features / updates:
  Dependency updates:
 - Bump shadowjar plugin to 5.0.0 [#306](https://github.com/salesforce/TransmogrifAI/pull/306)
 - Bump Apache Tika to 1.21 [#331](https://github.com/salesforce/TransmogrifAI/pull/331)
-- Enable CicleCI version 2.1 [#353](https://github.com/salesforce/TransmogrifAI/pull/353)
+- Enable CircleCI version 2.1 [#353](https://github.com/salesforce/TransmogrifAI/pull/353)
 
 ## 0.5.3
 
