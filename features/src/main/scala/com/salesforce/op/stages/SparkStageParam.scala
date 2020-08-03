@@ -123,7 +123,7 @@ class SparkStageParam[S <: PipelineStage with Params]
             }
           }
           }.opt
-        dirBundle.map(_.root.asInstanceOf[S]).orElse{
+        dirBundle.map(_.root.asInstanceOf[S]).orElse{ // for backwards compatibility
           val stagePath = new Path(p, stageUid).toString
           val className = (json \ "className").extract[String]
           val cls = SparkUtils.classForName(className)

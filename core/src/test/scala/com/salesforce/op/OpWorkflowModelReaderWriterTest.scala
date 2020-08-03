@@ -249,10 +249,9 @@ class OpWorkflowModelReaderWriterTest
   }
 
   it should "load proper workflow with spark wrapped stages" in new SwSingleStageFlow {
-    val path = "/Users/lmcguire/Desktop/tmp" // saveModelPath
-    wfM.save(path)
-    val wfMR = wf.loadModel(path).setReader(wfM.getReader())
-    val wfMRnoWF = OpWorkflowModel.load(path).setReader(wfM.getReader())
+    wfM.save(saveModelPath)
+    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    val wfMRnoWF = OpWorkflowModel.load(saveModelPath).setReader(wfM.getReader())
     assert(wfMR, wfM)
     assert(wfMRnoWF, wfM)
   }
