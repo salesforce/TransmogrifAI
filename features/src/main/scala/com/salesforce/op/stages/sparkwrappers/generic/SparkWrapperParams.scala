@@ -88,6 +88,8 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
     sparkMlStage.sbc = Option(SparkBundleContext().withDataset(df))
   }
 
+  private[op] def getOutputDF(): Option[DataFrame] = outputDF
+
   /**
    * Sets a save path for wrapped spark stage
    *

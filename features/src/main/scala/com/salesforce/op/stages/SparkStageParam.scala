@@ -32,10 +32,13 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import ml.combust.bundle.BundleFile
+import ml.combust.bundle.dsl.Bundle
 import ml.combust.bundle.serializer.SerializationFormat
 import ml.combust.mleap.spark.SparkSupport._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.bundle.SparkBundleContext
+import ml.combust.mleap.runtime.MleapSupport._
+import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
 import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
 import org.apache.spark.ml.{PipelineStage, Transformer}
@@ -46,7 +49,7 @@ import org.json4s.jackson.JsonMethods.{compact, parse, render}
 import org.json4s.{DefaultFormats, Formats, JString}
 import resource._
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class SparkStageParam[S <: PipelineStage with Params]
 (
@@ -100,39 +103,65 @@ class SparkStageParam[S <: PipelineStage with Params]
     }
   }
 
+  private def getPathUid(jsonStr: String): (Option[String], Option[String]) = {
+    val json = parse(jsonStr)
+    val uid = (json \ "uid").extractOpt[String]
+    val path = (json \ "path").extractOpt[String]
+    path -> uid
+  }
+
+
   /**
    * Decodes the saved path string and uses the Pipeline.load method
    * to recover the stage.
    */
   override def jsonDecode(jsonStr: String): Option[S] = {
-    val json = parse(jsonStr)
-    val uid = (json \ "uid").extractOpt[String]
-    val path = (json \ "path").extractOpt[String]
-    path -> uid match {
+    val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMLleap(jsonStr, asSpark = true)
+    println(jsonStr)
+    println(dirBundle.collect{ case Left(s) => s })
+    dirBundle.collect{ case Left(s) => s }.orElse { // for backwards compatibility
+      getPathUid(jsonStr) match {
+        case (Some(p), Some(stageUid)) =>
+          val stagePath = new Path(p, stageUid).toString
+          val json = parse(jsonStr)
+          val className = (json \ "className").extract[String]
+          val cls = SparkUtils.classForName(className)
+          val stage = cls.getMethod("read").invoke(null).asInstanceOf[MLReader[PipelineStage]].load(stagePath)
+          Option(stage).map(_.asInstanceOf[S])
+        case _ => None
+      }
+    }
+  }
+
+  private def loadError(loaded: Try[Bundle[_]]): Bundle[_] = {
+    loaded match {
+      case Failure(exception) =>
+        throw new Exception(s"Failed to load model because of: $exception")
+      case Success(mod) => mod
+    }
+  }
+
+
+  /**
+   * Decodes the saved path string and uses the Pipeline.load method
+   * to recover the stage as an Mleap transformer
+   */
+  def jsonDecodeMLleap[S](jsonStr: String, asSpark: Boolean = false): Option[Either[S, MLeapTransformer]] = {
+    getPathUid(jsonStr) match {
       case (None, _) | (_, None) | (_, Some(NoUID)) =>
         savePath = None
         None
       case (Some(p), Some(stageUid)) =>
         savePath = Option(p)
-        val dirBundle = {
-          for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
-            bundle.loadSparkBundle() match {
-              case Failure(exception) =>
-                throw new Exception(s"Failed to load model from path $p because of: $exception")
-              case Success(mod) => mod
-            }
-          }
-          }.opt
-        dirBundle.map(_.root.asInstanceOf[S]).orElse{ // for backwards compatibility
-          val stagePath = new Path(p, stageUid).toString
-          val className = (json \ "className").extract[String]
-          val cls = SparkUtils.classForName(className)
-          val stage = cls.getMethod("read").invoke(null).asInstanceOf[MLReader[PipelineStage]].load(stagePath)
-          Option(stage).map(_.asInstanceOf[S])
+        val loaded = for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
+          if (asSpark) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
+          else Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
         }
+        loaded.opt
     }
   }
 }
+
 
 object SparkStageParam {
   implicit val formats: Formats = DefaultFormats

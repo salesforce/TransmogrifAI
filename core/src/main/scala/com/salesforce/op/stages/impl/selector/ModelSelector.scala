@@ -196,6 +196,12 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
       .setEvaluators(evaluators)
+
+    bestModel match {
+      case m: SparkWrapperParams[_] => m.getOutputDF.foreach(selectedModel.setOutputDF)
+      case _ =>
+    }
+
     // Reset the job group to feature engineering.
     JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
     selectedModel

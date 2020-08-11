@@ -97,18 +97,20 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
   }
 
   lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
-  // lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
+  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
   lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
-  // lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel, xgbPred)
+  lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel, xgbPred)
   lazy val modelLocation2 = {
     Paths.get(tempDir.toString, "op-runner-local-test-model-2").toFile.getCanonicalFile.toString
   }
 
-  // TODO put back when XGBoost loading is fixed
-  //  Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark" in {
-  //    assertLoadModelAndScore(modelLocation, rawData, expectedScores, prediction)
-  //    assertLoadModelAndScore(xgbModelLocation, rawDataXGB, expectedXGBScores, xgbPred)
-  //  }
+  Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark" in {
+    assertLoadModelAndScore(modelLocation, rawData, expectedScores, prediction)
+  }
+
+  it should "produce scores without Spark using xgboost" in {
+    assertLoadModelAndScore(xgbModelLocation, rawDataXGB, expectedXGBScores, xgbPred)
+  }
 
   it should "produce scores without Spark in timely fashion" in {
     val scoreFn = model.scoreFunction
@@ -205,6 +207,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     ).setInput(labelSynth, genFeatureVector).getOutput()
     val workflow = new OpWorkflow().setInputDataset(rawDF).setResultFeatures(prediction, labelSynth, indexed, deindexed)
     lazy val model = workflow.train()
+    rawDF.show(10)
+    Seq(model.getStages().toList)
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)

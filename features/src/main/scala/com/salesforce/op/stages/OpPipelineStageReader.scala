@@ -34,9 +34,7 @@ import com.salesforce.op.features.OPFeature
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.SparkDefaultParamsReadWrite
-import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.JValue
 import org.json4s._
 import org.json4s.jackson.JsonMethods.{compact, render}
@@ -53,7 +51,7 @@ final class OpPipelineStageReader private
 (
   val originalStage: Option[OpPipelineStageBase],
   val features: Seq[OPFeature]
-) extends MLReader[OpPipelineStageBase] {
+) {
 
   /**
    * Legacy ctor which requires origin stage to be preset when loading stages
@@ -62,17 +60,6 @@ final class OpPipelineStageReader private
     this(Option(origStage), origStage.getInputFeatures().flatMap(_.allFeatures))
 
   def this(feats: Seq[OPFeature]) = this(None, feats)
-
-  /**
-   * Load from disk. File should contain data serialized in json format
-   *
-   * @param path to the stored output
-   * @return OpPipelineStageBase
-   */
-  override def load(path: String): OpPipelineStageBase = {
-    val metadataPath = new Path(path, "metadata").toString
-    loadFromJsonString(sc.textFile(metadataPath, 1).first(), path)
-  }
 
   /**
    * Loads from the json serialized data

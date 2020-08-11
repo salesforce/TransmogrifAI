@@ -30,6 +30,7 @@
 
 package com.salesforce.op
 
+
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
@@ -37,12 +38,15 @@ import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeatur
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
-import org.apache.spark.ml.util.MLReader
+import org.apache.commons.io.IOUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
 import scala.collection.mutable.ArrayBuffer
+import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -52,7 +56,7 @@ import scala.util.{Failure, Success, Try}
  *
  * @param workflowOpt optional workflow that produced the trained model
  */
-class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReader[OpWorkflowModel] {
+class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) {
 
   /**
    * Load a previously trained workflow model from path
@@ -60,14 +64,14 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @param path to the trained workflow model
    * @return workflow model
    */
-  final override def load(path: String): OpWorkflowModel = {
-    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
-      Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString)
-        .flatMap(loadJson(_, path = path)) match {
-        case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
-        case Success(wf) => wf
-      }
-    }(this.sparkSession)
+  final def load(path: String): OpWorkflowModel = {
+    implicit val conf = new org.apache.hadoop.conf.Configuration()
+    FileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path))
+    Try(FileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
+      .flatMap(loadJson(_, path = path)) match {
+      case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
+      case Success(wf) => wf
+    }
   }
 
   /**
@@ -224,3 +228,30 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   }
 
 }
+
+private object FileReader {
+
+  def loadFile(pathString: String)(implicit conf: Configuration): String = {
+    val path = new Path(pathString)
+    val fs = path.getFileSystem(conf)
+    val allFiles = fs.listFiles(path, false)
+    var partPath: Option[Path] = None
+    while (allFiles.hasNext) {
+      val p = allFiles.next().getPath
+      if (p.getName.startsWith("part")) {
+        partPath = Option(p)
+      }
+    }
+    val finalPath = partPath.getOrElse(path)
+    val codecFactory = new CompressionCodecFactory(conf)
+    val codec = Option(codecFactory.getCodec(finalPath))
+    val in = fs.open(finalPath)
+    val read = codec.map( c => Source.fromInputStream(c.createInputStream(in)).mkString )
+      .getOrElse( IOUtils.toString(in, "UTF-8") )
+    in.close()
+    read
+  }
+}
+
+
+
