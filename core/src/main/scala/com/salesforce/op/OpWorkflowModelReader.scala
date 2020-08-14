@@ -55,8 +55,9 @@ import scala.util.{Failure, Success, Try}
  * NOTE: The FeatureGeneratorStages will not be recovered into the Model object, because they are part of each feature.
  *
  * @param workflowOpt optional workflow that produced the trained model
+ * @param asSpark if true will load as spark models if false will load as Mlleap stages for spark wrapped stages
  */
-class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) {
+class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Boolean = true) {
 
   /**
    * Load a previously trained workflow model from path
@@ -120,7 +121,8 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) {
     val stagesJs = (json \ field.entryName).extract[JArray].arr
     val (recoveredStages, recoveredFeatures) = ArrayBuffer.empty[OPStage] -> ArrayBuffer.empty[OPFeature]
     for {j <- stagesJs} {
-      val stage = new OpPipelineStageReader(recoveredFeatures).loadFromJson(j, path = path).asInstanceOf[OPStage]
+      val stage = new OpPipelineStageReader(recoveredFeatures)
+        .loadFromJson(j, path = path, asSpark = asSpark).asInstanceOf[OPStage]
       recoveredStages += stage
       recoveredFeatures += stage.getOutput()
     }
@@ -135,7 +137,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) {
       val originalStage = workflow.getStages().find(_.uid == stageUid)
       originalStage match {
         case Some(os) => Option(
-          new OpPipelineStageReader(os).loadFromJson(j, path = path)).map(_.asInstanceOf[OPStage]
+          new OpPipelineStageReader(os).loadFromJson(j, path = path, asSpark = asSpark)).map(_.asInstanceOf[OPStage]
         )
         case None if generators.exists(_.uid == stageUid) => None // skip the generator since they are in the workflow
         case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")

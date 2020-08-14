@@ -466,6 +466,7 @@ case object OpWorkflowModel {
    * @param path to the trained workflow model
    * @return workflow model
    */
-  def load(path: String): OpWorkflowModel = new OpWorkflowModelReader(None).load(path)
+  def load(path: String, asSpark: Boolean = true): OpWorkflowModel =
+    new OpWorkflowModelReader(None, asSpark).load(path)
 
 }

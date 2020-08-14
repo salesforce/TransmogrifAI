@@ -106,7 +106,21 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "load stage correctly" in {
     val reader = new OpPipelineStageReader(stage)
-    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, asSpark = true)
+    stageLoaded shouldBe a[OpPipelineStageBase]
+    stageLoaded shouldBe a[Transformer]
+    stageLoaded.getOutput() shouldBe a[FeatureLike[_]]
+    val _ = stage.asInstanceOf[Transformer].transform(passengersDataSet)
+    val transformed = stageLoaded.asInstanceOf[Transformer].transform(passengersDataSet)
+    transformed.collect(stageLoaded.getOutput().asInstanceOf[FeatureLike[Real]]) shouldBe expected
+    stageLoaded.uid shouldBe stage.uid
+    stageLoaded.operationName shouldBe stage.operationName
+    stageLoaded.getInputFeatures() shouldBe stage.getInputFeatures()
+    stageLoaded.getInputSchema() shouldBe stage.getInputSchema()
+  }
+  it should "load stage correctly with spark as false" in {
+    val reader = new OpPipelineStageReader(stage)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, asSpark = false)
     stageLoaded shouldBe a[OpPipelineStageBase]
     stageLoaded shouldBe a[Transformer]
     stageLoaded.getOutput() shouldBe a[FeatureLike[_]]

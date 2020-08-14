@@ -43,7 +43,7 @@ import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
 import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.util.SparkUtils
-import org.json4s.JsonAST.{JObject, JValue}
+import org.json4s.JsonAST.{JBool, JObject, JValue}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
 import org.json4s.{DefaultFormats, Formats, JString}
@@ -66,9 +66,10 @@ class SparkStageParam[S <: PipelineStage with Params]
    */
   var savePath: Option[String] = None
   @transient var sbc: Option[SparkBundleContext] = None
+  var localTransformer: Option[MLeapTransformer] = None
 
   def this(parent: String, name: String, doc: String) =
-    this(parent, name, doc, (v: Option[S]) => true)
+    this(parent, name, doc, (_: Option[S]) => true)
 
   def this(parent: Identifiable, name: String, doc: String, isValid: Option[S] => Boolean) =
     this(parent.uid, name, doc, isValid)
@@ -103,11 +104,12 @@ class SparkStageParam[S <: PipelineStage with Params]
     }
   }
 
-  private def getPathUid(jsonStr: String): (Option[String], Option[String]) = {
+  private def getPathUid(jsonStr: String): (Option[String], Option[String], Option[Boolean]) = {
     val json = parse(jsonStr)
     val uid = (json \ "uid").extractOpt[String]
     val path = (json \ "path").extractOpt[String]
-    path -> uid
+    val asSpark = (json \ "asSpark").extractOpt[Boolean]
+    (path, uid, asSpark)
   }
 
 
@@ -116,12 +118,16 @@ class SparkStageParam[S <: PipelineStage with Params]
    * to recover the stage.
    */
   override def jsonDecode(jsonStr: String): Option[S] = {
-    val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMLleap(jsonStr, asSpark = true)
-    println(jsonStr)
-    println(dirBundle.collect{ case Left(s) => s })
-    dirBundle.collect{ case Left(s) => s }.orElse { // for backwards compatibility
+    val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMLleap(jsonStr)
+    dirBundle.flatMap{
+      case Right(mleap) =>
+        localTransformer = Option(mleap)
+        None
+      case Left(spark) => Option(spark)
+    }.orElse { // for backwards compatibility
       getPathUid(jsonStr) match {
-        case (Some(p), Some(stageUid)) =>
+        case (_, Some(NoUID), _) => None
+        case (Some(p), Some(stageUid), _) =>
           val stagePath = new Path(p, stageUid).toString
           val json = parse(jsonStr)
           val className = (json \ "className").extract[String]
@@ -146,15 +152,16 @@ class SparkStageParam[S <: PipelineStage with Params]
    * Decodes the saved path string and uses the Pipeline.load method
    * to recover the stage as an Mleap transformer
    */
-  def jsonDecodeMLleap[S](jsonStr: String, asSpark: Boolean = false): Option[Either[S, MLeapTransformer]] = {
+  def jsonDecodeMLleap(jsonStr: String): Option[Either[S, MLeapTransformer]] = {
     getPathUid(jsonStr) match {
-      case (None, _) | (_, None) | (_, Some(NoUID)) =>
+      case (None, _, _) | (_, None, _) | (_, Some(NoUID), _) =>
         savePath = None
         None
-      case (Some(p), Some(stageUid)) =>
+      case (Some(p), Some(stageUid), asSpark) =>
         savePath = Option(p)
+        println(asSpark)
         val loaded = for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
-          if (asSpark) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
+          if (asSpark.getOrElse(false)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
           else Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
         }
         loaded.opt
@@ -168,11 +175,13 @@ object SparkStageParam {
   val NoClass = ""
   val NoUID = ""
 
-  def updateParamsMetadataWithPath(jValue: JValue, path: String): JValue = jValue match {
+  def updateParamsMetadataWithPath(jValue: JValue, path: String, asSpark: Boolean): JValue = jValue match {
     case JObject(pairs) => JObject(
       pairs.map {
         case (SparkWrapperParams.SparkStageParamName, j) =>
-          SparkWrapperParams.SparkStageParamName -> j.merge(JObject("path" -> JString(path)))
+          SparkWrapperParams.SparkStageParamName -> j
+            .merge(JObject("path" -> JString(path)))
+            .merge(JObject("asSpark" -> JBool(asSpark)))
         case param => param
       }
     )
