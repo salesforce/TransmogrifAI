@@ -127,7 +127,7 @@ class SparkStageParam[S <: PipelineStage with Params]
     }.orElse { // for backwards compatibility
       getPathUid(jsonStr) match {
         case (_, Some(NoUID), _) => None
-        case (Some(p), Some(stageUid), _) =>
+        case (Some(p), Some(stageUid), Some(true)) =>
           val stagePath = new Path(p, stageUid).toString
           val json = parse(jsonStr)
           val className = (json \ "className").extract[String]

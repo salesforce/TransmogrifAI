@@ -75,23 +75,18 @@ trait OpWorkflowModelLocal extends Serializable {
     /**
      * Prepares a score function for local scoring
      *
-     * @param spark Spark Session needed for preparing scoring function,
-     *              Once scoring function is returned the Spark Session can be shutdown
-     *              since it's not required during local scoring.
      * @return score function for local scoring
      */
-    def scoreFunction(implicit spark: SparkSession): ScoreFunction = {
+    def scoreFunction: ScoreFunction = {
       // Prepare the stages for scoring
       val stagesWithIndex = model.getStages().zipWithIndex
 
-      // Prepare an empty DataFrame with transformed schema & metadata (needed for loading MLeap models)
-      // val transformedData = makeTransformedDataFrame(model)
-
       // Collect all OP stages
+      // todo fix wrapped predictors
       val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => OPModel(s.getOutputFeatureName, s) -> i }
 
       // Collect all Spark wrapped stages
-      val mleapStages = stagesWithIndex.collect { // TODO - this will likely fail on the predictors
+      val mleapStages = stagesWithIndex.filterNot(_._1.isInstanceOf[OpTransformer]).collect {
         case (opStage: OPStage with SparkWrapperParams[_], i) if opStage.getLocalMlStage().isDefined =>
           val model = opStage.getLocalMlStage().get
           MLeapModel(
@@ -111,6 +106,7 @@ trait OpWorkflowModelLocal extends Serializable {
         val transformedRow = allStages.foldLeft(inputMap) {
           // For OP Models we simply call transform
           case (row, OPModel(output, stage)) =>
+            println(row)
             row += output -> stage.transformKeyValue(row.apply)
 
           // For MLeap models we call the prepared local model

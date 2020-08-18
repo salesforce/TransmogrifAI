@@ -67,11 +67,11 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    */
   final def load(path: String): OpWorkflowModel = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    FileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path))
     Try(FileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
       .flatMap(loadJson(_, path = path)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
+
     }
   }
 
