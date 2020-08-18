@@ -159,7 +159,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     model.save(modelLocation2)
 
     // Load and score the model
-    val scoreFn = OpWorkflowModel.load(modelLocation2).scoreFunction
+    val scoreFn = OpWorkflowModel.load(modelLocation2, asSpark = false).scoreFunction
     scoreFn shouldBe a[ScoreFunction]
     val rawData = ds.withColumn(KeyFieldName, col(id)).sort(KeyFieldName).collect().map(_.toMap)
     val scores = rawData.map(scoreFn)
@@ -194,7 +194,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
     prediction: FeatureLike[Prediction]
   ): Unit = {
-    val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
+    val scoreFn = OpWorkflowModel.load(modelLocation, asSpark = false).scoreFunction
     scoreFn shouldBe a[ScoreFunction]
     val scores = rawData.map(scoreFn)
     assert(scores, expectedScores, prediction)

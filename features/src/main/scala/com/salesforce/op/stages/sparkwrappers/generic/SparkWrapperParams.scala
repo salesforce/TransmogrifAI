@@ -37,6 +37,7 @@ import org.apache.spark.ml.param.{Params, StringArrayParam}
 import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
 
 
 /**
@@ -77,6 +78,14 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
    * @return Option of spark ml stage
    */
   def getSparkMlStage(): Option[S] = $(sparkMlStage)
+
+  /**
+   * Method to access the local version of stage being wrapped
+   *
+   * @return Option of ml leap runtime version of the spark stage after reloading as local
+   */
+  def getLocalMlStage(): Option[MLeapTransformer] = sparkMlStage.localTransformer
+
 
   /**
    * XGBoost model save requires a non-empty dataframe to save correctly with Mleap
