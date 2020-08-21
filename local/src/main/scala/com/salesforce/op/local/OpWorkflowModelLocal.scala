@@ -34,7 +34,6 @@ package com.salesforce.op.local
 import com.salesforce.op.OpWorkflowModel
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.{OPStage, OpTransformer}
-import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 
@@ -106,7 +105,6 @@ trait OpWorkflowModelLocal extends Serializable {
         val transformedRow = allStages.foldLeft(inputMap) {
           // For OP Models we simply call transform
           case (row, OPModel(output, stage)) =>
-            println(row)
             row += output -> stage.transformKeyValue(row.apply)
 
           // For MLeap models we call the prepared local model

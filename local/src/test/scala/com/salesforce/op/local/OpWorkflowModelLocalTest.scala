@@ -113,9 +113,9 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
   }
 
   it should "produce scores without Spark in timely fashion" in {
-    val scoreFn = model.scoreFunction
+    val loadedModel = OpWorkflowModel.load(modelLocation, asSpark = false)
+    val scoreFn = loadedModel.scoreFunction
     scoreFn shouldBe a[ScoreFunction]
-    val warmUp = rawData.map(scoreFn)
     val numOfRuns = 1000
     var elapsed = 0L
     for {_ <- 0 until numOfRuns} {
@@ -194,7 +194,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
     prediction: FeatureLike[Prediction]
   ): Unit = {
-    val scoreFn = OpWorkflowModel.load(modelLocation, asSpark = false).scoreFunction
+    val loadedModel = OpWorkflowModel.load(modelLocation, asSpark = false)
+    val scoreFn = loadedModel.scoreFunction
     scoreFn shouldBe a[ScoreFunction]
     val scores = rawData.map(scoreFn)
     assert(scores, expectedScores, prediction)
@@ -208,7 +209,6 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     val workflow = new OpWorkflow().setInputDataset(rawDF).setResultFeatures(prediction, labelSynth, indexed, deindexed)
     lazy val model = workflow.train()
     rawDF.show(10)
-    Seq(model.getStages().toList)
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)

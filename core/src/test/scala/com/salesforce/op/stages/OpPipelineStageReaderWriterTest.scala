@@ -60,7 +60,6 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   private lazy val writer = new OpPipelineStageWriter(stage)
   private lazy val stageJsonString: String = writer.writeToJsonString(savePath)
   private lazy val stageJson: JValue = parse(stageJsonString)
-  private lazy val isModel = stage.isInstanceOf[Model[_]]
   private val FN = FieldNames
 
   Spec(this.getClass) should "write stage uid" in {
@@ -82,7 +81,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "write outputMetadata" in {
     val params = extractParams(stageJson)
-    val metadataStr = compact(render(extractParams(stageJson) \ "outputMetadata"))
+    val metadataStr = compact(render(params \ "outputMetadata"))
     val metadata = Metadata.fromJson(metadataStr)
     metadata shouldBe stage.getMetadata()
   }
