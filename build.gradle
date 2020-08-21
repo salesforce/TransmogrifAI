@@ -213,6 +213,7 @@ configure(allProjs) {
                 '**/com/salesforce/op/test/*.java',
                 '**/com/fasterxml/jackson/module/scala/**',
                 '**/com/salesforce/op/utils/stats/StreamingHistogram.java',
+                '**/com/salesforce/app/schema/PassengerDataAll.java',
                 '**/templates/**', '**/resources/**'
     }
     scoverage {

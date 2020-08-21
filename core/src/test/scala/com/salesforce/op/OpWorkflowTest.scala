@@ -130,7 +130,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     wf.rawFeatureFilter.get.isInstanceOf[RawFeatureFilter[_]] shouldBe true
   }
 
-  it should "correctly remove blacklisted features when possible" in {
+  it should "correctly remove blocklisted features when possible" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val checked = survivedNum.sanityCheck(fv)
@@ -141,9 +141,9 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     wf.getRawFeatures() should contain theSameElementsAs
       Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
 
-    val blacklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
-    wf.setBlacklist(blacklist, Seq.empty)
-    wf.getBlacklist() should contain theSameElementsAs blacklist
+    val blocklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
+    wf.setBlocklist(blocklist, Seq.empty)
+    wf.getBlocklist() should contain theSameElementsAs blocklist
     wf.getRawFeatures() should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
     wf.getResultFeatures().flatMap(_.rawFeatures).distinct.sortBy(_.name) should contain theSameElementsAs
@@ -169,7 +169,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     data.first().getAs[Vector](1).size shouldEqual OpVectorMetadata("", data.schema(1).metadata).columns.size
   }
 
-  it should "allow you to interact with updated features when things are blacklisted and" +
+  it should "allow you to interact with updated features when things are blocklisted and" +
     " features should have distributions" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
@@ -205,13 +205,13 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     data.select(whyNotNormed2.name, prob2.name).count() shouldBe 6
   }
 
-  it should "throw an error when it is not possible to remove blacklisted features" in {
+  it should "throw an error when it is not possible to remove blocklisted features" in {
     val wf = new OpWorkflow()
       .setResultFeatures(whyNotNormed)
       .withRawFeatureFilter(Option(dataReader), None)
 
     val error = intercept[RuntimeException](
-      wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
+      wf.setBlocklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     )
     error.getMessage.contains("creation of required result feature (height-weight_4-stagesApplied_Real")
   }
@@ -221,7 +221,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .setResultFeatures(whyNotNormed, weight)
       .withRawFeatureFilter(Option(dataReader), None, resultFeatureRetentionPolicy = ResultFeatureRetention.AtLeastOne)
 
-    wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
+    wf.setBlocklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     wf.getResultFeatures().map(_.name) shouldEqual Seq(weight).map(_.name)
   }
 

@@ -60,7 +60,7 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
      * off by default
      */
     val modelTypesToUse: Seq[BinaryClassificationModelsToTry] = Seq(
-      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpGBTClassifier
+      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpXGBoostClassifier
     )
 
     /**
@@ -122,9 +122,15 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       val xgb = new OpXGBoostClassifier()
       val xgbParams = new ParamGridBuilder()
         .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+        .addGrid(xgb.numEarlyStoppingRounds, DefaultSelectorParams.EarlyStopping)
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
-        .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(xgb.gamma, DefaultSelectorParams.BinaryClassXGBGamma)
+        .addGrid(xgb.maxDepth, DefaultSelectorParams.BinaryClassMaxDepthXGB)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
+        .addGrid(xgb.missing, DefaultSelectorParams.MissingValPad)
+        .addGrid(xgb.maximizeEvaluationMetrics, DefaultSelectorParams.MaximizeEvaluationMetrics)
+        .addGrid(xgb.evalMetric, DefaultSelectorParams.BinaryClassXGBEvaluationMetric)
+        .addGrid(xgb.objective, DefaultSelectorParams.BinaryClassXGBObjective)
 
       Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams,
         nb -> nbParams, dt -> dtParams, xgb -> xgbParams)
@@ -142,8 +148,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
    * @param splitter            instance that will balance and split the data
    * @param numFolds            number of folds for cross validation (>= 2)
    * @param validationMetric    metric name in evaluation: AuROC or AuPR
-   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                            and default evaluator is added to this list (here Evaluators.BinaryClassification)
+   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is
+   *                            the standard OpBinaryClassificationEvaluator and OpBinScoreEvaluator.
    * @param seed                random seed
    * @param stratify            whether or not stratify cross validation. Caution : setting that param to true might
    *                            impact the runtime
@@ -164,7 +170,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics] =
     Evaluators.BinaryClassification.auPR(),
-    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
+    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq(
+      new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator),
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
@@ -176,9 +183,13 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       numFolds = numFolds, seed = seed, evaluator = validationMetric, stratify = stratify,
       parallelism = parallelism, maxWait = maxWait
     )
+    // For backwards compatibility, make sure evaluators always include the defaults
+    val allEvaluators = addDefaultEvaluators(trainTestEvaluators, Seq(
+      new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator))
+
     selector(cv,
       splitter = splitter,
-      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator) ++ trainTestEvaluators,
+      trainTestEvaluators = allEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
       modelDefaults = Defaults
@@ -191,8 +202,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
    * @param splitter            instance that will balance and split the data
    * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
    * @param validationMetric    metric name in evaluation: AuROC or AuPR
-   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                            and default evaluator is added to this list (here Evaluators.BinaryClassification)
+   * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is
+   *                            the standard OpBinaryClassificationEvaluator and OpBinScoreEvaluator.
    * @param seed                random seed
    * @param stratify            whether or not stratify train validation split.
    *                            Caution : setting that param to true might impact the runtime
@@ -213,7 +224,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics] =
     Evaluators.BinaryClassification.auPR(),
-    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
+    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq(
+      new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator),
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
@@ -225,9 +237,13 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism,
       maxWait = maxWait
     )
+    // For backwards compatibility, make sure evaluators always include the defaults
+    val allEvaluators = addDefaultEvaluators(trainTestEvaluators, Seq(
+      new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator))
+
     selector(ts,
       splitter = splitter,
-      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
+      trainTestEvaluators = allEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
       modelDefaults = Defaults

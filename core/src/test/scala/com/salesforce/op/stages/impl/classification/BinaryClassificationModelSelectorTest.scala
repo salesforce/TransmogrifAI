@@ -307,14 +307,14 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
       largerBetter = false,
       evaluateFn = crossEntropyFun
     )
-
+    val customEvaluators = Seq(crossEntropy)
     val testEstimator =
       BinaryClassificationModelSelector
         .withCrossValidation(
           Option(DataSplitter(reserveTestFraction = 0.2)),
           numFolds = 4,
           validationMetric = Evaluators.BinaryClassification.recall(),
-          trainTestEvaluators = Seq(crossEntropy),
+          trainTestEvaluators = customEvaluators,
           seed = 10L,
           modelsAndParameters = models
         )
@@ -330,6 +330,9 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     val trainMetaData = metaData.trainEvaluation
     val holdOutMetaData = metaData.holdoutEvaluation.get
+
+    // check that the default evaluator(s) got added to the list of evaluators
+    testEstimator.evaluators.length should be > customEvaluators.size
 
     testEstimator.evaluators.foreach {
       case evaluator: OpBinaryClassificationEvaluator => {

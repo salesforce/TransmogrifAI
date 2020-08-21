@@ -30,9 +30,6 @@
 
 package com.salesforce.op.utils.io.avro
 
-import java.net.URI
-import java.nio.file.FileSystems
-
 import com.salesforce.op.utils.spark.RichRDD._
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -46,6 +43,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
+import scala.util.Try
 
 
 /**
@@ -86,16 +84,12 @@ object AvroInOut {
   }
 
   private[avro] def selectExistingPaths(path: String)(implicit sc: SparkSession): String = {
-    val paths = Option(path).map(_.split(',')).getOrElse(Array.empty)
-    val fs = try {
-      val separator = FileSystems.getDefault.getSeparator
-      val firstPath = paths.head.split(separator)
-      val bucket = firstPath.slice(0, math.min(4, firstPath.length)).mkString(separator)
-      FileSystem.get(new URI(bucket), sc.sparkContext.hadoopConfiguration)
-    } catch {
-      case ex: Exception => throw new IllegalArgumentException(s"Bad path '$path': ${ex.getMessage}")
-    }
-    val found = paths.filter(p => fs.exists(new Path(p)))
+    val paths = Option(path).map(_.split(',')).getOrElse(Array.empty).map(new Path(_))
+    val found = paths.headOption.flatMap(firstPath =>
+      Try(firstPath.getFileSystem(sc.sparkContext.hadoopConfiguration)).recover { case t =>
+        throw new IllegalArgumentException(s"Bad path '$path': ${t.getMessage}", t)
+      }.toOption)
+      .map(fs => paths.filter(fs.exists)).getOrElse(Array.empty)
     if (found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in path '$path'")
     found.mkString(",")
   }

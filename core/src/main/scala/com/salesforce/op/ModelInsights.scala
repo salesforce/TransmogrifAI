@@ -59,7 +59,7 @@ import org.json4s.jackson.Serialization._
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
-import scala.util.Try
+import scala.util.{Success, Try}
 
 /**
  * Summary of all model insights
@@ -400,8 +400,8 @@ case object ModelInsights {
       classOf[Continuous], classOf[Discrete],
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
       classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
-      classOf[BinaryClassificationBinMetrics], classOf[ThresholdMetrics],
-      classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
+      classOf[BinaryClassificationBinMetrics], classOf[MulticlassThresholdMetrics],
+      classOf[BinaryThresholdMetrics], classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
     ))
     val evalMetricsSerializer = new CustomSerializer[EvalMetric](_ =>
       ( { case JString(s) => EvalMetric.withNameInsensitive(s) },
@@ -436,8 +436,8 @@ case object ModelInsights {
    * @param stages                  stages used to make the feature
    * @param rawFeatures             raw features in the workflow
    * @param trainingParams          parameters used to create the workflow model
-   * @param blacklistedFeatures     blacklisted features from use in DAG
-   * @param blacklistedMapKeys      blacklisted map keys from use in DAG
+   * @param blocklistedFeatures     blocklisted features from use in DAG
+   * @param blocklistedMapKeys      blocklisted map keys from use in DAG
    * @param rawFeatureFilterResults results of raw feature filter
    * @return
    */
@@ -445,8 +445,8 @@ case object ModelInsights {
     stages: Array[OPStage],
     rawFeatures: Array[features.OPFeature],
     trainingParams: OpParams,
-    blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]],
+    blocklistedFeatures: Array[features.OPFeature],
+    blocklistedMapKeys: Map[String, Set[String]],
     rawFeatureFilterResults: RawFeatureFilterResults
   ): ModelInsights = {
 
@@ -523,7 +523,7 @@ case object ModelInsights {
     ModelInsights(
       label = labelSummary,
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, labelSummary),
+        blocklistedFeatures, blocklistedMapKeys, rawFeatureFilterResults, labelSummary),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -571,8 +571,8 @@ case object ModelInsights {
     summary: Option[SanityCheckerSummary],
     model: Option[Model[_]],
     rawFeatures: Array[features.OPFeature],
-    blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]],
+    blocklistedFeatures: Array[features.OPFeature],
+    blocklistedMapKeys: Map[String, Set[String]],
     rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults(),
     label: LabelSummary
   ): Seq[FeatureInsights] = {
@@ -636,7 +636,10 @@ case object ModelInsights {
               derivedFeatureName = h.columnName,
               stagesApplied = h.parentFeatureStages,
               derivedFeatureGroup = h.grouping,
-              derivedFeatureValue = h.indicatorValue,
+              derivedFeatureValue = h.indicatorValue match {
+                case Some(_) => h.indicatorValue
+                case _ => h.descriptorValue
+              },
               excluded = Option(s.dropped.contains(h.columnName)),
               corr = getCorr(s.correlations, h.columnName),
               cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
@@ -675,12 +678,12 @@ case object ModelInsights {
       case (None, _) => Seq.empty
     }
 
-    val blacklistInsights = blacklistedFeatures.map{ f =>
+    val blocklistInsights = blocklistedFeatures.map{ f =>
       Seq(f.name) -> Insights(derivedFeatureName = f.name, stagesApplied = Seq.empty, derivedFeatureGroup = None,
         derivedFeatureValue = None, excluded = Some(true))
     }
 
-    val blacklistMapInsights = blacklistedMapKeys.toArray.flatMap { case (mname, keys) =>
+    val blocklistMapInsights = blocklistedMapKeys.toArray.flatMap { case (mname, keys) =>
       keys.toArray.map(key => {
         Seq(mname) ->
           Insights(derivedFeatureName = key, stagesApplied = Seq.empty, derivedFeatureGroup = Some(key),
@@ -688,8 +691,8 @@ case object ModelInsights {
       })
     }
 
-    val allInsights = featureInsights ++ blacklistInsights ++ blacklistMapInsights
-    val allFeatures = rawFeatures ++ blacklistedFeatures
+    val allInsights = featureInsights ++ blocklistInsights ++ blocklistMapInsights
+    val allFeatures = rawFeatures ++ blocklistedFeatures
 
     allInsights
       .flatMap { case (feature, insights) => feature.map(_ -> insights) }
@@ -712,11 +715,9 @@ case object ModelInsights {
             sensitiveInformation = sensitiveFeatureInformation
           )
       }.toSeq ++ {
-        /*
-          Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata.
-          With current TMOG settings, this will not happen unless null tracking is turned off since
-          null indicators are created for all text features, even ignored ones.
-        */
+        //  Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata.
+        //  With current TMOG settings, this will not happen unless null tracking is turned off since
+        //  null indicators are created for all text features, even ignored ones.
         vectorInfo match {
           case Some(v) =>
             // Find features where `actionTaken` is true for all of the sensitive feature informations
@@ -798,8 +799,22 @@ case object ModelInsights {
       case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
-      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+      case m: XGBoostRegressionModel =>
+        Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
+          case Success(contrib) => contrib
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
+            case _ => Seq(Seq.empty)
+          }
+        }
+      case m: XGBoostClassificationModel =>
+        Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
+          case Success(contrib) => contrib
+          case _ => featureVectorSize match {
+            case Some(n) => Seq(Array.ofDim[Double](n).toIndexedSeq)
+            case _ => Seq(Seq.empty)
+          }
+        }
     }
     contributions.getOrElse(Seq.empty)
   }
