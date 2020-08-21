@@ -91,7 +91,7 @@ trait OpWorkflowModelLocal extends Serializable {
           MLeapModel(
             inputs = opStage.getTransientFeatures().map(_.name),
             output = opStage.getOutputFeatureName,
-            modelFn = MLeapModelConverter.modelToFunction(model)
+            modelFn = MLeapModelConverter.modelToFunction(model.model)
           ) -> i
       }
 

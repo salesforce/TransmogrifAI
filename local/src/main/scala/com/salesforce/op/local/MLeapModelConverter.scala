@@ -46,48 +46,7 @@ case object MLeapModelConverter {
    * @return runnable model apply function
    */
   def modelToFunction(model: Any): Array[Any] => Any = model match {
-    // model wrapped in transformer // TODO look into applying transform directly
-    case m: Binarizer => x => m.model.apply(x(0).asInstanceOf[Number].doubleValue())
-    case m: BucketedRandomProjectionLSH => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: Bucketizer => x => m.model.apply(x(0).asInstanceOf[Number].doubleValue())
-    case m: ChiSqSelector => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: Coalesce => x => m.model.apply(x: _*)
-    case m: CountVectorizer => x => m.model.apply(x(0).asInstanceOf[Seq[String]])
-    case m: DCT => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: ElementwiseProduct => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: FeatureHasher => x => m.model.apply(x(0).asInstanceOf[Seq[Any]])
-    case m: HashingTermFrequency => x => m.model.apply(x(0).asInstanceOf[Seq[Any]])
-    case m: IDF => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: Imputer => x => m.model.apply(x(0).asInstanceOf[Number].doubleValue())
-    case m: Interaction => x => m.model.apply(x(0).asInstanceOf[Seq[Any]])
-    case m: MathBinary => x => m.model.apply(
-        x.headOption.map(_.asInstanceOf[Number].doubleValue()),
-        x.lastOption.map(_.asInstanceOf[Number].doubleValue())
-      )
-    case m: MathUnary => x => m.model.apply(x(0).asInstanceOf[Number].doubleValue())
-    case m: MaxAbsScaler => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: MinHashLSH => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: MinMaxScaler => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: NGram => x => m.model.apply(x(0).asInstanceOf[Seq[String]])
-    case m: Normalizer => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: OneHotEncoder => x => m.model.apply(x(0).asInstanceOf[Vector].toArray)
-    case m: Pca => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: PolynomialExpansion => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: RegexIndexer => x => m.model.apply(x(0).toString)
-    case m: RegexTokenizer => x => m.model.apply(x(0).toString)
-    case m: ReverseStringIndexer => x => m.model.apply(x(0).asInstanceOf[Number].intValue())
-    case m: StandardScaler => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: StopWordsRemover => x => m.model.apply(x(0).asInstanceOf[Seq[String]])
-    case m: StringIndexer => x => m.model.apply(x(0))
-    case m: StringMap => x => m.model.apply(x(0).toString)
-    case m: Tokenizer => x => m.model.apply(x(0).toString)
-    case m: VectorAssembler => x => m.model.apply(x(0).asInstanceOf[Seq[Any]])
-    case m: VectorIndexer => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: VectorSlicer => x => m.model.apply(x(0).asInstanceOf[Vector])
-    case m: WordLengthFilter => x => m.model.apply(x(0).asInstanceOf[Seq[String]])
-    case m: WordToVector => x => m.model.apply(x(0).asInstanceOf[Seq[String]])
-
-    // just the underlying model
+    // TODO look into applying transform directly rather than using the model apply
     case m: BinarizerModel => x => m.apply(x(0).asInstanceOf[Number].doubleValue())
     case m: BucketedRandomProjectionLSHModel => x => m.apply(x(0).asInstanceOf[Vector])
     case m: BucketizerModel => x => m.apply(x(0).asInstanceOf[Number].doubleValue())
