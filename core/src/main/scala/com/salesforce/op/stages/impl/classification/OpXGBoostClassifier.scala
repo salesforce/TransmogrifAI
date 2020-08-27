@@ -384,9 +384,7 @@ class OpXGBoostClassificationModel
       .orElse{
         getLocalMlStage().map(_.model.asInstanceOf[MleapXGBoostClassificationModel])
           .map{ model => (model.booster, model.treeLimit, Float.NaN, model.numClasses) }
-      }.getOrElse(
-      throw new RuntimeException("Could not find spark or local wrapped XGBoost")
-    )
+      }.getOrElse( throw new RuntimeException("Could not find spark or local wrapped XGBoost") )
   }
 
   override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {

@@ -154,9 +154,8 @@ class OpLinearSVCModel
   @transient lazy private val predictRaw = getSparkOrLocalMethod("predictRaw", "predictRaw")
   @transient lazy private val predict: Vector => Double =
     getSparkMlStage().map(s => s.predict(_))
-      .orElse(
-        getLocalMlStage().map(s => s.model.asInstanceOf[MleapLinearSVCModel].predict(_))
-      ).get
+      .orElse( getLocalMlStage().map(s => s.model.asInstanceOf[MleapLinearSVCModel].predict(_) )
+      ).getOrElse( throw new RuntimeException("Failed to find wrapped stage for LinearSVC") )
 
   /**
    * Function used to convert input to output

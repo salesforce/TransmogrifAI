@@ -128,10 +128,8 @@ class OpRandomForestRegressionModel
 ) extends OpPredictionModel[RandomForestRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ){
-  @transient val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
-    .orElse(getLocalMlStage().map(s => s.model.asInstanceOf[MleapRandomForestRegressionModel].predict(_)))
-    .getOrElse(
-      throw new RuntimeException(s"Could not find the wrapped Spark stage.")
-    )
+  @transient lazy protected val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
+    .orElse( getLocalMlStage().map(s => s.model.asInstanceOf[MleapRandomForestRegressionModel].predict(_)) )
+    .getOrElse( throw new RuntimeException(s"Could not find the wrapped Spark stage.") )
 }
 

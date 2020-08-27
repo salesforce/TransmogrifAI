@@ -366,8 +366,8 @@ class OpXGBoostRegressionModel
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ) {
   import OpXGBoost._
-  private lazy val localModel = getLocalMlStage().map(s => s.model.asInstanceOf[MleapXGBoostRegressionModel])
-  @transient val predict: Vector => Double = {
+  @transient private lazy val localModel = getLocalMlStage().map(s => s.model.asInstanceOf[MleapXGBoostRegressionModel])
+  @transient lazy protected val predict: Vector => Double = {
     getSparkMlStage().map(s => s.predict(_))
       .getOrElse{
         features: Vector => {

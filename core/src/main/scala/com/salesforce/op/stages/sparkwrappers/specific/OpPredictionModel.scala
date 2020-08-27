@@ -61,7 +61,7 @@ abstract class OpPredictionModel[T <: PredictionModel[Vector, T] : ClassTag]
   /**
    * Function used to convert input to output
    */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) =>
+  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) =>
     Prediction(prediction = predict(features.value))
 
 }

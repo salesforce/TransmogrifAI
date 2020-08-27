@@ -184,7 +184,7 @@ class OpGeneralizedLinearRegressionModel
   sparkModel = sparkModel) {
 
   @transient lazy private val predictLink = getSparkOrLocalMethod("predictLink", "predictLink")
-  @transient lazy private val predict = getSparkOrLocalMethod("predict", "predict", argsCount = Some(2))
+  @transient lazy protected val predict = getSparkOrLocalMethod("predict", "predict", argsCount = Some(2))
 
   /**
    * Function used to convert input to output
