@@ -86,6 +86,14 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
    */
   def getLocalMlStage(): Option[MLeapTransformer] = sparkMlStage.localTransformer
 
+  /**
+   * method to set local stage for recovered wrapped stages after loading
+   * @param stage
+   */
+  private[op] def setLocalMlStage(stage: MLeapTransformer): this.type = {
+    sparkMlStage.localTransformer = Option(stage)
+    this
+  }
 
   /**
    * XGBoost model save requires a non-empty dataframe to save correctly with Mleap

@@ -107,7 +107,7 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val modelApply = model match {
     case m: SelectedModel => m.transformFn
     case m: OpPredictorWrapperModel[_] => m.transformFn
-    case m => toOPUnchecked(m).transformFn
+    case m => toOPUnchecked(m, m.uid).transformFn
   }
   private val labelDummy = RealNN(0.0)
   private lazy val histories = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory()

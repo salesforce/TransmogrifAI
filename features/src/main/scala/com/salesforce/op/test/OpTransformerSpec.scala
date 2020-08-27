@@ -171,9 +171,10 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
   protected def writeAndRead(
     stage: TransformerType, savePath: String = stageSavePath, asSpark: Boolean = true
   ): OpPipelineStageBase = {
-    val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
+    val pth = "/Users/lmcguire/Desktop/tmp"
+    val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(pth)
     val features = stage.getInputFeatures().flatMap(_.allFeatures)
-    new OpPipelineStageReader(features).loadFromJsonString(json, savePath, asSpark)
+    new OpPipelineStageReader(features).loadFromJsonString(json, pth, asSpark)
   }
 
   /**

@@ -34,9 +34,9 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
-import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel => MleapXGBoostClassificationModel}
+import ml.combust.mleap.xgboost.runtime.{XGBoostClassificationModel => MleapXGBoostClassificationModel}
 import ml.dmlc.xgboost4j.scala.spark._
-import ml.dmlc.xgboost4j.scala.{DMatrix, EvalTrait, ObjectiveTrait}
+import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait}
 import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
@@ -377,20 +377,23 @@ class OpXGBoostClassificationModel
 
   @transient lazy val probability2predictionMirror = getSparkOrLocalMethod("probability2prediction",
     "probabilityToPrediction")
-  private lazy val model = getSparkMlStage()
-    .orElse(getLocalMlStage().model.asInstanceOf[MleapXGBoostClassificationModel])
-    .get
-  private lazy val booster = model.nativeBooster
-  private lazy val treeLimit = model.getTreeLimit
-  private lazy val missing = model.getMissing
+
+  private lazy val (booster: Booster, treeLim: Int, missing: Float, numClasses: Int) = {
+    getSparkMlStage()
+      .map{ model => (model.nativeBooster, model.getTreeLimit, model.getMissing, model.numClasses) }
+      .orElse{
+        getLocalMlStage().map(_.model.asInstanceOf[MleapXGBoostClassificationModel])
+          .map{ model => (model.booster, model.treeLimit, Float.NaN, model.numClasses) }
+      }.get
+  }
 
   override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {
     val data = processMissingValues(Iterator(features.value.asXGB), missing)
     val dm = new DMatrix(dataIter = data)
-    val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
-    val rawPrediction = if (model.numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
-    val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
-    val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
+    val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLim)(0).map(_.toDouble)
+    val rawPrediction = if (numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
+    val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLim)(0).map(_.toDouble)
+    val probability = if (numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
     val prediction = probability2predictionMirror(Vectors.dense(probability)).asInstanceOf[Double]
 
     Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)

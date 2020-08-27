@@ -31,9 +31,10 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
-import ml.combust.bundle.BundleFile
+import ml.combust.bundle.{BundleContext, BundleFile, BundleRegistry}
 import ml.combust.bundle.dsl.Bundle
 import ml.combust.bundle.serializer.SerializationFormat
+import ml.combust.mleap.xgboost.runtime.bundle.ops.{XGBoostRegressionOp, XGBoostClassificationOp}
 import ml.combust.mleap.spark.SparkSupport._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.bundle.SparkBundleContext
@@ -119,7 +120,6 @@ class SparkStageParam[S <: PipelineStage with Params]
    */
   override def jsonDecode(jsonStr: String): Option[S] = {
     val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMLleap(jsonStr)
-    println(dirBundle.get)
     dirBundle.flatMap{
       case Right(mleap) =>
         localTransformer = Option(mleap)
@@ -154,7 +154,6 @@ class SparkStageParam[S <: PipelineStage with Params]
    * to recover the stage as an Mleap transformer
    */
   def jsonDecodeMLleap(jsonStr: String): Option[Either[S, MLeapTransformer]] = {
-    println(getPathUid(jsonStr))
     getPathUid(jsonStr) match {
       case (None, _, _) | (_, None, _) | (_, Some(NoUID), _) =>
         savePath = None
@@ -164,14 +163,12 @@ class SparkStageParam[S <: PipelineStage with Params]
         val loaded = for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
           if (asSpark.getOrElse(true)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
           else {
-            val tryload = bundle.loadMleapBundle()
-            println(tryload)
-            println(tryload.isFailure)
-            println(tryload.failed.get.getStackTrace.mkString("\n"))
+            implicitly[ml.combust.mleap.runtime.MleapContext].bundleRegistry
+              .register(new XGBoostRegressionOp)
+              .register(new XGBoostClassificationOp)
             Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
           }
         }
-        println(loaded.opt)
         loaded.opt
     }
   }
