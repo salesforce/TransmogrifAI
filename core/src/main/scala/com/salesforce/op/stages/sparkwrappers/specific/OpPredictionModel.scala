@@ -56,7 +56,7 @@ abstract class OpPredictionModel[T <: PredictionModel[Vector, T] : ClassTag]
   /**
    * Predict label for the given features
    */
-  @transient def predict: Vector => Double
+  @transient protected def predict: Vector => Double
 
   /**
    * Function used to convert input to output
