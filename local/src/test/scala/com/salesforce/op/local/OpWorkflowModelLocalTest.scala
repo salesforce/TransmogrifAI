@@ -116,6 +116,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     val loadedModel = OpWorkflowModel.load(modelLocation, asSpark = false)
     val scoreFn = loadedModel.scoreFunction
     scoreFn shouldBe a[ScoreFunction]
+    val warmUp = rawData.map(scoreFn)
     val numOfRuns = 1000
     var elapsed = 0L
     for {_ <- 0 until numOfRuns} {
@@ -184,6 +185,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
         deindexed.name -> deindexedV.value.orNull
       )
     } withClue(s"Record index $i: ") {
+      println(score)
+      println(expected)
       score shouldBe expected
     }
   }

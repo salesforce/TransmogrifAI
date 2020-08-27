@@ -372,7 +372,7 @@ class OpXGBoostRegressionModel
       .getOrElse{
         features: Vector => {
           val model = localModel.getOrElse(throw new RuntimeException(s"Could not find the wrapped Spark stage."))
-          val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), Float.NaN))
+          val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F))
           model.predict(data = dm)
         }
       }

@@ -383,7 +383,7 @@ class OpXGBoostClassificationModel
       .map{ model => (model.nativeBooster, model.getTreeLimit, model.getMissing, model.numClasses) }
       .orElse{
         getLocalMlStage().map(_.model.asInstanceOf[MleapXGBoostClassificationModel])
-          .map{ model => (model.booster, model.treeLimit, Float.NaN, model.numClasses) }
+          .map{ model => (model.booster, model.treeLimit, 0.0F, model.numClasses) }
       }.getOrElse( throw new RuntimeException("Could not find spark or local wrapped XGBoost") )
   }
 
