@@ -183,13 +183,13 @@ class OpGeneralizedLinearRegressionModel
 ) extends OpPredictorWrapperModel[GeneralizedLinearRegressionModel](uid = uid, operationName = operationName,
   sparkModel = sparkModel) {
 
-  @transient lazy private val predictLink = reflectMethod(getSparkMlStage().get, "predictLink")
-  @transient lazy private val predict = reflectMethod(getSparkMlStage().get, "predict", argsCount = Some(2))
+  @transient lazy private val predictLink = getSparkOrLocalMethod("predictLink", "predictLink")
+  @transient lazy private val predict = getSparkOrLocalMethod("predict", "predict", argsCount = Some(2))
 
   /**
    * Function used to convert input to output
    */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
+  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {
     val offset = 0.0
     val raw = predictLink(features.value, offset).asInstanceOf[Double]
     val pred = predict(features.value, offset).asInstanceOf[Double]

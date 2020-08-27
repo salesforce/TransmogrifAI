@@ -34,7 +34,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel => MleapXGBoostClassificationModel}
 import ml.dmlc.xgboost4j.scala.spark._
 import ml.dmlc.xgboost4j.scala.{DMatrix, EvalTrait, ObjectiveTrait}
 import org.apache.spark.ml.linalg.Vectors
@@ -375,10 +375,11 @@ class OpXGBoostClassificationModel
     throw new NotImplementedError(
       "XGBoost-Spark does not support 'raw2probability'. This might change in upcoming releases.")
 
-  @transient lazy val probability2predictionMirror =
-    reflectMethod(getSparkMlStage().get, "probability2prediction")
-
-  private lazy val model = getSparkMlStage().get
+  @transient lazy val probability2predictionMirror = getSparkOrLocalMethod("probability2prediction",
+    "probabilityToPrediction")
+  private lazy val model = getSparkMlStage()
+    .orElse(getLocalMlStage().model.asInstanceOf[MleapXGBoostClassificationModel])
+    .get
   private lazy val booster = model.nativeBooster
   private lazy val treeLimit = model.getTreeLimit
   private lazy val missing = model.getMissing

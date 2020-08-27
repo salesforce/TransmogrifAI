@@ -119,6 +119,7 @@ class SparkStageParam[S <: PipelineStage with Params]
    */
   override def jsonDecode(jsonStr: String): Option[S] = {
     val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMLleap(jsonStr)
+    println(dirBundle.get)
     dirBundle.flatMap{
       case Right(mleap) =>
         localTransformer = Option(mleap)
@@ -153,6 +154,7 @@ class SparkStageParam[S <: PipelineStage with Params]
    * to recover the stage as an Mleap transformer
    */
   def jsonDecodeMLleap(jsonStr: String): Option[Either[S, MLeapTransformer]] = {
+    println(getPathUid(jsonStr))
     getPathUid(jsonStr) match {
       case (None, _, _) | (_, None, _) | (_, Some(NoUID), _) =>
         savePath = None
@@ -161,8 +163,15 @@ class SparkStageParam[S <: PipelineStage with Params]
         savePath = Option(p)
         val loaded = for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
           if (asSpark.getOrElse(true)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
-          else Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
+          else {
+            val tryload = bundle.loadMleapBundle()
+            println(tryload)
+            println(tryload.isFailure)
+            println(tryload.failed.get.getStackTrace.mkString("\n"))
+            Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
+          }
         }
+        println(loaded.opt)
         loaded.opt
     }
   }

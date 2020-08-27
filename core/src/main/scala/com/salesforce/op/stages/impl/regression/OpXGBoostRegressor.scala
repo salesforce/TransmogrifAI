@@ -36,6 +36,8 @@ import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
 import ml.dmlc.xgboost4j.scala.{EvalTrait, ObjectiveTrait}
 import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostRegressorParams, TrackerConf, XGBoostRegressionModel, XGBoostRegressor}
+import org.apache.spark.ml.linalg.Vector
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostRegressionModel => MleapXGBoostRegressionModel}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -361,4 +363,11 @@ class OpXGBoostRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[XGBoostRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-)
+) {
+  @transient val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
+    .orElse(getLocalMlStage().map(s => s.model.asInstanceOf[MleapXGBoostRegressionModel].predict(_)))
+    .getOrElse(
+      throw new RuntimeException(s"Could not find the wrapped Spark stage.")
+    )
+}
+

@@ -34,6 +34,7 @@ import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import org.apache.spark.ml.PredictionModel
 import org.apache.spark.ml.linalg.Vector
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
@@ -45,7 +46,7 @@ import scala.reflect.runtime.universe._
  * @param operationName unique name of the operation this stage performs
  * @tparam T type of the model to wrap
  */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
+abstract class OpPredictionModel[T <: PredictionModel[Vector, T] : ClassTag]
 (
   sparkModel: T,
   uid: String,
@@ -55,9 +56,7 @@ abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
   /**
    * Predict label for the given features
    */
-  @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
-    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
-  ).predict(_)
+  @transient def predict: Vector => Double
 
   /**
    * Function used to convert input to output

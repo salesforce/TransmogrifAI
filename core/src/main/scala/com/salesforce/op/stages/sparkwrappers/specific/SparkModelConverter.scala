@@ -100,30 +100,4 @@ object SparkModelConverter {
     }
   }
 
-  /**
-   * Converts supported mleap loaded spark model of type PredictionModel[Vector, T] to an OP model
-   * @param model model to convert
-   * @return Op Binary Model which will produce the same values put into a Prediction return feature
-   */
-//  def toOPUnchecked(
-//    model: MLeapTransformer
-//  ): OpTransformer2[RealNN, OPVector, Prediction] =
-//    model match {
-//      case m: LogisticRegressionModel => new OpLogisticRegressionModel(m, uid = uid)
-//      case m: RandomForestClassificationModel => new OpRandomForestClassificationModel(m, uid = uid)
-//      case m: NaiveBayesModel => new OpNaiveBayesModel(m, uid)
-//      case m: DecisionTreeClassificationModel => new OpDecisionTreeClassificationModel(m, uid = uid)
-//      case m: GBTClassificationModel => new OpGBTClassificationModel(m, uid = uid)
-//      case m: LinearSVCModel => new OpLinearSVCModel(m, uid = uid)
-//      case m: MultilayerPerceptronClassificationModel => new OpMultilayerPerceptronClassificationModel(m, uid = uid)
-//      case m: LinearRegressionModel => new OpLinearRegressionModel(m, uid = uid)
-//      case m: RandomForestRegressionModel => new OpRandomForestRegressionModel(m, uid = uid)
-//      case m: GBTRegressionModel => new OpGBTRegressionModel(m, uid = uid)
-//      case m: DecisionTreeRegressionModel => new OpDecisionTreeRegressionModel(m, uid = uid)
-//      case m: GeneralizedLinearRegressionModel => new OpGeneralizedLinearRegressionModel(m, uid = uid)
-//      case m: XGBoostClassificationModel => new OpXGBoostClassificationModel(m, uid = uid)
-//      case m: XGBoostRegressionModel => new OpXGBoostRegressionModel(m, uid = uid)
-//      case m => throw new RuntimeException(s"model conversion not implemented for model $m")
-//    }
-
 }

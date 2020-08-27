@@ -34,7 +34,9 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.regression.{OpRandomForestRegressorParams, RandomForestRegressionModel, RandomForestRegressor}
+import ml.combust.mleap.core.regression.{RandomForestRegressionModel => MleapRandomForestRegressionModel}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -125,4 +127,11 @@ class OpRandomForestRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[RandomForestRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-)
+){
+  @transient val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
+    .orElse(getLocalMlStage().map(s => s.model.asInstanceOf[MleapRandomForestRegressionModel].predict(_)))
+    .getOrElse(
+      throw new RuntimeException(s"Could not find the wrapped Spark stage.")
+    )
+}
+

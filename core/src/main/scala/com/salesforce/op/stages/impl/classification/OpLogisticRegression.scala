@@ -205,8 +205,8 @@ class OpLogisticRegressionModel
 ) extends OpProbabilisticClassifierModel[LogisticRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ) {
-  @transient lazy val predictRawMirror = reflectMethod(getSparkMlStage().get, "predictRaw")
-  @transient lazy val raw2probabilityMirror = reflectMethod(getSparkMlStage().get, "raw2probability")
-  @transient lazy val probability2predictionMirror =
-    reflectMethod(getSparkMlStage().get, "probability2prediction")
+  @transient lazy val predictRawMirror = getSparkOrLocalMethod("predictRaw", "predictRaw")
+  @transient lazy val raw2probabilityMirror = getSparkOrLocalMethod("raw2probability", "rawToProbability")
+  @transient lazy val probability2predictionMirror = getSparkOrLocalMethod("probability2prediction",
+    "probabilityToPrediction")
 }
