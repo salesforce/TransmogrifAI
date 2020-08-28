@@ -34,8 +34,10 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
+import ml.combust.mleap.core.regression.{GeneralizedLinearRegressionModel => MleapGeneralizedLinearRegressionModel}
 import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import org.apache.spark.ml.regression.{GeneralizedLinearRegression, GeneralizedLinearRegressionModel, OpGeneralizedLinearRegressionParams}
+import org.apache.spark.ml.linalg.Vector
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -183,16 +185,22 @@ class OpGeneralizedLinearRegressionModel
 ) extends OpPredictorWrapperModel[GeneralizedLinearRegressionModel](uid = uid, operationName = operationName,
   sparkModel = sparkModel) {
 
-  @transient lazy private val predictLink = getSparkOrLocalMethod("predictLink", "predictLink")
-  @transient lazy protected val predict = getSparkOrLocalMethod("predict", "predict", argsCount = Some(2))
+  @transient lazy private val predictLinkSpark = getSparkMlStage()
+    .map(s => reflectMethod(s, "predictLink", argsCount = Option(2)))
+  @transient lazy private val predictLinkLocal = getLocalMlStage()
+    .map(s => s.model.asInstanceOf[MleapGeneralizedLinearRegressionModel].predictLink(_))
+  @transient lazy protected val predict: Vector => Double = getSparkMlStage().map( m => m.predict(_) )
+    .orElse{ getLocalMlStage().map(s => s.model.asInstanceOf[MleapGeneralizedLinearRegressionModel].predict(_)) }
+    .getOrElse( throw new RuntimeException("Failed to find predict function in local or spark models") )
 
   /**
    * Function used to convert input to output
    */
   override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {
-    val offset = 0.0
-    val raw = predictLink(features.value, offset).asInstanceOf[Double]
-    val pred = predict(features.value, offset).asInstanceOf[Double]
+    val raw: Double = predictLinkSpark.map( p => p(features.value, 0.0).asInstanceOf[Double] )
+      .orElse( predictLinkLocal.map(p => p(features.value)) )
+      .getOrElse(throw new RuntimeException("Failed to find link function in local or spark models"))
+    val pred: Double = predict(features.value)
     Prediction(prediction = pred, rawPrediction = raw)
   }
 }
