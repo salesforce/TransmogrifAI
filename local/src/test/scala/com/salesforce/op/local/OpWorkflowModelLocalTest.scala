@@ -96,8 +96,8 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
         .build()
   }
 
-  lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg)
-  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb)
+  lazy val (modelLocation, model, prediction) = buildAndSaveModel(logReg, "logreg")
+  lazy val (xgbModelLocation, xgbModel, xgbPred) = buildAndSaveModel(xgb, "xgboost")
   lazy val (rawData, expectedScores) = genRawDataAndScore(model, prediction)
   lazy val (rawDataXGB, expectedXGBScores) = genRawDataAndScore(xgbModel, xgbPred)
   lazy val modelLocation2 = {
@@ -113,10 +113,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
   }
 
   it should "produce scores without Spark in timely fashion" in {
-    val loadedModel = OpWorkflowModel.load(modelLocation, asSpark = false)
-    val scoreFn = loadedModel.scoreFunction
-    scoreFn shouldBe a[ScoreFunction]
-    val warmUp = rawData.map(scoreFn)
+    val scoreFn = assertLoadModelAndScore(modelLocation, rawData, expectedScores, prediction)
     val numOfRuns = 1000
     var elapsed = 0L
     for {_ <- 0 until numOfRuns} {
@@ -185,8 +182,6 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
         deindexed.name -> deindexedV.value.orNull
       )
     } withClue(s"Record index $i: ") {
-      println(score)
-      println(expected)
       score shouldBe expected
     }
   }
@@ -196,15 +191,16 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     rawData: Array[Map[String, Any]],
     expectedScores: Array[(Prediction, RealNN, RealNN, Text)],
     prediction: FeatureLike[Prediction]
-  ): Unit = {
+  ): ScoreFunction = {
     val loadedModel = OpWorkflowModel.load(modelLocation, asSpark = false)
     val scoreFn = loadedModel.scoreFunction
     scoreFn shouldBe a[ScoreFunction]
     val scores = rawData.map(scoreFn)
     assert(scores, expectedScores, prediction)
+    scoreFn
   }
 
-  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]):
+  private def buildAndSaveModel(modelsAndParams: Seq[(EstimatorType, Array[ParamMap])], pathName: String):
   (String, OpWorkflowModel, FeatureLike[Prediction]) = {
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
       modelsAndParameters = modelsAndParams
@@ -212,7 +208,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     val workflow = new OpWorkflow().setInputDataset(rawDF).setResultFeatures(prediction, labelSynth, indexed, deindexed)
     lazy val model = workflow.train()
     rawDF.show(10)
-    val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
+    val path = Paths.get(tempDir.toString, s"op-runner-local-test-model-$pathName").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)
   }
