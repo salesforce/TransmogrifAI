@@ -35,6 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.feature.TextTokenizer.TextTokenizerResult
 import com.salesforce.op.stages.{OpPipelineStageReaderWriter, ReaderWriter}
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.text.{Language, _}
 import org.apache.spark.ml.param._
 import org.json4s.{JObject, JValue}
@@ -133,7 +134,7 @@ class TextTokenizer[T <: Text]
 }
 
 object TextTokenizer {
-  val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
+  val LanguageDetector: LanguageDetector = new OpenNLPLanguageDetector()
   val Analyzer: TextAnalyzer = new LuceneTextAnalyzer()
   val AnalyzerHtmlStrip: TextAnalyzer = new LuceneHtmlStripTextAnalyzer()
   val AutoDetectLanguage = false
@@ -248,7 +249,7 @@ class TextTokenizerReaderWriter[T <: Text] extends OpPipelineStageReaderWriter[T
    */
   def read(stageClass: Class[TextTokenizer[T]], json: JValue): Try[TextTokenizer[T]] = Try {
     val languageDetector = ((json \ "languageDetector").extract[JObject] \ "className").extract[String] match {
-      case c if c == classOf[OptimaizeLanguageDetector].getName => new OptimaizeLanguageDetector
+      case c => ReflectionUtils.newInstance[LanguageDetector](c)
     }
     val analyzerJson = (json \ "analyzer").extract[JObject]
     val analyzer = (analyzerJson \ "className").extract[String] match {

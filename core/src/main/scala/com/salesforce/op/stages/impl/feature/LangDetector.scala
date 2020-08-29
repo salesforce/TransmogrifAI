@@ -64,5 +64,5 @@ class LangDetector[T <: Text]
 }
 
 object LangDetector {
-  val DefaultDetector: LanguageDetector = new OptimaizeLanguageDetector()
+  val DefaultDetector: LanguageDetector = new OpenNLPLanguageDetector()
 }

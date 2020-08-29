@@ -34,6 +34,8 @@ import java.io.InputStream
 
 import com.salesforce.op.utils.text.Language._
 import com.salesforce.op.utils.text.NameEntityType._
+import com.salesforce.op.utils.text.OpenNLPLanguageDetector.getClass
+import opennlp.tools.langdetect.LanguageDetectorModel
 import opennlp.tools.namefind.TokenNameFinderModel
 import opennlp.tools.sentdetect.SentenceModel
 import opennlp.tools.tokenize.TokenizerModel
@@ -106,6 +108,11 @@ object OpenNLPModels {
    */
   def getTokenizerModel(language: Language): Option[TokenizerModel] =
     tokenizerModels.get(language)
+
+
+  def getLanguageDetection(): LanguageDetectorModel = {
+    new LanguageDetectorModel(loadFromResource(s"$modelsPath/langdetect-183.bin"))
+  }
 
   private def loadTokenNameFinderModel(resourcePath: String): TokenNameFinderModel = {
     val modelStream = loadFromResource(resourcePath)

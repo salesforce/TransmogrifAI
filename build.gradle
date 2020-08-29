@@ -78,7 +78,7 @@ configure(allProjs) {
         chillVersion = '0.9.3'
         reflectionsVersion = '0.9.11'
         collectionsVersion = '3.2.2'
-        optimaizeLangDetectorVersion = '0.0.1'
+        optimaizeLangDetectorVersion = '0.6'
         tikaVersion = '1.22'
         sparkTestingBaseVersion = '2.4.3_0.12.0'
         sourceCodeVersion = '0.1.3'

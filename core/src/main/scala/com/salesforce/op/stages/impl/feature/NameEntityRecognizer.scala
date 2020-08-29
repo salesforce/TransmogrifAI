@@ -92,7 +92,7 @@ class NameEntityRecognizer[T <: Text]
 
 object NameEntityRecognizer {
   val Analyzer: TextAnalyzer = new OpenNLPAnalyzer()
-  val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
+  val LanguageDetector: LanguageDetector = new OpenNLPLanguageDetector()
   val Tagger: NameEntityTagger[_ <: TaggerResult] = new OpenNLPNameEntityTagger()
   val Splitter: SentenceSplitter = new OpenNLPSentenceSplitter()
   val AutoDetectLanguage = false
