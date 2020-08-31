@@ -88,17 +88,17 @@ class SparkStageParam[S <: PipelineStage with Params]
   override def jsonEncode(sparkStage: Option[S]): String = {
     def json(className: String, uid: String) = compact(render(("className" -> className) ~ ("uid" -> uid)))
     (sparkStage, savePath, sbc) match {
-      case (Some(stage), Some(p), Some(c)) =>
-        for {bundle <- managed(BundleFile(s"file:$p/${stage.uid}"))} {
+      case (Some(stage), Some(path), Some(c)) =>
+        for {bundle <- managed(BundleFile(s"file:$path/${stage.uid}"))} {
           stage.asInstanceOf[Transformer].writeBundle.format(SerializationFormat.Json).save(bundle)(c).get
         }
         json(className = stage.getClass.getName, uid = stage.uid)
-      case (Some(stage), Some(p), None) =>
-        val stagePath = new Path(p, stage.uid).toString
+      case (Some(stage), Some(path), None) =>
+        val stagePath = new Path(path, stage.uid).toString
         stage.asInstanceOf[MLWritable].write.save(stagePath)
         json(className = stage.getClass.getName, uid = stage.uid)
-      case (Some(s), None, _) =>
-        throw new RuntimeException(s"Path must be set before Spark stage '${s.uid}' can be saved")
+      case (Some(stage), None, _) =>
+        throw new RuntimeException(s"Path must be set before Spark stage '${stage.uid}' can be saved")
       case _ =>
         json(className = NoClass, uid = NoUID)
     }
@@ -127,8 +127,8 @@ class SparkStageParam[S <: PipelineStage with Params]
     }.orElse { // for backwards compatibility
       getPathUid(jsonStr) match {
         case (_, Some(NoUID), _) => None
-        case (Some(p), Some(stageUid), Some(true)) =>
-          val stagePath = new Path(p, stageUid).toString
+        case (Some(path), Some(stageUid), Some(true)) =>
+          val stagePath = new Path(path, stageUid).toString
           val json = parse(jsonStr)
           val className = (json \ "className").extract[String]
           val cls = SparkUtils.classForName(className)
@@ -157,9 +157,9 @@ class SparkStageParam[S <: PipelineStage with Params]
       case (None, _, _) | (_, None, _) | (_, Some(NoUID), _) =>
         savePath = None
         None
-      case (Some(p), Some(stageUid), asSpark) =>
+      case (Some(path), Some(stageUid), asSpark) =>
         savePath = Option(p)
-        val loaded = for {bundle <- managed(BundleFile(s"file:$p/$stageUid"))} yield {
+        val loaded = for {bundle <- managed(BundleFile(s"file:$path/$stageUid"))} yield {
           if (asSpark.getOrElse(true)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
           else Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
         }
