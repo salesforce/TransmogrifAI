@@ -240,7 +240,7 @@ private object WorkflowFileReader {
     var partPath: Option[Path] = None
     while (allFiles.hasNext) {
       val p = allFiles.next().getPath
-      if (p.getName.startsWith("part")) {
+      if (p.getName.startsWith("part-00000")) {
         partPath = Option(p)
       }
     }
