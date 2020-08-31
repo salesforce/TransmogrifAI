@@ -349,10 +349,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
     val rawData = generateRawData()
     // Update features with fitted stages
-    val fittedStgs = fitStages(data = rawData, stagesToFit = stages, persistEveryKStages)
-    val newResultFtrs = resultFeatures.map(_.copyWithNewStages(fittedStgs))
-    val (fittedStages, newResultFeatures) = fittedStgs -> newResultFtrs
-
+    val fittedStages = fitStages(data = rawData, stagesToFit = stages, persistEveryKStages)
+    val newResultFeatures = resultFeatures.map(_.copyWithNewStages(fittedStages)
 
     val model =
       new OpWorkflowModel(uid, getParameters())

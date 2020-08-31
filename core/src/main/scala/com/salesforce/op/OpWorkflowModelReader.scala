@@ -55,7 +55,7 @@ import scala.util.{Failure, Success, Try}
  * NOTE: The FeatureGeneratorStages will not be recovered into the Model object, because they are part of each feature.
  *
  * @param workflowOpt optional workflow that produced the trained model
- * @param asSpark if true will load as spark models if false will load as Mlleap stages for spark wrapped stages
+ * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
  */
 class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Boolean = true) {
 
@@ -67,7 +67,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    */
   final def load(path: String): OpWorkflowModel = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    Try(FileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
+    Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
       .flatMap(loadJson(_, path = path)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
@@ -231,7 +231,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 
 }
 
-private object FileReader {
+private object WorkflowFileReader {
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     val path = new Path(pathString)

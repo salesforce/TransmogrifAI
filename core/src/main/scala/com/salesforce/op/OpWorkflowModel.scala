@@ -464,7 +464,7 @@ case object OpWorkflowModel {
    * Load a previously trained workflow model from path
    *
    * @param path to the trained workflow model
-   * @param asSpark if true will load as spark models if false will load as Mlleap stages for spark wrapped stages
+   * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
    * @return workflow model
    */
   def load(path: String, asSpark: Boolean = true): OpWorkflowModel =
