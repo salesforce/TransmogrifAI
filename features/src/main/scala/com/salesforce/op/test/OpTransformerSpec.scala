@@ -80,6 +80,13 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer]
     val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
     res shouldEqual expectedResult
   }
+  it should "transform data after being loaded without spark" in {
+    val loaded = writeAndRead(stage, asSpark = false)
+    val transformed = loaded.asInstanceOf[TransformerType].transform(inputData)
+    val output = loaded.getOutput().asInstanceOf[FeatureLike[O]]
+    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
+    res shouldEqual expectedResult
+  }
 }
 
 /**
@@ -127,6 +134,7 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
         val sparkWrapped = l.asInstanceOf[SparkWrapperParams[_]]
         sparkWrapped.getLocalMlStage().isDefined shouldBe true
         sparkWrapped.getSparkMlStage().isEmpty shouldBe true
+      case _ =>
     }
     assert(loaded, transformer)
   }

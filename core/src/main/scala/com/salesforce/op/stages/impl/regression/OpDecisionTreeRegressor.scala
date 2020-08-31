@@ -33,6 +33,8 @@ package com.salesforce.op.stages.impl.regression
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
+import org.apache.spark.ml.linalg.Vector
+import ml.combust.mleap.core.regression.{DecisionTreeRegressionModel => MleapDecisionTreeRegressionModel}
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
 import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, DecisionTreeRegressor, OpDecisionTreeRegressorParams}
 
@@ -112,4 +114,8 @@ class OpDecisionTreeRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[DecisionTreeRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-)
+) {
+  @transient lazy protected val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
+    .orElse( getLocalMlStage().map(s => s.model.asInstanceOf[MleapDecisionTreeRegressionModel].predict(_)) )
+    .getOrElse( throw new RuntimeException(s"Could not find the wrapped Spark stage.") )
+}

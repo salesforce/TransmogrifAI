@@ -39,7 +39,23 @@ import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PredictionModel}
-import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
+import ml.combust.mleap.runtime.transformer.classification.{LogisticRegression => MlLogisticRegression}
+import ml.combust.mleap.runtime.transformer.classification.{RandomForestClassifier => MlRandomForestClassifier}
+import ml.combust.mleap.runtime.transformer.classification.{NaiveBayesClassifier => MlNaiveBayesClassifier}
+import ml.combust.mleap.runtime.transformer.classification.{DecisionTreeClassifier => MlDecisionTreeClassifier}
+import ml.combust.mleap.runtime.transformer.classification.{GBTClassifier => MlGBTClassifier}
+import ml.combust.mleap.runtime.transformer.classification.{LinearSVC => MlLinearSVC}
+import ml.combust.mleap.runtime.transformer.classification.{MultiLayerPerceptronClassifier => MlMultiLayerPerceptronClassifier}
+import ml.combust.mleap.runtime.transformer.regression.{LinearRegression => MlLinearRegression}
+import ml.combust.mleap.runtime.transformer.regression.{RandomForestRegression => MlRandomForestRegression}
+import ml.combust.mleap.runtime.transformer.regression.{GeneralizedLinearRegression => MlGeneralizedLinearRegression}
+import ml.combust.mleap.runtime.transformer.regression.{DecisionTreeRegression => MlDecisionTreeRegression}
+import ml.combust.mleap.runtime.transformer.regression.{GBTRegression => MlGBTRegression}
+import ml.combust.mleap.xgboost.runtime.{XGBoostClassification => MlXGBoostClassification}
+import ml.combust.mleap.xgboost.runtime.{XGBoostRegression => MlXGBoostRegression}
+
+
+
 
 /**
  * Allows conversion from spark models to models that follow the OP convention of having a
@@ -64,66 +80,48 @@ object SparkModelConverter {
   /**
    * Converts supported spark model of type PredictionModel[Vector, T] to an OP model
    * @param model model to convert
-   * @tparam T type of model to convert
-   * @return Op Binary Model which will produce the same values put into a Prediction return feature
-   */
-  // TODO remove when loco and model selector are updated
-  def toOPUnchecked(model: Model[_]): OpTransformer2[RealNN, OPVector, Prediction] =
-    toOPUnchecked(model, model.uid)
-
-  /**
-   * Converts supported spark model of type PredictionModel[Vector, T] to an OP model
-   * @param model model to convert
    * @param uid uid to give converted model
    * @return Op Binary Model which will produce the same values put into a Prediction return feature
    */
   def toOPUnchecked(
-    model: Model[_],
+    model: Any,
     uid: String
   ): OpTransformer2[RealNN, OPVector, Prediction] = {
     model match {
       case m: LogisticRegressionModel => new OpLogisticRegressionModel(m, uid = uid)
+      case m: MlLogisticRegression => new OpLogisticRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m: RandomForestClassificationModel => new OpRandomForestClassificationModel(m, uid = uid)
+      case m: MlRandomForestClassifier =>
+        new OpRandomForestClassificationModel(null, uid = uid).setLocalMlStage(m)
       case m: NaiveBayesModel => new OpNaiveBayesModel(m, uid)
+      case m: MlNaiveBayesClassifier => new OpNaiveBayesModel(null, uid = uid).setLocalMlStage(m)
       case m: DecisionTreeClassificationModel => new OpDecisionTreeClassificationModel(m, uid = uid)
+      case m: MlDecisionTreeClassifier =>
+        new OpDecisionTreeClassificationModel(null, uid = uid).setLocalMlStage(m)
       case m: GBTClassificationModel => new OpGBTClassificationModel(m, uid = uid)
+      case m: MlGBTClassifier => new OpGBTClassificationModel(null, uid = uid).setLocalMlStage(m)
       case m: LinearSVCModel => new OpLinearSVCModel(m, uid = uid)
+      case m: MlLinearSVC => new OpLinearSVCModel(null, uid = uid).setLocalMlStage(m)
       case m: MultilayerPerceptronClassificationModel => new OpMultilayerPerceptronClassificationModel(m, uid = uid)
+      case m: MlMultiLayerPerceptronClassifier =>
+        new OpMultilayerPerceptronClassificationModel(null, uid = uid).setLocalMlStage(m)
       case m: LinearRegressionModel => new OpLinearRegressionModel(m, uid = uid)
+      case m: MlLinearRegression => new OpLinearRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m: RandomForestRegressionModel => new OpRandomForestRegressionModel(m, uid = uid)
+      case m: MlRandomForestRegression => new OpRandomForestRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m: GBTRegressionModel => new OpGBTRegressionModel(m, uid = uid)
+      case m: MlGBTRegression => new OpGBTRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m: DecisionTreeRegressionModel => new OpDecisionTreeRegressionModel(m, uid = uid)
+      case m: MlDecisionTreeRegression => new OpDecisionTreeRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m: GeneralizedLinearRegressionModel => new OpGeneralizedLinearRegressionModel(m, uid = uid)
+      case m: MlGeneralizedLinearRegression =>
+        new OpGeneralizedLinearRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m: XGBoostClassificationModel => new OpXGBoostClassificationModel(m, uid = uid)
+      case m: MlXGBoostClassification => new OpXGBoostClassificationModel(null, uid = uid).setLocalMlStage(m)
       case m: XGBoostRegressionModel => new OpXGBoostRegressionModel(m, uid = uid)
+      case m: MlXGBoostRegression => new OpXGBoostRegressionModel(null, uid = uid).setLocalMlStage(m)
       case m => throw new RuntimeException(s"model conversion not implemented for model $m")
     }
   }
-
-  /**
-   * Converts supported mleap loaded spark model of type PredictionModel[Vector, T] to an OP model
-   * @param model model to convert
-   * @return Op Binary Model which will produce the same values put into a Prediction return feature
-   */
-//  def toOPUnchecked(
-//    model: MLeapTransformer
-//  ): OpTransformer2[RealNN, OPVector, Prediction] =
-//    model match {
-//      case m: LogisticRegressionModel => new OpLogisticRegressionModel(m, uid = uid)
-//      case m: RandomForestClassificationModel => new OpRandomForestClassificationModel(m, uid = uid)
-//      case m: NaiveBayesModel => new OpNaiveBayesModel(m, uid)
-//      case m: DecisionTreeClassificationModel => new OpDecisionTreeClassificationModel(m, uid = uid)
-//      case m: GBTClassificationModel => new OpGBTClassificationModel(m, uid = uid)
-//      case m: LinearSVCModel => new OpLinearSVCModel(m, uid = uid)
-//      case m: MultilayerPerceptronClassificationModel => new OpMultilayerPerceptronClassificationModel(m, uid = uid)
-//      case m: LinearRegressionModel => new OpLinearRegressionModel(m, uid = uid)
-//      case m: RandomForestRegressionModel => new OpRandomForestRegressionModel(m, uid = uid)
-//      case m: GBTRegressionModel => new OpGBTRegressionModel(m, uid = uid)
-//      case m: DecisionTreeRegressionModel => new OpDecisionTreeRegressionModel(m, uid = uid)
-//      case m: GeneralizedLinearRegressionModel => new OpGeneralizedLinearRegressionModel(m, uid = uid)
-//      case m: XGBoostClassificationModel => new OpXGBoostClassificationModel(m, uid = uid)
-//      case m: XGBoostRegressionModel => new OpXGBoostRegressionModel(m, uid = uid)
-//      case m => throw new RuntimeException(s"model conversion not implemented for model $m")
-//    }
 
 }

@@ -31,9 +31,10 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
-import ml.combust.bundle.BundleFile
+import ml.combust.bundle.{BundleContext, BundleFile, BundleRegistry}
 import ml.combust.bundle.dsl.Bundle
 import ml.combust.bundle.serializer.SerializationFormat
+import ml.combust.mleap.xgboost.runtime.bundle.ops.{XGBoostRegressionOp, XGBoostClassificationOp}
 import ml.combust.mleap.spark.SparkSupport._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.bundle.SparkBundleContext
@@ -158,10 +159,15 @@ class SparkStageParam[S <: PipelineStage with Params]
         savePath = None
         None
       case (Some(path), Some(stageUid), asSpark) =>
-        savePath = Option(p)
+        savePath = Option(path)
         val loaded = for {bundle <- managed(BundleFile(s"file:$path/$stageUid"))} yield {
           if (asSpark.getOrElse(true)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
-          else Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
+          else {
+            implicitly[ml.combust.mleap.runtime.MleapContext].bundleRegistry
+              .register(new XGBoostRegressionOp)
+              .register(new XGBoostClassificationOp)
+            Right(loadError(bundle.loadMleapBundle()).root.asInstanceOf[MLeapTransformer])
+          }
         }
         loaded.opt
     }

@@ -35,13 +35,16 @@ import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.OpPipelineStage2
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
-import scala.collection.JavaConverters._
 
-import scala.reflect.runtime.universe.TypeTag
+import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
+
 
 /**
  * Wraps a spark ML predictor.  Predictors represent supervised learning algorithms (regression and classification) in
@@ -115,7 +118,7 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
 
 }
 
-abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
+abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M] : ClassTag]
 (
   val operationName: String,
   val uid: String,
@@ -128,4 +131,11 @@ abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
 ) extends Model[OpPredictorWrapperModel[M]] with SparkWrapperParams[M]
   with OpTransformer2[RealNN, OPVector, Prediction] {
   setDefault(sparkMlStage, Option(sparkModel))
+
+  protected def getSparkOrLocalMethod(sparkMethodName: String, localMethodName: String,
+    argsCount: Option[Int] = None): MethodMirror = {
+    getSparkMlStage().map(s => reflectMethod(s, sparkMethodName, argsCount))
+      .orElse(getLocalMlStage().map(s => reflectMethod(s.model, localMethodName, argsCount)))
+      .getOrElse(throw new RuntimeException("No spark wrapped stage or local wrapped stage was found"))
+  }
 }

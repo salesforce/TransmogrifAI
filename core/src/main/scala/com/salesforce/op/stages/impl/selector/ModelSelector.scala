@@ -241,10 +241,9 @@ final class SelectedModel private[op]
   }
 
   @transient private lazy val recoveredStage: ModelType = (getSparkMlStage(), getLocalMlStage()) match {
-    case (Some(m: PredictionModel[_, _]), _) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
+    case (Some(m: PredictionModel[_, _]), _) => SparkModelConverter.toOPUnchecked(m, m.uid).asInstanceOf[ModelType]
     case (Some(m: ModelType@unchecked), _) => m
-//    case (None, Some(m: MLeapTransformer)) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
-//    // TODO make this work
+    case (None, Some(m: MLeapTransformer)) => SparkModelConverter.toOPUnchecked(m, m.uid).asInstanceOf[ModelType]
     case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
       s" type ${m.getClass.getName}")
   }
