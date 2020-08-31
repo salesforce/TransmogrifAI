@@ -53,7 +53,6 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
-import org.scalactic.Equality
 
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempDirectoryTest with TestCommon {

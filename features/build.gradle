@@ -23,5 +23,5 @@ dependencies {
     compile "ml.combust.mleap:mleap-runtime_$scalaVersion:$mleapVersion"
     compile "ml.combust.mleap:mleap-xgboost-spark_$scalaVersion:$mleapVersion"
     compile "ml.combust.mleap:mleap-xgboost-runtime_$scalaVersion:$mleapVersion"
-    compile "com.jsuereth:scala-arm_$scalaVersion:$mleapVersion"
+    // compile "com.jsuereth:scala-arm_$scalaVersion:$mleapVersion"
 }

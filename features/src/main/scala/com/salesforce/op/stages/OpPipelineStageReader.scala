@@ -66,6 +66,7 @@ final class OpPipelineStageReader private
    *
    * @param json json
    * @param path to the stored output
+   * @param asSpark load as spark or mleap stage
    * @return OpPipelineStageBase
    */
   def loadFromJson(json: JValue, path: String, asSpark: Boolean): OpPipelineStageBase =
@@ -76,6 +77,7 @@ final class OpPipelineStageReader private
    *
    * @param jsonStr json string
    * @param path    to the stored output
+   * @param asSpark load as spark or mleap stage
    * @return OpPipelineStageBase
    */
   def loadFromJsonString(jsonStr: String, path: String, asSpark: Boolean): OpPipelineStageBase = {

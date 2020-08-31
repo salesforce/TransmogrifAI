@@ -119,7 +119,7 @@ class SparkStageParam[S <: PipelineStage with Params]
    * to recover the stage.
    */
   override def jsonDecode(jsonStr: String): Option[S] = {
-    val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMLleap(jsonStr)
+    val dirBundle: Option[Either[S, MLeapTransformer]] = jsonDecodeMleap(jsonStr)
     dirBundle.flatMap{
       case Right(mleap) =>
         localTransformer = Option(mleap)
@@ -153,7 +153,7 @@ class SparkStageParam[S <: PipelineStage with Params]
    * Decodes the saved path string and uses the Pipeline.load method
    * to recover the stage as an Mleap transformer
    */
-  def jsonDecodeMLleap(jsonStr: String): Option[Either[S, MLeapTransformer]] = {
+  def jsonDecodeMleap(jsonStr: String): Option[Either[S, MLeapTransformer]] = {
     getPathUid(jsonStr) match {
       case (None, _, _) | (_, None, _) | (_, Some(NoUID), _) =>
         savePath = None
