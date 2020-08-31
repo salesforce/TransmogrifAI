@@ -159,7 +159,7 @@ class SparkStageParam[S <: PipelineStage with Params]
         savePath = None
         None
       case (Some(path), Some(stageUid), asSpark) =>
-        savePath = Option(p)
+        savePath = Option(path)
         val loaded = for {bundle <- managed(BundleFile(s"file:$path/$stageUid"))} yield {
           if (asSpark.getOrElse(true)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
           else {

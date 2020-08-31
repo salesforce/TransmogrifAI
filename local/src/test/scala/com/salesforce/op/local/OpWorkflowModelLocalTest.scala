@@ -53,7 +53,7 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
-
+import org.scalactic.Equality
 
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempDirectoryTest with TestCommon {
@@ -182,7 +182,11 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
         deindexed.name -> deindexedV.value.orNull
       )
     } withClue(s"Record index $i: ") {
-      score shouldBe expected
+      val scoresFound = score(prediction.name).asInstanceOf[Map[String, Double]]
+      val scoresExp = expected(prediction.name).asInstanceOf[Map[String, Double]]
+      val keys = scoresExp.keySet.union(scoresFound.keySet)
+      keys.foreach( k => math.abs(scoresFound(k) - scoresExp(k)) < 0.001 shouldBe true )
+      score.filterNot(_._1 == prediction.name) shouldEqual expected.filterNot(_._1 == prediction.name)
     }
   }
 
@@ -207,7 +211,6 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     ).setInput(labelSynth, genFeatureVector).getOutput()
     val workflow = new OpWorkflow().setInputDataset(rawDF).setResultFeatures(prediction, labelSynth, indexed, deindexed)
     lazy val model = workflow.train()
-    rawDF.show(10)
     val path = Paths.get(tempDir.toString, s"op-runner-local-test-model-$pathName").toFile.getCanonicalFile.toString
     model.save(path)
     (path, model, prediction)
