@@ -34,9 +34,12 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
-import ml.dmlc.xgboost4j.scala.{EvalTrait, ObjectiveTrait}
-import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostRegressorParams, TrackerConf, XGBoostRegressionModel, XGBoostRegressor}
+import ml.dmlc.xgboost4j.scala.{DMatrix, EvalTrait, ObjectiveTrait}
+import ml.dmlc.xgboost4j.scala.spark.{DataUtils, OpXGBoost, OpXGBoostRegressorParams, TrackerConf, XGBoost, XGBoostRegressionModel, XGBoostRegressor}
+import org.apache.spark.ml.linalg.Vector
+import ml.combust.mleap.xgboost.runtime.{XGBoostRegressionModel => MleapXGBoostRegressionModel}
 
+import scala.collection.Iterator
 import scala.reflect.runtime.universe.TypeTag
 
 /**
@@ -361,4 +364,19 @@ class OpXGBoostRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[XGBoostRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-)
+) {
+  import OpXGBoost._
+  @transient private lazy val localModel = getLocalMlStage().map(s => s.model.asInstanceOf[MleapXGBoostRegressionModel])
+  @transient lazy protected val predict: Vector => Double = {
+    getSparkMlStage().map(s => s.predict(_))
+      .getOrElse{
+        features: Vector => {
+          val model = localModel.getOrElse(throw new RuntimeException(s"Could not find the wrapped Spark stage."))
+          // Put data into correct format for XGBoostMleap
+          val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F))
+          model.predict(data = dm)
+        }
+      }
+  }
+}
+

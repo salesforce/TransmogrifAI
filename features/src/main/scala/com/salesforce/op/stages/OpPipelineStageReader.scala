@@ -34,9 +34,7 @@ import com.salesforce.op.features.OPFeature
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.SparkDefaultParamsReadWrite
-import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.JValue
 import org.json4s._
 import org.json4s.jackson.JsonMethods.{compact, render}
@@ -53,7 +51,7 @@ final class OpPipelineStageReader private
 (
   val originalStage: Option[OpPipelineStageBase],
   val features: Seq[OPFeature]
-) extends MLReader[OpPipelineStageBase] {
+) {
 
   /**
    * Legacy ctor which requires origin stage to be preset when loading stages
@@ -64,25 +62,14 @@ final class OpPipelineStageReader private
   def this(feats: Seq[OPFeature]) = this(None, feats)
 
   /**
-   * Load from disk. File should contain data serialized in json format
-   *
-   * @param path to the stored output
-   * @return OpPipelineStageBase
-   */
-  override def load(path: String): OpPipelineStageBase = {
-    val metadataPath = new Path(path, "metadata").toString
-    loadFromJsonString(sc.textFile(metadataPath, 1).first(), path)
-  }
-
-  /**
    * Loads from the json serialized data
    *
    * @param json json
    * @param path to the stored output
    * @return OpPipelineStageBase
    */
-  def loadFromJson(json: JValue, path: String): OpPipelineStageBase =
-    loadFromJsonString(jsonStr = compact(render(json)), path = path)
+  def loadFromJson(json: JValue, path: String, asSpark: Boolean): OpPipelineStageBase =
+    loadFromJsonString(jsonStr = compact(render(json)), path = path, asSpark = asSpark)
 
   /**
    * Loads from the json serialized data
@@ -91,7 +78,7 @@ final class OpPipelineStageReader private
    * @param path    to the stored output
    * @return OpPipelineStageBase
    */
-  def loadFromJsonString(jsonStr: String, path: String): OpPipelineStageBase = {
+  def loadFromJsonString(jsonStr: String, path: String, asSpark: Boolean): OpPipelineStageBase = {
     // Load stage json with it's params
     val metadata = SparkDefaultParamsReadWrite.parseMetadata(jsonStr)
     val (className, metadataJson) = metadata.className -> metadata.metadata
@@ -123,8 +110,8 @@ final class OpPipelineStageReader private
     // Update [[SparkWrapperParams]] with path so we can load the [[SparkStageParam]] instance
     val updatedMetadata = stage match {
       case _: SparkWrapperParams[_] => metadata.copy(
-        params = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path),
-        defaultParams = SparkStageParam.updateParamsMetadataWithPath(metadata.defaultParams, path)
+        params = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path, asSpark),
+        defaultParams = SparkStageParam.updateParamsMetadataWithPath(metadata.defaultParams, path, asSpark)
       )
       case _ => metadata
     }

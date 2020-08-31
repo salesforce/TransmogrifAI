@@ -33,6 +33,7 @@ package com.salesforce.op.test
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, FeatureSparkTypes}
 import com.salesforce.op.stages._
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.ml.Transformer
@@ -79,9 +80,13 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer]
     val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
     res shouldEqual expectedResult
   }
-
-  // TODO: test metadata on stages
-
+  it should "transform data after being loaded without spark" in {
+    val loaded = writeAndRead(stage, asSpark = false)
+    val transformed = loaded.asInstanceOf[TransformerType].transform(inputData)
+    val output = loaded.getOutput().asInstanceOf[FeatureLike[O]]
+    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
+    res shouldEqual expectedResult
+  }
 }
 
 /**
@@ -118,6 +123,20 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
     transformer.transform(inputData) // needs to have been called so the params on wrapped stages are set to save
     val loaded = writeAndRead(transformer)
     assert(loaded, transformer)
+
+
+  }
+  it should "be json writable/readable as a local stage" in {
+    transformer.transform(inputData) // needs to have been called so the params on wrapped stages are set to save
+    val loaded = writeAndRead(transformer, asSpark = false)
+    loaded match {
+      case l if l.isInstanceOf[SparkWrapperParams[_]] =>
+        val sparkWrapped = l.asInstanceOf[SparkWrapperParams[_]]
+        sparkWrapped.getLocalMlStage().isDefined shouldBe true
+        sparkWrapped.getSparkMlStage().isEmpty shouldBe true
+      case _ =>
+    }
+    assert(loaded, transformer)
   }
   it should "transform schema" in {
     val transformedSchema = transformer.transformSchema(inputData.schema)
@@ -149,10 +168,12 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
    * @param savePath Spark stage save path
    * @return read stage
    */
-  protected def writeAndRead(stage: TransformerType, savePath: String = stageSavePath): OpPipelineStageBase = {
+  protected def writeAndRead(
+    stage: TransformerType, savePath: String = stageSavePath, asSpark: Boolean = true
+  ): OpPipelineStageBase = {
     val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
     val features = stage.getInputFeatures().flatMap(_.allFeatures)
-    new OpPipelineStageReader(features).loadFromJsonString(json, savePath)
+    new OpPipelineStageReader(features).loadFromJsonString(json, savePath, asSpark)
   }
 
   /**

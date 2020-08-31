@@ -34,6 +34,7 @@ import com.salesforce.op.features.types._
 import org.apache.spark.ml.classification.ProbabilisticClassificationModel
 import org.apache.spark.ml.linalg.Vector
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
@@ -45,7 +46,7 @@ import scala.reflect.runtime.universe._
  * @param operationName unique name of the operation this stage performs
  * @tparam T type of the model to wrap
  */
-abstract class OpProbabilisticClassifierModel[T <: ProbabilisticClassificationModel[Vector, T]]
+abstract class OpProbabilisticClassifierModel[T <: ProbabilisticClassificationModel[Vector, T] : ClassTag]
 (
   sparkModel: T,
   uid: String,
