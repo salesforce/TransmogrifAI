@@ -141,7 +141,9 @@ abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
       .getOrElse(throw new RuntimeException("No spark wrapped stage or local wrapped stage was found"))
   }
 
-  @transient private lazy val predictMirror: MethodMirror = getSparkOrLocalMethod("predict", "predict")
+  @transient private lazy val predictMirror: MethodMirror = getSparkOrLocalMethod(
+    "predict", "predict", argsCount = Option(1)
+  )
 
   /**
    * Predict label for the given features
