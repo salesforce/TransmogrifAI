@@ -39,9 +39,8 @@ import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml._
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.Dataset
 
-import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 

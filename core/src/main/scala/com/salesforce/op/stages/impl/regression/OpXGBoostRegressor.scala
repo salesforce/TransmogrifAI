@@ -366,17 +366,25 @@ class OpXGBoostRegressionModel
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ) {
   import OpXGBoost._
-  @transient private lazy val localModel = getLocalMlStage().map(s => s.model.asInstanceOf[MleapXGBoostRegressionModel])
-  @transient lazy protected val predict: Vector => Double = {
-    getSparkMlStage().map(s => s.predict(_))
-      .getOrElse{
-        features: Vector => {
-          val model = localModel.getOrElse(throw new RuntimeException(s"Could not find the wrapped Spark stage."))
-          // Put data into correct format for XGBoostMleap
-          val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F))
-          model.predict(data = dm)
-        }
-      }
+
+  @transient private lazy val localModel = getLocalMlStage()
+    .map{ s => s.model.asInstanceOf[MleapXGBoostRegressionModel] }
+
+  @transient private lazy val localPredict = localModel.map{ model =>
+    features: Vector => {
+      // Put data into correct format for XGBoostMleap
+      val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F))
+      model.predict(data = dm)
+    }
+  }
+
+  @transient private lazy val sparkPredict = getSparkMlStage().map(s => s.predict(_))
+
+  override protected def predict(features: Vector): Double = {
+    sparkPredict
+      .orElse(localPredict)
+      .getOrElse(throw new RuntimeException("Failed to find spark or local xgboost stage"))
+      .apply(features)
   }
 }
 
