@@ -47,11 +47,13 @@ import scala.reflect.runtime.universe._
  * @param operationName unique name of the operation this stage performs
  * @tparam T type of the model to wrap
  */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T] : ClassTag]
+abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
 (
   sparkModel: T,
   uid: String,
   operationName: String
+)(
+  implicit ctag: ClassTag[T]
 ) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
 
   /**

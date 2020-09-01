@@ -109,6 +109,7 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
 
+    // Mleap XGBoost save calls first on associated dataframe and so cannot use empty DF to seed
     if (model.isInstanceOf[XGBoostClassificationModel] || model.isInstanceOf[XGBoostRegressionModel]) {
       wrappedModel.setOutputDF(model.transform(dataset.limit(1)))
     }
@@ -118,7 +119,7 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
 
 }
 
-abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M] : ClassTag]
+abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
 (
   val operationName: String,
   val uid: String,
@@ -127,7 +128,8 @@ abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M] : ClassTa
   implicit val tti1: TypeTag[RealNN],
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
-  val ttov: TypeTag[Prediction#Value]
+  val ttov: TypeTag[Prediction#Value],
+  val ctag: ClassTag[M]
 ) extends Model[OpPredictorWrapperModel[M]] with SparkWrapperParams[M]
   with OpTransformer2[RealNN, OPVector, Prediction] {
   setDefault(sparkMlStage, Option(sparkModel))
