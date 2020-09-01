@@ -138,4 +138,13 @@ abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M] : ClassTa
       .orElse(getLocalMlStage().map(s => reflectMethod(s.model, localMethodName, argsCount)))
       .getOrElse(throw new RuntimeException("No spark wrapped stage or local wrapped stage was found"))
   }
+
+  @transient private lazy val predictMirror: MethodMirror = getSparkOrLocalMethod("predict", "predict")
+
+  /**
+   * Predict label for the given features
+   */
+  protected def predict(features: Vector): Double =
+    predictMirror.apply(features).asInstanceOf[Double]
+
 }

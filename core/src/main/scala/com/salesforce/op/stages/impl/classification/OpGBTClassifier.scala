@@ -138,10 +138,5 @@ class OpGBTClassificationModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpProbabilisticClassifierModel[GBTClassificationModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-) {
-  @transient lazy val predictRawMirror = getSparkOrLocalMethod("predictRaw", "predictRaw")
-  @transient lazy val raw2probabilityMirror = getSparkOrLocalMethod("raw2probability", "rawToProbability")
-  @transient lazy val probability2predictionMirror = getSparkOrLocalMethod("probability2prediction",
-    "probabilityToPrediction")
-}
+)
 

@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.sparkwrappers.specific
 
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
+import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import org.apache.spark.ml.PredictionModel
 import org.apache.spark.ml.linalg.Vector
 
@@ -54,14 +55,8 @@ abstract class OpPredictionModel[T <: PredictionModel[Vector, T] : ClassTag]
 ) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
 
   /**
-   * Predict label for the given features
-   */
-  @transient protected def predict: Vector => Double
-
-  /**
    * Function used to convert input to output
    */
   override def transformFn: (RealNN, OPVector) => Prediction = (_, features) =>
     Prediction(prediction = predict(features.value))
-
 }

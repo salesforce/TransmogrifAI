@@ -37,7 +37,7 @@ import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPr
 import ml.combust.mleap.xgboost.runtime.{XGBoostClassificationModel => MleapXGBoostClassificationModel}
 import ml.dmlc.xgboost4j.scala.spark._
 import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait}
-import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 import scala.reflect.runtime.universe._
 
@@ -367,16 +367,13 @@ class OpXGBoostClassificationModel
 ) {
   import OpXGBoost._
 
-  protected def predictRawMirror: MethodMirror =
+  override protected def predictRaw(features: Vector): Vector =
     throw new NotImplementedError(
       "XGBoost-Spark does not support 'predictRaw'. This might change in upcoming releases.")
 
-  protected def raw2probabilityMirror: MethodMirror =
+ override protected def raw2probability(raw: Vector): Vector =
     throw new NotImplementedError(
       "XGBoost-Spark does not support 'raw2probability'. This might change in upcoming releases.")
-
-  @transient lazy val probability2predictionMirror = getSparkOrLocalMethod("probability2prediction",
-    "probabilityToPrediction")
 
   private lazy val (booster: Booster, treeLim: Int, missing: Float, numClasses: Int) = {
     getSparkMlStage()
@@ -399,7 +396,7 @@ class OpXGBoostClassificationModel
       val rawPrediction = if (numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
       val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLim)(0).map(_.toDouble)
       val probability = if (numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
-      val prediction = probability2predictionMirror(Vectors.dense(probability)).asInstanceOf[Double]
+      val prediction = probability2prediction(Vectors.dense(probability))
       Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)
     }
   }

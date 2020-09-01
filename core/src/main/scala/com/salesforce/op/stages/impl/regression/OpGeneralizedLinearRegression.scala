@@ -189,9 +189,6 @@ class OpGeneralizedLinearRegressionModel
     .map(s => reflectMethod(s, "predictLink", argsCount = Option(2)))
   @transient lazy private val predictLinkLocal = getLocalMlStage()
     .map(s => s.model.asInstanceOf[MleapGeneralizedLinearRegressionModel].predictLink(_))
-  @transient lazy protected val predict: Vector => Double = getSparkMlStage().map( m => m.predict(_) )
-    .orElse{ getLocalMlStage().map(s => s.model.asInstanceOf[MleapGeneralizedLinearRegressionModel].predict(_)) }
-    .getOrElse( throw new RuntimeException("Failed to find predict function in local or spark models") )
 
   /**
    * Function used to convert input to output

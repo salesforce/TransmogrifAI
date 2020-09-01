@@ -140,8 +140,4 @@ class OpGBTRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[GBTRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-) {
-  @transient lazy protected val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
-    .orElse( getLocalMlStage().map(s => s.model.asInstanceOf[MleapGBTTreeRegressionModel].predict(_)) )
-    .getOrElse( throw new RuntimeException(s"Could not find the wrapped Spark stage.") )
-}
+)

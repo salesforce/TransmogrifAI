@@ -114,8 +114,4 @@ class OpDecisionTreeRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[DecisionTreeRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-) {
-  @transient lazy protected val predict: Vector => Double = getSparkMlStage().map(s => s.predict(_))
-    .orElse( getLocalMlStage().map(s => s.model.asInstanceOf[MleapDecisionTreeRegressionModel].predict(_)) )
-    .getOrElse( throw new RuntimeException(s"Could not find the wrapped Spark stage.") )
-}
+)

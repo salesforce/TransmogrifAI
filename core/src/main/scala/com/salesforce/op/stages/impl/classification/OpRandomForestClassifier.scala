@@ -149,11 +149,6 @@ class OpRandomForestClassificationModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpProbabilisticClassifierModel[RandomForestClassificationModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-) {
-  @transient lazy val predictRawMirror = getSparkOrLocalMethod("predictRaw", "predictRaw")
-  @transient lazy val raw2probabilityMirror = getSparkOrLocalMethod("raw2probability", "rawToProbability")
-  @transient lazy val probability2predictionMirror = getSparkOrLocalMethod("probability2prediction",
-    "probabilityToPrediction")
-}
+)
 
 
