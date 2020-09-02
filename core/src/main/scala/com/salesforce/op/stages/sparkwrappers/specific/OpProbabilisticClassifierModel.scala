@@ -35,7 +35,6 @@ import org.apache.spark.ml.classification.ProbabilisticClassificationModel
 import org.apache.spark.ml.linalg.Vector
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
 
 /**
  * Class that takes in a spark ProbabilisticClassifierModel and wraps it into an OP model which returns a
