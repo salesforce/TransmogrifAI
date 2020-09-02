@@ -47,6 +47,7 @@ import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, PredictionModel}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
 
 import scala.reflect.runtime.universe._
 
@@ -196,6 +197,12 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
       .setEvaluators(evaluators)
+
+    bestModel match {
+      case m: SparkWrapperParams[_] => m.getOutputDF.foreach(selectedModel.setOutputDF)
+      case _ =>
+    }
+
     // Reset the job group to feature engineering.
     JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
     selectedModel
@@ -233,9 +240,10 @@ final class SelectedModel private[op]
     case m => setDefault(sparkMlStage, Option(m))
   }
 
-  @transient private lazy val recoveredStage: ModelType = getSparkMlStage() match {
-    case Some(m: PredictionModel[_, _]) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
-    case Some(m: ModelType@unchecked) => m
+  @transient private lazy val recoveredStage: ModelType = (getSparkMlStage(), getLocalMlStage()) match {
+    case (Some(m: PredictionModel[_, _]), _) => SparkModelConverter.toOPUnchecked(m, m.uid).asInstanceOf[ModelType]
+    case (Some(m: ModelType@unchecked), _) => m
+    case (None, Some(m: MLeapTransformer)) => SparkModelConverter.toOPUnchecked(m, m.uid).asInstanceOf[ModelType]
     case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
       s" type ${m.getClass.getName}")
   }

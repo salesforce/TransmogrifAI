@@ -34,10 +34,10 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import ml.combust.mleap.xgboost.runtime.{XGBoostClassificationModel => MleapXGBoostClassificationModel}
 import ml.dmlc.xgboost4j.scala.spark._
-import ml.dmlc.xgboost4j.scala.{DMatrix, EvalTrait, ObjectiveTrait}
-import org.apache.spark.ml.linalg.Vectors
+import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait}
+import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 import scala.reflect.runtime.universe._
 
@@ -367,31 +367,37 @@ class OpXGBoostClassificationModel
 ) {
   import OpXGBoost._
 
-  protected def predictRawMirror: MethodMirror =
+  override protected def predictRaw(features: Vector): Vector =
     throw new NotImplementedError(
       "XGBoost-Spark does not support 'predictRaw'. This might change in upcoming releases.")
 
-  protected def raw2probabilityMirror: MethodMirror =
+ override protected def raw2probability(raw: Vector): Vector =
     throw new NotImplementedError(
       "XGBoost-Spark does not support 'raw2probability'. This might change in upcoming releases.")
 
-  @transient lazy val probability2predictionMirror =
-    reflectMethod(getSparkMlStage().get, "probability2prediction")
+  private lazy val (booster: Booster, treeLim: Int, missing: Float, numClasses: Int) = {
+    getSparkMlStage()
+      .map{ model => (model.nativeBooster, model.getTreeLimit, model.getMissing, model.numClasses) }
+      .getOrElse( throw new RuntimeException("Could not find spark or local wrapped XGBoost") )
+  }
 
-  private lazy val model = getSparkMlStage().get
-  private lazy val booster = model.nativeBooster
-  private lazy val treeLimit = model.getTreeLimit
-  private lazy val missing = model.getMissing
+  private lazy val localModel = getLocalMlStage().map(_.model.asInstanceOf[MleapXGBoostClassificationModel])
 
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
-    val data = processMissingValues(Iterator(features.value.asXGB), missing)
-    val dm = new DMatrix(dataIter = data)
-    val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
-    val rawPrediction = if (model.numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
-    val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
-    val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
-    val prediction = probability2predictionMirror(Vectors.dense(probability)).asInstanceOf[Double]
-
-    Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)
+  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {
+    localModel.map{ model =>
+      val rawPrediction = model.predictRaw(features.value)
+      val probability = model.predictProbabilities(features.value)
+      val prediction = model.predict(features.value)
+      Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)
+    }.getOrElse{
+      val data = processMissingValues(Iterator(features.value.asXGB), missing)
+      val dm = new DMatrix(dataIter = data)
+      val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLim)(0).map(_.toDouble)
+      val rawPrediction = if (numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
+      val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLim)(0).map(_.toDouble)
+      val probability = if (numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
+      val prediction = probability2prediction(Vectors.dense(probability))
+      Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)
+    }
   }
 }

@@ -143,7 +143,8 @@ class OpPipelineStagesTest
     testOp.setInput(weight)
     val reader = new OpPipelineStageReader(testOp)
     val stageJson = writer.writeToJsonString(savePath)
-    val stage = reader.loadFromJsonString(stageJson, savePath).asInstanceOf[UnaryLambdaTransformer[Real, Real]]
+    val stage = reader.loadFromJsonString(stageJson, savePath, asSpark = true)
+      .asInstanceOf[UnaryLambdaTransformer[Real, Real]]
 
     val features = stage.get(stage.inputFeatures).get
     features should have length 1
