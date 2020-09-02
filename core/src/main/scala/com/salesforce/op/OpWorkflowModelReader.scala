@@ -236,15 +236,11 @@ private object WorkflowFileReader {
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     val path = new Path(pathString)
     val fs = path.getFileSystem(conf)
-    val allFiles = fs.listFiles(path, false)
-    var partPath: Option[Path] = None
-    while (allFiles.hasNext) {
-      val p = allFiles.next().getPath
-      if (p.getName.startsWith("part-00000")) {
-        partPath = Option(p)
-      }
-    }
-    val finalPath = partPath.getOrElse(path)
+
+    val partFile = new Path(pathString, "part-00000")
+    val partZipped = new Path(pathString, "part-00000.gz")
+    val finalPath = if (fs.exists(partZipped)) partZipped else if (fs.exists(partFile)) partFile else path
+
     val codecFactory = new CompressionCodecFactory(conf)
     val codec = Option(codecFactory.getCodec(finalPath))
     val in = fs.open(finalPath)
