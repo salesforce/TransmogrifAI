@@ -184,7 +184,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
       val scoresFound = score(prediction.name).asInstanceOf[Map[String, Double]]
       val scoresExp = expected(prediction.name).asInstanceOf[Map[String, Double]]
       val keys = scoresExp.keySet.union(scoresFound.keySet)
-      keys.foreach( k => math.abs(scoresFound(k) - scoresExp(k)) < 0.001 shouldBe true )
+      keys.foreach( k => math.abs(scoresFound(k) - scoresExp(k)) < 0.01 shouldBe true )
       score.filterNot(_._1 == prediction.name) shouldEqual expected.filterNot(_._1 == prediction.name)
     }
   }
