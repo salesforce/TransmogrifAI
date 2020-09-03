@@ -34,7 +34,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import ml.combust.mleap.core.classification.{LinearSVCModel => MleapLinearSVCModel}
 import org.apache.spark.ml.classification.{LinearSVC, LinearSVCModel, OpLinearSVCParams}
 import org.apache.spark.ml.linalg.Vector
 
@@ -151,15 +151,14 @@ class OpLinearSVCModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictorWrapperModel[LinearSVCModel](uid = uid, operationName = operationName, sparkModel = sparkModel) {
 
-  @transient lazy private val predictRaw = reflectMethod(getSparkMlStage().get, "predictRaw")
-  @transient lazy private val predict = reflectMethod(getSparkMlStage().get, "predict")
+  @transient lazy private val predictRaw = getSparkOrLocalMethod("predictRaw", "predictRaw")
 
   /**
    * Function used to convert input to output
    */
-  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
+  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) => {
     val raw = predictRaw(features.value).asInstanceOf[Vector]
-    val pred = predict(features.value).asInstanceOf[Double]
+    val pred = predict(features.value)
 
     Prediction(rawPrediction = raw, prediction = pred)
   }

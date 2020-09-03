@@ -60,7 +60,6 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   private lazy val writer = new OpPipelineStageWriter(stage)
   private lazy val stageJsonString: String = writer.writeToJsonString(savePath)
   private lazy val stageJson: JValue = parse(stageJsonString)
-  private lazy val isModel = stage.isInstanceOf[Model[_]]
   private val FN = FieldNames
 
   Spec(this.getClass) should "write stage uid" in {
@@ -70,8 +69,8 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   it should "write class name" in {
     (stageJson \ FN.Class.entryName).extract[String] shouldBe stage.getClass.getName
   }
-  it should "write paramMap" in {
-    val params = (stageJson \ FN.ParamMap.entryName).extract[Map[String, Any]]
+  it should "write params map" in {
+    val params = extractParams(stageJson).extract[Map[String, Any]]
     if (hasOutputName) {
       params should have size 4
       params.keys shouldBe Set("inputFeatures", "outputMetadata", "inputSchema", "outputFeatureName")
@@ -81,17 +80,18 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
     }
   }
   it should "write outputMetadata" in {
-    val metadataStr = compact(render((stageJson \ FN.ParamMap.entryName) \ "outputMetadata"))
+    val params = extractParams(stageJson)
+    val metadataStr = compact(render(params \ "outputMetadata"))
     val metadata = Metadata.fromJson(metadataStr)
     metadata shouldBe stage.getMetadata()
   }
   it should "write inputSchema" in {
-    val schemaStr = compact(render((stageJson \ FN.ParamMap.entryName) \ "inputSchema"))
+    val schemaStr = compact(render(extractParams(stageJson) \ "inputSchema"))
     val schema = DataType.fromJson(schemaStr)
     schema shouldBe stage.getInputSchema()
   }
   it should "write input features" in {
-    val jArray = ((stageJson \ FN.ParamMap.entryName) \ "inputFeatures").extract[JArray]
+    val jArray = (extractParams(stageJson) \ "inputFeatures").extract[JArray]
     jArray.values should have length expectedFeaturesLength
     val obj = jArray(0).extract[JObject]
     obj.values.keys shouldBe Set("name", "isResponse", "isRaw", "uid", "typeName", "stages", "originFeatures")
@@ -105,7 +105,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "load stage correctly" in {
     val reader = new OpPipelineStageReader(stage)
-    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, asSpark = true)
     stageLoaded shouldBe a[OpPipelineStageBase]
     stageLoaded shouldBe a[Transformer]
     stageLoaded.getOutput() shouldBe a[FeatureLike[_]]
@@ -116,6 +116,26 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
     stageLoaded.operationName shouldBe stage.operationName
     stageLoaded.getInputFeatures() shouldBe stage.getInputFeatures()
     stageLoaded.getInputSchema() shouldBe stage.getInputSchema()
+  }
+  it should "load stage correctly with spark as false" in {
+    val reader = new OpPipelineStageReader(stage)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, asSpark = false)
+    stageLoaded shouldBe a[OpPipelineStageBase]
+    stageLoaded shouldBe a[Transformer]
+    stageLoaded.getOutput() shouldBe a[FeatureLike[_]]
+    val _ = stage.asInstanceOf[Transformer].transform(passengersDataSet)
+    val transformed = stageLoaded.asInstanceOf[Transformer].transform(passengersDataSet)
+    transformed.collect(stageLoaded.getOutput().asInstanceOf[FeatureLike[Real]]) shouldBe expected
+    stageLoaded.uid shouldBe stage.uid
+    stageLoaded.operationName shouldBe stage.operationName
+    stageLoaded.getInputFeatures() shouldBe stage.getInputFeatures()
+    stageLoaded.getInputSchema() shouldBe stage.getInputSchema()
+  }
+
+  private def extractParams(stageJson: JValue): JValue = {
+    val defaultParamsMap = stageJson \ FN.DefaultParamMap.entryName
+    val paramsMap = stageJson \ FN.ParamMap.entryName
+    defaultParamsMap.merge(paramsMap)
   }
 
 }

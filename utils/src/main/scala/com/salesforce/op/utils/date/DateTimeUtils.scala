@@ -33,7 +33,7 @@ package com.salesforce.op.utils.date
 import java.util.TimeZone
 
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter, DateTimeFormatterBuilder, ISODateTimeFormat}
-import org.joda.time.{DateTime, DateTimeZone, Days}
+import org.joda.time.{DateTime, DateTimeZone, Duration}
 
 
 object DateTimeUtils {
@@ -107,10 +107,13 @@ object DateTimeUtils {
    * @return sequence of YYYY/MM/dd strings from the start to the end dates inclusive
    */
   def getRange(startDate: String, endDate: String): Seq[String] = {
-    val start = new DateTime(parse(startDate, DefaultTimeZoneStr), DefaultTimeZone)
-    val end = new DateTime(parse(endDate, DefaultTimeZoneStr), DefaultTimeZone)
-    val days = Days.daysBetween(start, end).getDays
-    (0 to days).map(d => parseUnix(start.plusDays(d).getMillis))
+    val start = parse(startDate, DefaultTimeZoneStr)
+    val end = parse(endDate, DefaultTimeZoneStr)
+    val days = getStandardDays(start, end)
+    (0 to days.toInt).map { day =>
+      val dur = Duration.millis(start).plus(Duration.standardDays(day))
+      parseUnix(dur.getMillis)
+    }
   }
 
   /**
@@ -123,5 +126,17 @@ object DateTimeUtils {
   def getDatePlusDays(startDate: String, difference: Int): String = {
     val start = new DateTime(parse(startDate, DefaultTimeZoneStr), DefaultTimeZone)
     parseUnix(start.plusDays(difference).getMillis)
+  }
+
+
+  /**
+   * Days between epoch start and end
+   *
+   * @param startMillis start Unix time in millis
+   * @param endMillis end Unix time in millis
+   * @return Duration in days between start and end Unix times
+   */
+  def getStandardDays(startMillis: Long, endMillis: Long): Long = {
+    Duration.millis(endMillis - startMillis).getStandardDays
   }
 }

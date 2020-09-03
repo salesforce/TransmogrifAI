@@ -40,13 +40,14 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames.ModelType
 import com.salesforce.op.stages.impl.tuning.{BestEstimator, _}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, PredictionModel}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
 
 import scala.reflect.runtime.universe._
 
@@ -144,13 +145,14 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   final override def fit(dataset: Dataset[_]): SelectedModel = {
 
     implicit val spark = dataset.sparkSession
+    JobGroupUtil.setJobGroup(OpStep.CrossValidation)
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
     require(!dataset.isEmpty, "Dataset cannot be empty")
     val data = dataset.select(labelColName, in2.name)
-    val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map{ e =>
+    val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map { e =>
       val PrevalidationVal(summary, dataOpt) = prepareForValidation(data, labelColName)
       (e, summary, dataOpt.getOrElse(data))
-    }.getOrElse{ findBestEstimator(data.toDF()) }
+    }.getOrElse { findBestEstimator(data.toDF()) }
 
     val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
@@ -159,7 +161,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     log.info(s"With parameters : ${bestEst.extractParamMap()}")
 
     // set input and output params
-    outputsColNamesMap.foreach{ case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
+    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
 
     // get eval results for metadata
     val trainingEval = evaluate(bestModel.transform(preparedData))
@@ -184,12 +186,26 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val meta = metadataSummary.toMetadata(skipUnsupported = true)
     setMetadata(meta.toSummaryMetadata())
 
-    new SelectedModel(bestModel.asInstanceOf[ModelType], outputsColNamesMap, uid = uid, operationName = operationName)
+    val selectedModel = new SelectedModel(
+      bestModel.asInstanceOf[ModelType],
+      outputsColNamesMap,
+      uid = uid,
+      operationName = operationName
+    )
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
       .setParent(this)
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
       .setEvaluators(evaluators)
+
+    bestModel match {
+      case m: SparkWrapperParams[_] => m.getOutputDF.foreach(selectedModel.setOutputDF)
+      case _ =>
+    }
+
+    // Reset the job group to feature engineering.
+    JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
+    selectedModel
   }
 
 }
@@ -224,9 +240,10 @@ final class SelectedModel private[op]
     case m => setDefault(sparkMlStage, Option(m))
   }
 
-  @transient private lazy val recoveredStage: ModelType = getSparkMlStage() match {
-    case Some(m: PredictionModel[_, _]) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
-    case Some(m: ModelType@unchecked) => m
+  @transient private lazy val recoveredStage: ModelType = (getSparkMlStage(), getLocalMlStage()) match {
+    case (Some(m: PredictionModel[_, _]), _) => SparkModelConverter.toOPUnchecked(m, m.uid).asInstanceOf[ModelType]
+    case (Some(m: ModelType@unchecked), _) => m
+    case (None, Some(m: MLeapTransformer)) => SparkModelConverter.toOPUnchecked(m, m.uid).asInstanceOf[ModelType]
     case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
       s" type ${m.getClass.getName}")
   }

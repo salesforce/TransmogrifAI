@@ -74,7 +74,7 @@ class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
     val recovered: FeaturesAndGenerators =
       for {(feature, featureGenerator) <- featuresAndGenerators} yield {
         val featureGenJson = featureGenerator.write.asInstanceOf[OpPipelineStageWriter].writeToJsonString("")
-        val recoveredStage = new OpPipelineStageReader(Seq.empty).loadFromJsonString(featureGenJson, "")
+        val recoveredStage = new OpPipelineStageReader(Seq.empty).loadFromJsonString(featureGenJson, "", true)
         recoveredStage shouldBe a[FeatureGeneratorStage[_, _]]
         feature -> recoveredStage.asInstanceOf[FeatureGeneratorStage[Row, _ <: FeatureType]]
       }
@@ -87,7 +87,7 @@ class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
     val multiplied = FeatureBuilder.Integral[Int].extract(new IntMultiplyExtractor(multiplier)).asPredictor
     val featureGenerator = multiplied.originStage
     val featureGenJson = featureGenerator.write.asInstanceOf[OpPipelineStageWriter].writeToJsonString("")
-    val recoveredStage = new OpPipelineStageReader(Seq.empty).loadFromJsonString(featureGenJson, "")
+    val recoveredStage = new OpPipelineStageReader(Seq.empty).loadFromJsonString(featureGenJson, "", true)
     recoveredStage shouldBe a[FeatureGeneratorStage[_, _]]
     val extractFn = recoveredStage.asInstanceOf[FeatureGeneratorStage[Int, Integral]].extractFn
     extractFn shouldBe a[IntMultiplyExtractor]

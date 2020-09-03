@@ -30,9 +30,14 @@
 
 package com.salesforce.op.stages.sparkwrappers.generic
 
-import com.salesforce.op.stages.SparkStageParam
-import org.apache.spark.ml.PipelineStage
+import com.salesforce.op.features.FeatureSparkTypes
+import com.salesforce.op.stages.{OpPipelineStageBase, SparkStageParam}
+import org.apache.spark.ml.bundle.SparkBundleContext
 import org.apache.spark.ml.param.{Params, StringArrayParam}
+import org.apache.spark.ml.{PipelineStage, Transformer}
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
 
 
 /**
@@ -41,7 +46,7 @@ import org.apache.spark.ml.param.{Params, StringArrayParam}
  * @tparam S type of Spark stage to wrap
  */
 trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
-  self: PipelineStage =>
+  self: OpPipelineStageBase =>
 
   final val sparkInputColParamNames = new StringArrayParam(
     parent = this,
@@ -75,13 +80,54 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
   def getSparkMlStage(): Option[S] = $(sparkMlStage)
 
   /**
+   * Method to access the local version of stage being wrapped
+   *
+   * @return Option of ml leap runtime version of the spark stage after reloading as local
+   */
+  def getLocalMlStage(): Option[MLeapTransformer] = sparkMlStage.localTransformer
+
+  /**
+   * method to set local stage for recovered wrapped stages after loading
+   * @param stage
+   */
+  private[op] def setLocalMlStage(stage: MLeapTransformer): this.type = {
+    sparkMlStage.localTransformer = Option(stage)
+    this
+  }
+
+  /**
+   * XGBoost model save requires a non-empty dataframe to save correctly with Mleap
+   */
+  private var outputDF: Option[DataFrame] = None
+
+  def setOutputDF(df: DataFrame): Unit = {
+    outputDF = Option(df)
+    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(df))
+  }
+
+  private[op] def getOutputDF(): Option[DataFrame] = outputDF
+
+  /**
    * Sets a save path for wrapped spark stage
    *
    * @param path
    */
   def setStageSavePath(path: String): this.type = {
     sparkMlStage.savePath = Option(path)
+    val ds = outputDF.getOrElse(getEmptyDF)
+    sparkMlStage.sbc = Option(SparkBundleContext().withDataset(ds))
     this
+  }
+
+
+  /**
+   * Used for saving models in ML leap format
+   */
+  private def getEmptyDF: DataFrame = {
+    val rawSchema = FeatureSparkTypes.toStructType(getInputFeatures(): _*)
+    val spark = SparkSession.active
+    val df = spark.emptyDataset[Row](RowEncoder(rawSchema))
+    getSparkMlStage().collect { case t: Transformer => t }.foldLeft(df) { case (d, t) => t.transform(d) }
   }
 
   /**

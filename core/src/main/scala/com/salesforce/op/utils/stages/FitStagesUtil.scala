@@ -204,7 +204,6 @@ private[op] case object FitStagesUtil {
    * @param train                training dataset
    * @param test                 test dataset
    * @param hasTest              whether the test dataset is empty or not
-   * @param indexOfLastEstimator Optional index of the last estimator
    * @param persistEveryKStages  frequency of persisting stages
    * @param fittedTransformers   list of already fitted transformers
    * @param spark                Spark session
@@ -215,7 +214,6 @@ private[op] case object FitStagesUtil {
     train: Dataset[Row],
     test: Dataset[Row],
     hasTest: Boolean,
-    indexOfLastEstimator: Option[Int],
     persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
     fittedTransformers: Seq[OPStage] = Seq.empty
   )(implicit spark: SparkSession): FittedDAG = {
@@ -228,7 +226,7 @@ private[op] case object FitStagesUtil {
           train = currTrain,
           test = currTest,
           hasTest = hasTest,
-          transformData = indexOfLastEstimator.exists(_ < index), // only need to update for fit before last estimator
+          transformData = true, // even transformers need to be fit because may need metadata from training
           persistEveryKStages = persistEveryKStages
         )
         alreadyFitted ++= justFitted

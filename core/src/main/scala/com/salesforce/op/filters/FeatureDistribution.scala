@@ -221,14 +221,15 @@ object FeatureDistribution {
   /**
    * Facilitates feature distribution retrieval from computed feature summaries
    *
-   * @param featureKey      feature key
-   * @param summary         feature summary
-   * @param value           optional processed sequence
-   * @param bins            number of histogram bins
-   * @param textBinsFormula formula to compute the text features bin size.
-   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
-   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
-   * @param `type`          feature distribution type: training or scoring
+   * @param featureKey          feature key
+   * @param summary             feature summary
+   * @param value               optional processed sequence
+   * @param bins                number of histogram bins
+   * @param textBinsFormula     formula to compute the text features bin size.
+   *                            Input arguments are [[Summary]] and number of bins to use in computing feature
+   *                            distributions (histograms for numerics, hashes for strings). Output is the bins for
+   *                            the text features.
+   * @param `type`              feature distribution type: training or scoring
    * @return feature distribution given the provided information
    */
   private[op] def fromSummary(
@@ -245,7 +246,8 @@ object FeatureDistribution {
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     val moments = value.map(momentsValues)
-    val cardEstimate = value.map(cardinalityValues)
+    // Tokenization is already done during prep phase, so we can skip text cleaning and tokenization here (for now)
+    val cardEstimate = value.map(cardinalityValues(_, shouldCleanText = false, tokenizeForLengths = false))
 
     FeatureDistribution(
       name = name,
@@ -268,7 +270,7 @@ object FeatureDistribution {
    */
   private def momentsValues(values: ProcessedSeq): Moments = {
     val population = values match {
-      case Left(seq) => seq.map(x => x.length.toDouble)
+      case Left(seq) => seq.map(_.length.toDouble)
       case Right(seq) => seq
     }
     MomentsGroup.sum(population.map(x => Moments(x)))
@@ -276,17 +278,28 @@ object FeatureDistribution {
 
   /**
    * Function to track frequency of the first $(MaxCardinality) unique values
-   * (number for numeric features, token for text features)
+   * (number for numeric features, token for text features). Note that shouldCleanText and tokenizeForLengths are
+   * exposed, but not relevant yet because tokenization always happens before this, during data preparation.
    *
-   * @param values          values to track distribution / frequency
-   * @return TextStats object containing a Map from a value to its frequency (histogram)
+   * @param values              values to track distribution / frequency
+   * @param shouldCleanText     whether or not to clean text for TextStats calculation
+   * @param tokenizeForLengths  whether or not to tokenize strings before computing length distribution
+   * @return TextStats object   containing a Map from a value to its frequency (histogram)
    */
-  private def cardinalityValues(values: ProcessedSeq): TextStats = {
-    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty)
-  }
+  private def cardinalityValues(values: ProcessedSeq, shouldCleanText: Boolean,
+    tokenizeForLengths: Boolean): TextStats = {
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(RawFeatureFilter.MaxCardinality)
 
-  private def countStringValues[T](seq: Seq[T]): Map[String, Long] = {
-    seq.groupBy(identity).map { case (k, valSeq) => k.toString -> valSeq.size.toLong }
+    val stringVals = values match {
+      case Left(stringSeq) => stringSeq
+      case Right(doubleSeq) => doubleSeq.map(_.toString)
+    }
+    stringVals.foldLeft(TextStats.empty)((acc, el) => acc + TextStats.textStatsFromString(
+      textString = el,
+      shouldCleanText = shouldCleanText,
+      shouldTokenize = tokenizeForLengths,
+      maxCardinality = RawFeatureFilter.MaxCardinality)
+    )
   }
 
   /**

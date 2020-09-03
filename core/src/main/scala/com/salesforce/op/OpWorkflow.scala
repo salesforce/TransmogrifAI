@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
@@ -110,64 +111,64 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
 
   /**
-   * Will set the blacklisted features variable and if list is non-empty it will
-   * @param features list of features to blacklist
+   * Will set the blocklisted features variable and if list is non-empty it will
+   * @param features list of features to blocklist
    * @param distributions feature distributions calculated in raw feature filter
    */
-  private[op] def setBlacklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
-    // TODO: Figure out a way to keep track of raw features that aren't explicitly blacklisted, but can't be used
-    // TODO: because they're inputs into an explicitly blacklisted feature. Eg. "height" in ModelInsightsTest
+  private[op] def setBlocklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
+    // TODO: Figure out a way to keep track of raw features that aren't explicitly blocklisted, but can't be used
+    // TODO: because they're inputs into an explicitly blocklisted feature. Eg. "height" in ModelInsightsTest
 
-    def finalResultFeaturesCheck(resultFeatures: Array[OPFeature], blacklisted: List[OPFeature]): Unit = {
+    def finalResultFeaturesCheck(resultFeatures: Array[OPFeature], blocklisted: List[OPFeature]): Unit = {
       if (resultFeaturePolicy == ResultFeatureRetention.Strict) {
-        resultFeatures.foreach{ f => if (blacklisted.contains(f)) {
-          throw new IllegalArgumentException(s"Blacklist of features (${blacklisted.map(_.name).mkString(", ")})" +
+        resultFeatures.foreach{ f => if (blocklisted.contains(f)) {
+          throw new IllegalArgumentException(s"Blocklist of features (${blocklisted.map(_.name).mkString(", ")})" +
             s" from RawFeatureFilter contained the result feature ${f.name}") } }
       } else if (resultFeaturePolicy == ResultFeatureRetention.AtLeastOne) {
-        if (resultFeatures.forall(blacklisted.contains)) throw new IllegalArgumentException(s"Blacklist of features" +
-          s" (${blacklisted.map(_.name).mkString(", ")}) from RawFeatureFilter removed all result features")
+        if (resultFeatures.forall(blocklisted.contains)) throw new IllegalArgumentException(s"Blocklist of features" +
+          s" (${blocklisted.map(_.name).mkString(", ")}) from RawFeatureFilter removed all result features")
       } else throw new IllegalArgumentException(s"result feature retention policy $resultFeaturePolicy not supported")
     }
 
-    blacklistedFeatures = features
-    if (blacklistedFeatures.nonEmpty) {
-      val allBlacklisted: MList[OPFeature] = MList(getBlacklist(): _*)
+    blocklistedFeatures = features
+    if (blocklistedFeatures.nonEmpty) {
+      val allBlocklisted: MList[OPFeature] = MList(getBlocklist(): _*)
       val allUpdated: MList[OPFeature] = MList.empty
 
       val initialResultFeatures = getResultFeatures()
-      finalResultFeaturesCheck(initialResultFeatures, allBlacklisted.toList)
+      finalResultFeaturesCheck(initialResultFeatures, allBlocklisted.toList)
 
       val initialStages = getStages() // ordered by DAG so dont need to recompute DAG
-      // for each stage remove anything blacklisted from the inputs and update any changed input features
+      // for each stage remove anything blocklisted from the inputs and update any changed input features
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
-        val blacklistRemoved = inFeatures
-          .filterNot { f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+        val blocklistRemoved = inFeatures
+          .filterNot { f => allBlocklisted.exists(bl => bl.sameOrigin(f)) }
           .map { f =>
             if (f.isRaw) f.withDistributions(distributions.collect { case d if d.name == f.name => d }) else f
           }
-        val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
+        val inputsChanged = blocklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
         Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
           case Success(out) => allUpdated += out
           case Failure(e) =>
             log.info(s"Issue updating inputs for stage $stg: $e")
-            allBlacklisted += oldOutput
-            finalResultFeaturesCheck(initialResultFeatures, allBlacklisted.toList)
+            allBlocklisted += oldOutput
+            finalResultFeaturesCheck(initialResultFeatures, allBlocklisted.toList)
         }
       }
 
-      // Update the whole DAG with the blacklisted features expunged
+      // Update the whole DAG with the blocklisted features expunged
       val updatedResultFeatures = initialResultFeatures
-        .filterNot(allBlacklisted.contains)
+        .filterNot(allBlocklisted.contains)
         .map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
       setResultFeatures(updatedResultFeatures: _*)
     }
   }
 
 
-  protected[op] def setBlacklistMapKeys(mapKeys: Map[String, Set[String]]): Unit = {
-    blacklistedMapKeys = mapKeys
+  protected[op] def setBlocklistMapKeys(mapKeys: Map[String, Set[String]]): Unit = {
+    blocklistedMapKeys = mapKeys
   }
 
   /**
@@ -232,28 +233,30 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    (reader, rawFeatureFilter) match {
-      case (None, None) => throw new IllegalArgumentException(
-        "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
-      case (Some(r), None) =>
-        checkReadersAndFeatures()
-        r.generateDataFrame(rawFeatures, parameters).persist()
-      case (rd, Some(rf)) =>
-        rd match {
-          case None => setReader(rf.trainingReader)
-          case Some(r) => if (r != rf.trainingReader) log.warn(
-            "Workflow data reader and RawFeatureFilter training reader do not match! " +
-              "The RawFeatureFilter training reader will be used to generate the data for training")
-        }
-        checkReadersAndFeatures()
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
+      (reader, rawFeatureFilter) match {
+        case (None, None) => throw new IllegalArgumentException(
+          "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
+        case (Some(r), None) =>
+          checkReadersAndFeatures()
+          r.generateDataFrame(rawFeatures, parameters).persist()
+        case (rd, Some(rf)) =>
+          rd match {
+            case None => setReader(rf.trainingReader)
+            case Some(r) => if (r != rf.trainingReader) log.warn(
+              "Workflow data reader and RawFeatureFilter training reader do not match! " +
+                "The RawFeatureFilter training reader will be used to generate the data for training")
+          }
+          checkReadersAndFeatures()
 
-        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
-          rf.generateFilteredRaw(rawFeatures, parameters)
+          val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
+            rf.generateFilteredRaw(rawFeatures, parameters)
 
-        setRawFeatureFilterResults(rawFeatureFilterResults)
-        setBlacklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
-        setBlacklistMapKeys(mapKeysToDrop)
-        cleanedData
+          setRawFeatureFilterResults(rawFeatureFilterResults)
+          setBlocklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
+          setBlocklistMapKeys(mapKeysToDrop)
+          cleanedData
+      }
     }
   }
 
@@ -344,27 +347,18 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   def train(persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
     (implicit spark: SparkSession): OpWorkflowModel = {
 
-    val (fittedStages, newResultFeatures) =
-      if (stages.exists(_.isInstanceOf[Estimator[_]])) {
-        val rawData = generateRawData()
-        // Update features with fitted stages
-        val fittedStgs = fitStages(data = rawData, stagesToFit = stages, persistEveryKStages)
-        val newResultFtrs = resultFeatures.map(_.copyWithNewStages(fittedStgs))
-        fittedStgs -> newResultFtrs
-      } else if (rawFeatureFilter.nonEmpty) {
-        generateRawData()
-        stages -> resultFeatures
-      } else {
-        stages -> resultFeatures
-      }
+    val rawData = generateRawData()
+    // Update features with fitted stages
+    val fittedStages = fitStages(data = rawData, stagesToFit = stages, persistEveryKStages)
+    val newResultFeatures = resultFeatures.map(_.copyWithNewStages(fittedStages))
 
     val model =
       new OpWorkflowModel(uid, getParameters())
         .setStages(fittedStages)
         .setFeatures(newResultFeatures)
         .setParameters(getParameters())
-        .setBlacklist(getBlacklist())
-        .setBlacklistMapKeys(getBlacklistMapKeys())
+        .setBlocklist(getBlocklist())
+        .setBlocklistMapKeys(getBlocklistMapKeys())
         .setRawFeatureFilterResults(getRawFeatureFilterResults())
 
     reader.map(model.setReader).getOrElse(model)
@@ -394,34 +388,34 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       .map(_.filter(s => stagesToFit.contains(s._1)))
       .filter(_.nonEmpty)
 
-    // Search for the last estimator
-    val indexOfLastEstimator: Option[Int] =
-      dag.collect { case seq if seq.exists(_._1.isInstanceOf[Estimator[_]]) => seq.head._2 }.lastOption
-
     // doing regular workflow fit without workflow level CV
     if (!isWorkflowCV) {
-      FitStagesUtil.fitAndTransformDAG(
-        dag = dag,
-        train = train,
-        test = test,
-        hasTest = hasTest,
-        indexOfLastEstimator = indexOfLastEstimator,
-        persistEveryKStages = persistEveryKStages
-      ).transformers
+      // The cross-validation job group is handled in the appropriate Estimator
+      JobGroupUtil.withJobGroup(OpStep.FeatureEngineering) {
+        FitStagesUtil.fitAndTransformDAG(
+          dag = dag,
+          train = train,
+          test = test,
+          hasTest = hasTest,
+          persistEveryKStages = persistEveryKStages
+        ).transformers
+      }
     } else {
       // doing workflow level CV/TS
       // Extract Model Selector and Split the DAG into
       val CutDAG(modelSelectorOpt, before, during, after) = FitStagesUtil.cutDAG(dag)
 
       log.info("Applying initial DAG before CV/TS. Stages: {}", before.flatMap(_.map(_._1.stageName)).mkString(", "))
-      val FittedDAG(beforeTrain, beforeTest, beforeTransformers) = FitStagesUtil.fitAndTransformDAG(
-        dag = before,
-        train = train,
-        test = test,
-        hasTest = hasTest,
-        indexOfLastEstimator = indexOfLastEstimator,
-        persistEveryKStages = persistEveryKStages
-      )
+      val FittedDAG(beforeTrain, beforeTest, beforeTransformers) =
+        JobGroupUtil.withJobGroup(OpStep.FeatureEngineering) {
+          FitStagesUtil.fitAndTransformDAG(
+            dag = before,
+            train = train,
+            test = test,
+            hasTest = hasTest,
+            persistEveryKStages = persistEveryKStages
+          )
+        }
 
       // Break up catalyst (cause it chokes) by converting into rdd, persisting it and then back to dataframe
       val (trainRDD, testRDD) = (beforeTrain.rdd.persist(), beforeTest.rdd.persist())
@@ -437,19 +431,22 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           log.info("Estimate best Model with CV/TS. Stages included in CV are: {}, {}",
             during.flatMap(_.map(_._1.stageName)).mkString(", "), modelSelector.uid: Any
           )
-          modelSelector.findBestEstimator(trainFixed, Option(during))
+          JobGroupUtil.withJobGroup(OpStep.CrossValidation) {
+            modelSelector.findBestEstimator(trainFixed, Option(during))
+          }
           val remainingDAG: StagesDAG = (during :+ (Array(modelSelector -> distance): Layer)) ++ after
 
           log.info("Applying DAG after CV/TS. Stages: {}", remainingDAG.flatMap(_.map(_._1.stageName)).mkString(", "))
-          val fitted = FitStagesUtil.fitAndTransformDAG(
-            dag = remainingDAG,
-            train = trainFixed,
-            test = testFixed,
-            hasTest = hasTest,
-            indexOfLastEstimator = indexOfLastEstimator,
-            persistEveryKStages = persistEveryKStages,
-            fittedTransformers = beforeTransformers
-          ).transformers
+          val fitted = JobGroupUtil.withJobGroup(OpStep.FeatureEngineering) {
+            FitStagesUtil.fitAndTransformDAG(
+              dag = remainingDAG,
+              train = trainFixed,
+              test = testFixed,
+              hasTest = hasTest,
+              persistEveryKStages = persistEveryKStages,
+              fittedTransformers = beforeTransformers
+            ).transformers
+          }
           trainRDD.unpersist()
           testRDD.unpersist()
           fitted
@@ -480,7 +477,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param path to the trained workflow model
    * @return workflow model
    */
-  def loadModel(path: String): OpWorkflowModel = new OpWorkflowModelReader(Some(this)).load(path)
+  def loadModel(path: String): OpWorkflowModel = {
+    new OpWorkflowModelReader(Some(this)).load(path)
+  }
 
   /**
    * Returns a dataframe containing all the columns generated up to and including the feature input

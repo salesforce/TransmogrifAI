@@ -55,8 +55,8 @@ import scala.util.Failure
 /**
  * Specialized stage that will load up data and compute distributions and empty counts on raw features.
  * This information is then used to compute which raw features should be excluded from the workflow DAG
- * Note: Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
- * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. However, they
+ * Note: Currently, raw features that aren't explicitly blocklisted, but are not used because they are inputs to
+ * explicitly blocklisted features are not present as raw features in the model, nor in ModelInsights. However, they
  * are accessible from an OpWorkflowModel via getRawFeatureFilterResults().
  *
  * @param trainingReader                reader to get the training data
@@ -599,7 +599,6 @@ object RawFeatureFilter {
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
   val MaxCardinality = 500
-
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName
 

@@ -53,7 +53,7 @@ private[op] trait TransmogrifierDefaults {
   val NullString: String = OpVectorColumnMetadata.NullString
   val OtherString: String = OpVectorColumnMetadata.OtherString
   val DefaultNumOfFeatures: Int = 512
-  val MaxNumOfFeatures: Int = 16384
+  val MaxNumOfFeatures: Int = 1 << 17 // 2^17
   val DateListDefault: DateListPivot = DateListPivot.SinceLast
   val ReferenceDate: org.joda.time.DateTime = DateTimeUtils.now()
   val TopK: Int = 20
@@ -595,30 +595,30 @@ trait MapPivotParams extends Params {
 
   def setCleanKeys(clean: Boolean): this.type = set(cleanKeys, clean)
 
-  final val whiteListKeys = new StringArrayParam(
-    parent = this, name = "whiteListKeys", doc = "list of map keys to include in pivot"
+  final val allowListKeys = new StringArrayParam(
+    parent = this, name = "allowListKeys", doc = "list of map keys to include in pivot"
   )
-  setDefault(whiteListKeys, Array[String]())
+  setDefault(allowListKeys, Array[String]())
 
-  final def setWhiteListKeys(keys: Array[String]): this.type = set(whiteListKeys, keys)
+  final def setAllowListKeys(keys: Array[String]): this.type = set(allowListKeys, keys)
 
-  final val blackListKeys = new StringArrayParam(
-    parent = this, name = "blackListKeys", doc = "list of map keys to exclude from pivot"
+  final val blockListKeys = new StringArrayParam(
+    parent = this, name = "blockListKeys", doc = "list of map keys to exclude from pivot"
   )
-  setDefault(blackListKeys, Array[String]())
+  setDefault(blockListKeys, Array[String]())
 
-  final def setBlackListKeys(keys: Array[String]): this.type = set(blackListKeys, keys)
+  final def setBlockListKeys(keys: Array[String]): this.type = set(blockListKeys, keys)
 
   protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
     val map = cleanMap[V](m, shouldCleanKey, shouldCleanValue)
-    val (whiteList, blackList) = (
-      $(whiteListKeys).map(cleanTextFn(_, shouldCleanKey)),
-      $(blackListKeys).map(cleanTextFn(_, shouldCleanKey))
+    val (allowList, blockList) = (
+      $(allowListKeys).map(cleanTextFn(_, shouldCleanKey)),
+      $(blockListKeys).map(cleanTextFn(_, shouldCleanKey))
     )
-    if (whiteList.nonEmpty) {
-      map.filter { case (k, v) => whiteList.contains(k) && !blackList.contains(k) }
-    } else if (blackList.nonEmpty) {
-      map.filter { case (k, v) => !blackList.contains(k) }
+    if (allowList.nonEmpty) {
+      map.filter { case (k, v) => allowList.contains(k) && !blockList.contains(k) }
+    } else if (blockList.nonEmpty) {
+      map.filter { case (k, v) => !blockList.contains(k) }
     } else {
       map
     }

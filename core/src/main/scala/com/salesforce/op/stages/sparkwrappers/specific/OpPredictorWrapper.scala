@@ -35,11 +35,15 @@ import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.OpPipelineStage2
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.Dataset
 
-import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
+
 
 /**
  * Wraps a spark ML predictor.  Predictors represent supervised learning algorithms (regression and classification) in
@@ -98,12 +102,20 @@ class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vect
       .set(po, getOutputFeatureName)
       .fit(dataset)
 
-    SparkModelConverter.toOP(model, uid)
+    val wrappedModel = SparkModelConverter.toOP(model, uid)
       .setParent(this)
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
+
+    // Mleap XGBoost save calls first on associated dataframe and so cannot use empty DF to seed
+    if (model.isInstanceOf[XGBoostClassificationModel] || model.isInstanceOf[XGBoostRegressionModel]) {
+      wrappedModel.setOutputDF(model.transform(dataset.limit(1)))
+    }
+
+    wrappedModel
   }
+
 }
 
 abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
@@ -115,8 +127,27 @@ abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
   implicit val tti1: TypeTag[RealNN],
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
-  val ttov: TypeTag[Prediction#Value]
+  val ttov: TypeTag[Prediction#Value],
+  val ctag: ClassTag[M]
 ) extends Model[OpPredictorWrapperModel[M]] with SparkWrapperParams[M]
   with OpTransformer2[RealNN, OPVector, Prediction] {
   setDefault(sparkMlStage, Option(sparkModel))
+
+  protected def getSparkOrLocalMethod(sparkMethodName: String, localMethodName: String,
+    argsCount: Option[Int] = None): MethodMirror = {
+    getSparkMlStage().map(s => reflectMethod(s, sparkMethodName, argsCount))
+      .orElse(getLocalMlStage().map(s => reflectMethod(s.model, localMethodName, argsCount)))
+      .getOrElse(throw new RuntimeException("No spark wrapped stage or local wrapped stage was found"))
+  }
+
+  @transient private lazy val predictMirror: MethodMirror = getSparkOrLocalMethod(
+    "predict", "predict", argsCount = Option(1)
+  )
+
+  /**
+   * Predict label for the given features
+   */
+  protected def predict(features: Vector): Double =
+    predictMirror.apply(features).asInstanceOf[Double]
+
 }

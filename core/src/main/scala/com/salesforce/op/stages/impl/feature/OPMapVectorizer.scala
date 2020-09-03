@@ -40,7 +40,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoders}
-import org.joda.time.{DateTime, DateTimeZone, Days}
+import org.joda.time.DateTime
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -186,7 +186,7 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
     parent = this, name = "numFeatures",
     doc = s"number of features (hashes) to generate (default: ${TransmogrifierDefaults.DefaultNumOfFeatures})",
     isValid = ParamValidators.inRange(
-      lowerBound = 0, upperBound = TransmogrifierDefaults.MaxNumOfFeatures,
+      lowerBound = 0, upperBound = 1E7,
       lowerInclusive = false, upperInclusive = true
     )
   )
@@ -291,7 +291,8 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
       grouping = Option(key),
-      indicatorValue = None
+      indicatorValue = None,
+      descriptorValue = col.descriptorValue
     )
     meta.withColumns(cols.toArray)
   }
@@ -394,10 +395,9 @@ final class DateMapVectorizerModel[T <: OPMap[Long]] private[op]
   uid: String
 )(implicit tti: TypeTag[T])
   extends OPMapVectorizerModel[Long, T](args = args, operationName = operationName, uid = uid) {
-  val timeZone: DateTimeZone = DateTimeUtils.DefaultTimeZone
 
   def convertFn: DateMap#Value => RealMap#Value = (dt: DateMap#Value) =>
-    dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), referenceDate).getDays.toDouble)
+    dt.mapValues(v => DateTimeUtils.getStandardDays(v, referenceDate.getMillis))
 }
 
 final class RealMapVectorizerModel[T <: OPMap[Double]] private[op]

@@ -30,17 +30,23 @@
 
 package com.salesforce.op
 
+
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
+import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
-import org.apache.spark.ml.util.MLReader
+import org.apache.commons.io.IOUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
 import scala.collection.mutable.ArrayBuffer
+import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -49,8 +55,9 @@ import scala.util.{Failure, Success, Try}
  * NOTE: The FeatureGeneratorStages will not be recovered into the Model object, because they are part of each feature.
  *
  * @param workflowOpt optional workflow that produced the trained model
+ * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
  */
-class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReader[OpWorkflowModel] {
+class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Boolean = true) {
 
   /**
    * Load a previously trained workflow model from path
@@ -58,11 +65,13 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @param path to the trained workflow model
    * @return workflow model
    */
-  final override def load(path: String): OpWorkflowModel = {
-    Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString)
+  final def load(path: String): OpWorkflowModel = {
+    implicit val conf = new org.apache.hadoop.conf.Configuration()
+    Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
       .flatMap(loadJson(_, path = path)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
+
     }
   }
 
@@ -92,15 +101,15 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       stages <- loadStages(json, workflowOpt, path)
       resolvedFeatures <- resolveFeatures(json, stages)
       resultFeatures <- resolveResultFeatures(json, resolvedFeatures)
-      blacklist <- resolveBlacklist(json, workflowOpt, resolvedFeatures, path)
-      blacklistMapKeys <- resolveBlacklistMapKeys(json)
+      blocklist <- resolveBlocklist(json, workflowOpt, resolvedFeatures, path)
+      blocklistMapKeys <- resolveBlocklistMapKeys(json)
       rffResults <- resolveRawFeatureFilterResults(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
-      .setBlacklist(blacklist)
-      .setBlacklistMapKeys(blacklistMapKeys)
+      .setBlocklist(blocklist)
+      .setBlocklistMapKeys(blocklistMapKeys)
       .setRawFeatureFilterResults(rffResults)
   }
 
@@ -112,7 +121,8 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     val stagesJs = (json \ field.entryName).extract[JArray].arr
     val (recoveredStages, recoveredFeatures) = ArrayBuffer.empty[OPStage] -> ArrayBuffer.empty[OPFeature]
     for {j <- stagesJs} {
-      val stage = new OpPipelineStageReader(recoveredFeatures).loadFromJson(j, path = path).asInstanceOf[OPStage]
+      val stage = new OpPipelineStageReader(recoveredFeatures)
+        .loadFromJson(j, path = path, asSpark = asSpark).asInstanceOf[OPStage]
       recoveredStages += stage
       recoveredFeatures += stage.getOutput()
     }
@@ -127,7 +137,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       val originalStage = workflow.getStages().find(_.uid == stageUid)
       originalStage match {
         case Some(os) => Option(
-          new OpPipelineStageReader(os).loadFromJson(j, path = path)).map(_.asInstanceOf[OPStage]
+          new OpPipelineStageReader(os).loadFromJson(j, path = path, asSpark = asSpark)).map(_.asInstanceOf[OPStage]
         )
         case None if generators.exists(_.uid == stageUid) => None // skip the generator since they are in the workflow
         case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
@@ -163,31 +173,39 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     features.filter(f => resultIds.contains(f.uid))
   }
 
-  private def resolveBlacklist
+  private def resolveBlocklist
   (
     json: JValue,
     wfOpt: Option[OpWorkflow],
     features: Array[OPFeature],
     path: String
   ): Try[Array[OPFeature]] = {
-    if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
-      for {
-        feats <- wfOpt
-          .map(wf => Success(wf.getAllFeatures() ++ wf.getBlacklist()))
-          .getOrElse(loadStages(json, BlacklistedStages, path).map(_._2))
-        allFeatures = features ++ feats
-        blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[Array[String]]
-      } yield blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
-    } else {
-      Success(Array.empty[OPFeature])
-    }
+    // For backward compatibility. The relevant field name is determined
+    // by the max length of the blocklist found for each name.
+    val potentialNames = Seq(
+      (json \ BlocklistedFeaturesUids.entryName, BlocklistedStages),
+      (json \ OldBlocklistedFeaturesUids.entryName, OldBlocklistedStages)
+    )
+    potentialNames.map { names =>
+      if (names._1 != JNothing) { // for backwards compatibility
+        for {
+          feats <- wfOpt
+            .map(wf => Success(wf.getAllFeatures() ++ wf.getBlocklist()))
+            .getOrElse(loadStages(json, names._2, path).map(_._2))
+          allFeatures = features ++ feats
+          blocklistIds = names._1.extract[Array[String]]
+        } yield blocklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
+      } else {
+        Success(Array.empty[OPFeature])
+      }
+    }.maxBy(_.getOrElse(Array()).length)
   }
 
-  private def resolveBlacklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
-    (json \ BlacklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
-      case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
-      case None => Map.empty
-    }
+  private def resolveBlocklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
+    // For backward compatibility we combine new and deprecated keys.
+    Seq(json \ BlocklistedMapKeys.entryName, json \ OldBlocklistedMapKeys.entryName)
+      .flatMap(_.extractOpt[Map[String, List[String]]])
+      .flatMap(_.map { case (k, vs) => k -> vs.toSet }).toMap
   }
 
   private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {
@@ -212,3 +230,30 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   }
 
 }
+
+private object WorkflowFileReader {
+
+  def loadFile(pathString: String)(implicit conf: Configuration): String = {
+    val path = new Path(pathString)
+    val fs = path.getFileSystem(conf)
+    val allFiles = fs.listFiles(path, false)
+    var partPath: Option[Path] = None
+    while (allFiles.hasNext) {
+      val p = allFiles.next().getPath
+      if (p.getName.startsWith("part-00000")) {
+        partPath = Option(p)
+      }
+    }
+    val finalPath = partPath.getOrElse(path)
+    val codecFactory = new CompressionCodecFactory(conf)
+    val codec = Option(codecFactory.getCodec(finalPath))
+    val in = fs.open(finalPath)
+    val read = codec.map( c => Source.fromInputStream(c.createInputStream(in)).mkString )
+      .getOrElse( IOUtils.toString(in, "UTF-8") )
+    in.close()
+    read
+  }
+}
+
+
+

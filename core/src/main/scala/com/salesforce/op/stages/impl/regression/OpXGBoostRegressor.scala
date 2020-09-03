@@ -34,10 +34,12 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
-import ml.dmlc.xgboost4j.scala.{EvalTrait, ObjectiveTrait}
-import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostRegressorParams, TrackerConf, XGBoostRegressionModel, XGBoostRegressor}
+import ml.dmlc.xgboost4j.scala.{DMatrix, EvalTrait, ObjectiveTrait}
+import ml.dmlc.xgboost4j.scala.spark.{DataUtils, OpXGBoost, OpXGBoostRegressorParams, TrackerConf, XGBoost, XGBoostRegressionModel, XGBoostRegressor}
+import org.apache.spark.ml.linalg.Vector
+import ml.combust.mleap.xgboost.runtime.{XGBoostRegressionModel => MleapXGBoostRegressionModel}
 
+import scala.collection.Iterator
 import scala.reflect.runtime.universe.TypeTag
 
 /**
@@ -235,6 +237,11 @@ class OpXGBoostRegressor(uid: String = UID[OpXGBoostRegressor])
   def setMaxBins(value: Int): this.type = set(maxBins, value)
 
   /**
+   * Maximum number of nodes to be added. Only relevant when grow_policy=lossguide is set.
+   */
+  def setMaxLeaves(value: Int): this.type = set(maxLeaves, value)
+
+  /**
    * This is only used for approximate greedy algorithm.
    * This roughly translated into O(1 / sketch_eps) number of bins. Compared to directly select
    * number of bins, this comes with theoretical guarantee with sketch accuracy.
@@ -281,7 +288,18 @@ class OpXGBoostRegressor(uid: String = UID[OpXGBoostRegressor])
   def setLambdaBias(value: Double): this.type = set(lambdaBias, value)
 
   // setters for learning params
+
+  /**
+   * Specify the learning task and the corresponding learning objective.
+   * options: reg:squarederror, reg:logistic, binary:logistic, binary:logitraw, count:poisson,
+   * multi:softmax, multi:softprob, rank:pairwise, reg:gamma. default: reg:squarederror
+   */
   def setObjective(value: String): this.type = set(objective, value)
+
+  /**
+   * Objective type used for training. For options see [[ml.dmlc.xgboost4j.scala.spark.params.LearningTaskParams]]
+   */
+  def setObjectiveType(value: String): this.type = set(objectiveType, value)
 
   /**
    * Specify the learning task and the corresponding learning objective.
@@ -308,6 +326,11 @@ class OpXGBoostRegressor(uid: String = UID[OpXGBoostRegressor])
    * of consecutive increases in any evaluation metric.
    */
   def setNumEarlyStoppingRounds(value: Int): this.type = set(numEarlyStoppingRounds, value)
+
+  /**
+   * Define the expected optimization to the evaluation metrics, true to maximize otherwise minimize it
+   */
+  def setMaximizeEvaluationMetrics(value: Boolean): this.type = set(maximizeEvaluationMetrics, value)
 
   /**
    * Customized objective function provided by user. default: null
@@ -342,5 +365,26 @@ class OpXGBoostRegressionModel
 ) extends OpPredictionModel[XGBoostRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ) {
-  @transient lazy val predictMirror = reflectMethod(getSparkMlStage().get, "predict")
+  import OpXGBoost._
+
+  @transient private lazy val localModel = getLocalMlStage()
+    .map{ s => s.model.asInstanceOf[MleapXGBoostRegressionModel] }
+
+  @transient private lazy val localPredict = localModel.map{ model =>
+    features: Vector => {
+      // Put data into correct format for XGBoostMleap
+      val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F))
+      model.predict(data = dm)
+    }
+  }
+
+  @transient private lazy val sparkPredict = getSparkMlStage().map(s => s.predict(_))
+
+  override protected def predict(features: Vector): Double = {
+    sparkPredict
+      .orElse(localPredict)
+      .getOrElse(throw new RuntimeException("Failed to find spark or local xgboost stage"))
+      .apply(features)
+  }
 }
+

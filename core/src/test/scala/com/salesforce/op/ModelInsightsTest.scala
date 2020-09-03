@@ -45,19 +45,20 @@ import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.Moments
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
+import com.twitter.algebird.Moments
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
-class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality {
+class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality with OpXGBoostQuietLogging {
 
   private val density = weight / height
   private val generVec = genderPL.vectorize(topK = 10, minSupport = 1, cleanText = true)
@@ -74,8 +75,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
-  val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
-  val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
+  val xgbClassifier = new OpXGBoostClassifier().setMissing(0.0f).setSilent(1).setSeed(42L)
+  val xgbRegressor = new OpXGBoostRegressor().setMissing(0.0f).setSilent(1).setSeed(42L)
   val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
   val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()
   lazy val xgbWorkflow =
@@ -280,8 +281,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "find the sanity checker metadata even if the model has been serialized" in {
     val path = tempDir.toString + "/model-insights-test-" + System.currentTimeMillis()
     val json = OpWorkflowModelWriter.toJson(workflowModel, path)
-    val loadedModel = new OpWorkflowModelReader(Some(workflow)).loadJson(json, path)
-    val insights = loadedModel.get.modelInsights(checked)
+    val loadedModel = new OpWorkflowModelReader(Some(workflow)).loadJson(json, path).get
+    val insights = loadedModel.modelInsights(checked)
     val ageInsights = insights.features.filter(_.featureName == age.name).head
     val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
     ageInsights.derivedFeatures.foreach { f =>
@@ -445,7 +446,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly serialize and deserialize from json when raw feature filter is used" in {
-
     val insights = modelWithRFF.modelInsights(predWithMaps)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
@@ -456,6 +456,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
+            i.distributions.foreach { i => i.cardEstimate should not be None}
+            o.distributions.foreach { o => o.cardEstimate shouldEqual None}
             RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
             RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
             RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
@@ -509,12 +511,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "have feature insights for features that are removed by the raw feature filter" in {
     val insights = modelWithRFF.modelInsights(predWithMaps)
 
-    modelWithRFF.getBlacklist() should contain theSameElementsAs Array(age, description, genderPL, weight)
+    modelWithRFF.getBlocklist() should contain theSameElementsAs Array(age, description, genderPL, weight)
     val heightIn = insights.features.find(_.featureName == age.name).get
     heightIn.derivedFeatures.size shouldBe 1
     heightIn.derivedFeatures.head.excluded shouldBe Some(true)
 
-    modelWithRFF.getBlacklistMapKeys() should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
+    modelWithRFF.getBlocklistMapKeys() should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
     val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
     val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
     mapDerivedIn.size shouldBe 3
@@ -526,7 +528,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val labelName = "l"
 
   val summary = SanityCheckerSummary(
-    correlationsWLabel = Correlations(Seq("f0_f0_f2_1", "f0_f0_f3_2"), Seq(5.2, 5.3), Seq("f1_0"),
+    correlations = Correlations(Seq("f1_0", "f0_f0_f2_1", "f0_f0_f3_2"), Seq(Double.NaN, 5.2, 5.3), Seq.empty,
       CorrelationType.Pearson),
     dropped = Seq("f1_0"),
     featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
@@ -688,10 +690,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
 
     /**
-     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
-     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
-     * it's not explicitly blacklisted itself.
+     * Currently, raw features that aren't explicitly blocklisted, but are not used because they are inputs to
+     * explicitly blocklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blocklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blocklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
 
@@ -968,4 +970,5 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       "second" -> classOf[SingleMetric]
     )
   }
+
 }

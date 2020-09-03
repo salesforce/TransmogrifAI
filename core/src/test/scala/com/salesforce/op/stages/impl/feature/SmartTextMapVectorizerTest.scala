@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.Feature
+import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
@@ -44,7 +44,11 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
 import com.salesforce.op.testkit.RandomText
+import org.apache.spark.sql.{DataFrame, Encoder, Encoders}
+import org.scalatest.Assertion
+import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -117,6 +121,18 @@ class SmartTextMapVectorizerTest
   val (rawDFSeparateMaps, rawTextMap1, rawTextMap2, rawTextMap3) =
     TestFeatureBuilder("textMap1", "textMap2", "textMap3", mapDataSeparate)
 
+  val textMapData = Map(
+    "f1" -> "I have got a lovely bunch of coconuts. Here they are all standing in a row.",
+    "f2" -> "Olly wolly polly woggy ump bump fizz!"
+  )
+  val tokensMap = textMapData.mapValues(s => TextTokenizer.tokenizeString(s).tokens)
+  val tol = 1e-12 // Tolerance for comparing real numbers
+
+  val oneCountryData: Seq[Text] = Seq.fill(1000)(Text("United States"))
+  val categoricalCountryData = Random.shuffle(oneCountryData ++ countryData)
+  val countryMapData = categoricalCountryData.map { case country => mapifyText(Seq(country)) }
+  val (countryMapDF, rawCatCountryMap) = TestFeatureBuilder("rawCatCountryMap", countryMapData)
+
   /**
    * Estimator instance to be tested
    */
@@ -134,6 +150,7 @@ class SmartTextMapVectorizerTest
     Vectors.dense(Array(0.0, 1.0, 0.0, 1.0))
   ).map(_.toOPVector)
 
+  import spark.sqlContext.implicits._
 
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
@@ -449,7 +466,43 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance " +
+    "when data is in a single TextMap" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -485,7 +538,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(0.5).setTextLengthType(TextLengthType.Tokens)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
@@ -860,5 +913,262 @@ class SmartTextMapVectorizerTest
       }
       loggingLevels(prevLoggingLevels) // Reset logging levels
     }
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance " +
+    "when data is in many TextMaps" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0).setTextLengthType(TextLengthType.FullEntry)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDFSeparateMaps)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "treat the edge case of coverage being near 0" in {
+    val maxCard = 100
+    val vectorizer = new SmartTextMapVectorizer().setCoveragePct(1e-10).setMaxCardinality(maxCard).setMinSupport(1)
+      .setTrackTextLen(true).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.TopK + 2, Pivot)
+  }
+  it should "treat the edge case of coverage being near 1" in {
+    val maxCard = 100
+    val vectorizer = new SmartTextMapVectorizer().setCoveragePct(1.0 - 1e-10).setMaxCardinality(maxCard)
+      .setMinSupport(1)
+      .setTrackTextLen(true).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.DefaultNumOfFeatures + 2, Hash)
+  }
+
+  it should "detect one categorical with high cardinality using the coverage" in {
+    val maxCard = 100
+    val topK = 10
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
+      .setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, topK + 2, Pivot)
+  }
+
+  it should "not pivot using the coverage because of a high minimum support" in {
+    val maxCard = 100
+    val topK = 10
+    val minSupport = 99999
+    val numHashes = 5
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(minSupport).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, numHashes + 2, Hash)
+  }
+
+  it should "still pivot using the coverage despite a high minimum support" in {
+    val maxCard = 100
+    val topK = 10
+    val minSupport = 100
+    val numHashes = 5
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(minSupport).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, 3, Pivot)
+  }
+
+  it should "not pivot using the coverage because top K is too high" in {
+    val maxCard = 100
+    val topK = 1000000
+    val numHashes = 5
+    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be <= topK
+    val vectorizer = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setNumFeatures(numHashes).setCoveragePct(0.5)
+      .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountryMap)
+    val output = vectorizer.getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(output).transform(countryMapDF)
+    assertVectorLength(transformed, output, numHashes + 2, Hash)
+  }
+
+  it should "still transform country into text, despite the coverage" in {
+    val maxCard = 100
+    val topK = 10
+    val numHashes = 5
+    val cardinality = rawDFSeparateMaps.select(rawTextMap1).as[TextMap#Value].map(_.get("f0")).distinct().count().toInt
+    cardinality should be > maxCard
+    cardinality should be > topK
+    val coverageHashed = new SmartTextMapVectorizer()
+      .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
+      .setTrackTextLen(true).setNumFeatures(numHashes).setInput(rawTextMap1).getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(coverageHashed).transform(rawDFSeparateMaps)
+    val expectedLength = numHashes + 2 + categoricalTextData.toSet.filter(!_.isEmpty).toSeq.length + 2
+    assertVectorLength(transformed, coverageHashed, expectedLength , Hash)
+  }
+
+  it should "create a TextStats object from text that makes sense" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
+      textMapData,
+      shouldCleanKeys = false,
+      shouldCleanValues = false,
+      shouldTokenize = true,
+      maxCardinality = 100
+    )
+
+    // Check sizes
+    res.keyValueCounts.size shouldBe 2 // Two keys in textMapData
+    res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
+
+    // Check value counts
+    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts should contain
+      ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.keyValueCounts("f2").valueCounts.size shouldBe 1
+    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+
+    // Check token length counts
+    res.keyValueCounts("f1").lengthCounts.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
+    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (3 -> 2L)
+    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (8 -> 2L)
+    res.keyValueCounts("f2").lengthCounts.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+  }
+
+  it should "create a TextStats with the correct derived quantities" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
+      textMapData,
+      shouldCleanKeys = false,
+      shouldCleanValues = false,
+      shouldTokenize = true,
+      maxCardinality = 100
+    )
+
+    checkDerivedQuantities(res, "f1", Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
+    checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3, 4, 4).map(_.toLong))
+  }
+
+  it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
+      textMapData,
+      shouldCleanKeys = false,
+      shouldCleanValues = false,
+      shouldTokenize = true,
+      maxCardinality = 2
+    )
+
+    // Check lengths
+    res.keyValueCounts.size shouldBe 2 // Two keys in textMapData
+    res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
+
+    // Check value counts
+    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts should contain
+    ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.keyValueCounts("f2").valueCounts.size shouldBe 1
+    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+
+    // Check token length counts
+    res.keyValueCounts("f1").lengthCounts.size shouldBe 3
+    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (3 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    checkDerivedQuantities(res, "f1", Seq(6, 3, 5).map(_.toLong))
+
+    res.keyValueCounts("f2").lengthCounts.size shouldBe 3
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 1L)
+    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+    checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3).map(_.toLong))
+  }
+
+  it should "turn on stripHTML flag is equivalent to passing in a custom AnalyzerHtmlStrip" +
+    "inside SmartTextMapVectorizer" in {
+    val exampleHTML = "<body>Big ones, small <h1>ones</h1>, some as big as your head</body>".toText
+    val tokensWithFlag = new SmartTextMapVectorizer()
+      .setStripHtml(true).setInput(m1).tokenize(exampleHTML).tokens.value
+    val tokensWithAnalyzer = new SmartTextMapVectorizer().setInput(m1)
+      .tokenize(exampleHTML, analyzer = TextTokenizer.AnalyzerHtmlStrip).tokens.value
+    tokensWithFlag should contain theSameElementsInOrderAs tokensWithAnalyzer
+  }
+
+  private[op] def assertVectorLength(df: DataFrame, output: FeatureLike[OPVector],
+    expectedLength: Int, textVectorizationMethod: TextVectorizationMethod): Unit = {
+    val result = df.collect(output)
+    val firstRes = result.head
+    val metaColumns = OpVectorMetadata(df.schema(output.name)).columns
+
+    firstRes.v.size shouldBe expectedLength
+    metaColumns.length shouldBe expectedLength
+
+    textVectorizationMethod match {
+      case Pivot => assert(metaColumns(expectedLength - 2).indicatorValue.contains(OpVectorColumnMetadata.OtherString))
+      case Hash => assert(metaColumns(expectedLength - 2).descriptorValue
+        .contains(OpVectorColumnMetadata.TextLenString))
+      case other => throw new Error(s"Only Pivoting or Hashing possible, got ${other} instead")
+    }
+    assert(metaColumns(expectedLength - 1).indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  /**
+   * Set of tests to check that the derived quantities calculated on the length distribution in TextMapStats (for
+   * a single key) match the actual length distributions of the tokens.
+   *
+   * @param res       TextMapStats result to compare
+   * @param key       key to use for comparisons
+   * @param lengthSeq Expected length sequence
+   * @return          Assertions on derived quantities in TextStats
+   */
+  private[op] def checkDerivedQuantities(res: TextMapStats, key: String, lengthSeq: Seq[Long]): Assertion = {
+    val expectedLengthMean = lengthSeq.sum.toDouble / lengthSeq.length
+    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / lengthSeq.length
+    val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
+
+    res.keyValueCounts(key).lengthSize shouldBe lengthSeq.length
+    compareWithTol(res.keyValueCounts(key).lengthMean, expectedLengthMean, tol)
+    compareWithTol(res.keyValueCounts(key).lengthVariance, expectedLengthVariance, tol)
+    compareWithTol(res.keyValueCounts(key).lengthStdDev, expectedLengthStdDev, tol)
   }
 }

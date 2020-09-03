@@ -33,6 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.compress.GzipCodec
@@ -55,8 +56,10 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   implicit val jsonFormats: Formats = DefaultFormats
 
   override protected def saveImpl(path: String): Unit = {
-    sc.parallelize(Seq(toJsonString(path)), 1)
-      .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
+      sc.parallelize(Seq(toJsonString(path)), 1)
+        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+    }(this.sparkSession)
   }
 
   /**
@@ -77,9 +80,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
     val FN = OpWorkflowModelReadWriteShared.FieldNames
     (FN.Uid.entryName -> model.uid) ~
       (FN.ResultFeaturesUids.entryName -> resultFeaturesJArray) ~
-      (FN.BlacklistedFeaturesUids.entryName -> blacklistFeaturesJArray()) ~
-      (FN.BlacklistedMapKeys.entryName -> blacklistMapKeys()) ~
-      (FN.BlacklistedStages.entryName -> blackListedStagesJArray(path)) ~
+      (FN.BlocklistedFeaturesUids.entryName -> blocklistFeaturesJArray()) ~
+      (FN.BlocklistedMapKeys.entryName -> blocklistMapKeys()) ~
+      (FN.BlocklistedStages.entryName -> blocklistedStagesJArray(path)) ~
       (FN.Stages.entryName -> stagesJArray(path)) ~
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
       (FN.Parameters.entryName -> model.getParameters().toJson(pretty = false)) ~
@@ -91,11 +94,11 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   private def resultFeaturesJArray(): JArray =
     JArray(model.getResultFeatures().map(_.uid).map(JString).toList)
 
-  private def blacklistFeaturesJArray(): JArray =
-    JArray(model.getBlacklist().map(_.uid).map(JString).toList)
+  private def blocklistFeaturesJArray(): JArray =
+    JArray(model.getBlocklist().map(_.uid).map(JString).toList)
 
-  private def blacklistMapKeys(): JObject =
-    JObject(model.getBlacklistMapKeys().map { case (k, vs) => k -> JArray(vs.map(JString).toList) }.toList)
+  private def blocklistMapKeys(): JObject =
+    JObject(model.getBlocklistMapKeys().map { case (k, vs) => k -> JArray(vs.map(JString).toList) }.toList)
 
   /**
    * Serialize all the model stages
@@ -109,14 +112,14 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   }
 
   /**
-   * Serialize all the blacklisted model stages
+   * Serialize all the blocklisted model stages
    *
    * @param path path to store the spark params for stages
    * @return array of serialized stages
    */
-  private def blackListedStagesJArray(path: String): JArray = {
-    val blacklistStages = model.getBlacklist().map(_.originStage)
-    stagesJArray(blacklistStages, path)
+  private def blocklistedStagesJArray(path: String): JArray = {
+    val blocklistStages = model.getBlocklist().map(_.originStage)
+    stagesJArray(blocklistStages, path)
   }
 
   /**
@@ -162,14 +165,21 @@ private[op] object OpWorkflowModelReadWriteShared {
     val values = findValues
     case object Uid extends FieldNames("uid")
     case object ResultFeaturesUids extends FieldNames("resultFeaturesUids")
-    case object BlacklistedFeaturesUids extends FieldNames("blacklistedFeaturesUids")
-    case object BlacklistedMapKeys extends FieldNames("blacklistedMapKeys")
-    case object BlacklistedStages extends FieldNames("blacklistedStages")
+    case object BlocklistedFeaturesUids extends FieldNames("blocklistedFeaturesUids")
+    case object BlocklistedMapKeys extends FieldNames("blocklistedMapKeys")
+    case object BlocklistedStages extends FieldNames("blocklistedStages")
     case object Stages extends FieldNames("stages")
     case object AllFeatures extends FieldNames("allFeatures")
     case object Parameters extends FieldNames("parameters")
     case object TrainParameters extends FieldNames("trainParameters")
     case object RawFeatureFilterResultsFieldName extends FieldNames("rawFeatureFilterResults")
+  }
+
+  object DeprecatedFieldNames extends Enum[FieldNames] {
+    val values = findValues
+    case object OldBlocklistedFeaturesUids extends FieldNames("blacklistedFeaturesUids")
+    case object OldBlocklistedMapKeys extends FieldNames("blacklistedMapKeys")
+    case object OldBlocklistedStages extends FieldNames("blacklistedStages")
   }
 
 }
@@ -183,7 +193,7 @@ object OpWorkflowModelWriter {
   /**
    * Save [[OpWorkflowModel]] to path
    *
-   * @param model     workflow model instance
+   * @param model workflow model instance
    * @param path      path to save the model and its stages
    * @param overwrite should overwrite the destination
    */

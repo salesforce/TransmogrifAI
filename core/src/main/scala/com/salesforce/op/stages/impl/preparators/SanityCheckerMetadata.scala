@@ -42,9 +42,8 @@ import scala.util.{Failure, Success, Try}
 /**
  * Contains all names for sanity checker metadata
  */
-case object SanityCheckerNames {
-  val CorrelationsWLabel: String = "correlationsWithLabel"
-  val CorrelationsWLabelIsNaN: String = "correlationsWithLabelIsNaN"
+case object SanityCheckerNames extends DerivedFeatureFilterNames {
+  val Correlations: String = "correlations"
   val CorrelationType: String = "correlationType"
   val CategoricalStats: String = "categoricalStats"
   val CategoricalFeatures: String = "categoricalFeatures"
@@ -57,52 +56,50 @@ case object SanityCheckerNames {
   val MaxRuleConfidence: String = "maxRuleConfidence"
   val Support: String = "support"
   val CountMatrix: String = "countMatrix"
-  val Names: String = "names"
   val FeaturesIn: String = "features"
-  val Values: String = "values"
-  val FeaturesStatistics = "statistics"
-  val Dropped = "featuresDropped"
-  val Mean = "mean"
-  val Max = "max"
-  val Min = "min"
-  val Count = "count"
-  val SampleFraction = "sampleFraction"
+  val ValuesLabel: String = "valuesLabel"
+  val ValuesFeatures: String = "valuesFeatures"
   val NumNonZeros = "numNonZeros"
-  val Variance = "variance"
   val NumNull = "number of nulls"
 }
 
 /**
  * Case class to convert to and from [[SanityChecker]] summary metadata
  *
- * @param correlationsWLabel      feature correlations with label
- * @param dropped                 features dropped for label leakage
- * @param featuresStatistics      stats on features
- * @param names                   names of features passed in
+ * @param correlations feature correlations with label
+ * @param dropped            features dropped for label leakage
+ * @param featuresStatistics stats on features
+ * @param names              names of features passed in
  * @param categoricalStats
  */
 case class SanityCheckerSummary
 (
-  correlationsWLabel: Correlations,
+  correlations: Correlations,
   dropped: Seq[String],
   featuresStatistics: SummaryStatistics,
   names: Seq[String],
   categoricalStats: Array[CategoricalGroupStats]
 ) extends MetadataLike {
 
-  private[op] def this(
+  private[op] def this
+  (
     stats: Array[ColumnStatistics],
     catStats: Array[CategoricalGroupStats],
     dropped: Seq[String],
     colStats: MultivariateStatisticalSummary,
     names: Seq[String],
     correlationType: CorrelationType,
-    sample: Double
+    sample: Double,
+    keepFeatureFeature: CorrelationLevel
   ) {
     this(
-      correlationsWLabel = new Correlations(
-        stats.filter(s => s.corrLabel.isDefined && !s.corrLabel.get.isNaN).map(s => s.name -> s.corrLabel.get),
-        stats.filter(s => s.corrLabel.isDefined && s.corrLabel.get.isNaN).map(_.name),
+      correlations = new Correlations(
+        stats.filter(s => s.corrLabel.isDefined).map { s =>
+          keepFeatureFeature match {
+            case CorrelationLevel.Stored => (s.name, s.corrLabel.get, s.featureCorrs)
+            case _ => (s.name, s.corrLabel.get, Seq.empty)
+          }
+        },
         correlationType
       ),
       dropped = dropped,
@@ -121,7 +118,7 @@ case class SanityCheckerSummary
    */
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     val summaryMeta = new MetadataBuilder()
-    summaryMeta.putMetadata(SanityCheckerNames.CorrelationsWLabel, correlationsWLabel.toMetadata(skipUnsupported))
+    summaryMeta.putMetadata(SanityCheckerNames.Correlations, correlations.toMetadata(skipUnsupported))
     summaryMeta.putStringArray(SanityCheckerNames.Dropped, dropped.toArray)
     summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata(skipUnsupported))
     summaryMeta.putStringArray(SanityCheckerNames.Names, names.toArray)
@@ -262,17 +259,15 @@ case class CategoricalStats
    * @throws RuntimeException in case of unsupported value type
    * @return [[Metadata]] metadata
    */
-  // TODO: Build the metadata here instead of by treating Cramer's V and mutual info as correlations
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
     meta.putStringArray(SanityCheckerNames.CategoricalFeatures, categoricalFeatures)
-    // TODO: use custom serializer here instead of replacing NaNs with 0s
     meta.putDoubleArray(SanityCheckerNames.CramersV, cramersVs.map(f => if (f.isNaN) 0 else f))
     meta.putDoubleArray(SanityCheckerNames.MutualInfo, mutualInfos)
     meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel,
       pointwiseMutualInfos.toMetadata(skipUnsupported))
     val countMeta = new MetadataBuilder()
-    counts.map{ case (k, v) => countMeta.putDoubleArray(k, v)}
+    counts.map { case (k, v) => countMeta.putDoubleArray(k, v) }
     meta.putMetadata(SanityCheckerNames.CountMatrix, countMeta.build())
     meta.build()
   }
@@ -282,23 +277,24 @@ case class CategoricalStats
  * Correlations between features and the label from [[SanityChecker]]
  *
  * @param featuresIn names of features
- * @param values     correlation of feature with label
- * @param nanCorrs   nan correlation features
+ * @param valuesWithLabel     correlation of feature with label
+ * @param valuesWithFeatures   correlations between features
  * @param corrType   type of correlation done on
  */
 case class Correlations
 (
   featuresIn: Seq[String],
-  values: Seq[Double],
-  nanCorrs: Seq[String],
+  valuesWithLabel: Seq[Double],
+  valuesWithFeatures: Seq[Seq[Double]],
   corrType: CorrelationType
 ) extends MetadataLike {
-  require(featuresIn.length == values.length, "Feature names and correlation values arrays must have the same length")
+  require(featuresIn.length == valuesWithLabel.length,
+    "Feature names and correlation values arrays must have the same length")
 
-  def this(corrs: Seq[(String, Double)], nans: Seq[String], corrType: CorrelationType) = this(
+  def this(corrs: Seq[(String, Double, Seq[Double])], corrType: CorrelationType) = this(
     featuresIn = corrs.map(_._1),
-    values = corrs.map(_._2),
-    nanCorrs = nans,
+    valuesWithLabel = corrs.map(_._2),
+    valuesWithFeatures = if (corrs.flatMap(_._3).isEmpty) Seq.empty else corrs.map(_._3),
     corrType = corrType
   )
 
@@ -311,8 +307,12 @@ case class Correlations
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     val corrMeta = new MetadataBuilder()
     corrMeta.putStringArray(SanityCheckerNames.FeaturesIn, featuresIn.toArray)
-    corrMeta.putDoubleArray(SanityCheckerNames.Values, values.toArray)
-    corrMeta.putStringArray(SanityCheckerNames.CorrelationsWLabelIsNaN, nanCorrs.toArray)
+    corrMeta.putStringArray(SanityCheckerNames.ValuesLabel, valuesWithLabel.map(_.toString).toArray)
+    val fcMeta = new MetadataBuilder
+    if (valuesWithFeatures.nonEmpty) {
+      valuesWithFeatures.zip(featuresIn).map(c => fcMeta.putStringArray(c._2, c._1.map(_.toString).toArray))
+    }
+    corrMeta.putMetadata(SanityCheckerNames.ValuesFeatures, fcMeta.build())
     corrMeta.putString(SanityCheckerNames.CorrelationType, corrType.sparkName)
     corrMeta.build()
   }
@@ -327,29 +327,45 @@ case class Correlations
       } else {
         corrType
       }
-    new Correlations(featuresIn ++ corr.featuresIn, values ++ corr.values, nanCorrs ++ corr.nanCorrs, corrName)
+    Correlations(featuresIn ++ corr.featuresIn, valuesWithLabel ++ corr.valuesWithLabel,
+      valuesWithFeatures ++ corr.valuesWithFeatures, corrName)
   }
 }
 
 case object SanityCheckerSummary {
 
   def flatten(checkers: Seq[SanityCheckerSummary]): SanityCheckerSummary = {
-    val correlationsWLabel: Correlations = checkers.map(_.correlationsWLabel).reduce(_ + _)
+    val correlations: Correlations = checkers.map(_.correlations).reduce(_ + _)
     val dropped: Seq[String] = checkers.flatMap(_.dropped)
     val featuresStatistics: SummaryStatistics = checkers.map(_.featuresStatistics).reduce(_ + _)
     val names: Seq[String] = checkers.flatMap(_.names)
     val categoricalStats: Array[CategoricalGroupStats] = checkers.flatMap(_.categoricalStats).toArray
-    new SanityCheckerSummary(correlationsWLabel, dropped, featuresStatistics, names, categoricalStats)
+    new SanityCheckerSummary(correlations, dropped, featuresStatistics, names, categoricalStats)
   }
 
   private def correlationsFromMetadata(meta: Metadata): Correlations = {
     val wrapped = meta.wrapped
-    Correlations(
-      featuresIn = wrapped.getArray[String](SanityCheckerNames.FeaturesIn).toSeq,
-      values = wrapped.getArray[Double](SanityCheckerNames.Values).toSeq,
-      nanCorrs = wrapped.getArray[String](SanityCheckerNames.CorrelationsWLabelIsNaN).toSeq,
-      corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
-    )
+    val features = wrapped.getArray[String](SanityCheckerNames.FeaturesIn).toSeq
+    if (wrapped.underlyingMap.keySet.contains("correlationsWithLabelIsNaN")) { // old sanity checker meta
+      val nans = wrapped.getArray[String]("correlationsWithLabelIsNaN")
+      val labelCorr = wrapped.getArray[Double]("values").toSeq
+      Correlations(
+        featuresIn = features ++ nans,
+        valuesWithLabel = labelCorr ++ Seq.fill(nans.length)(Double.NaN),
+        valuesWithFeatures = Seq.empty,
+        corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
+      )
+    } else {
+      val fc = wrapped.get[Metadata](SanityCheckerNames.ValuesFeatures).wrapped
+      Correlations(
+        featuresIn = features,
+        valuesWithLabel = wrapped.getArray[String](SanityCheckerNames.ValuesLabel).toSeq.map(_.toDouble),
+        valuesWithFeatures =
+          if (fc.underlyingMap.isEmpty) Seq.empty
+          else features.map(f => fc.getArray[String](f).toSeq.map(_.toDouble)),
+        corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
+      )
+    }
   }
 
   private def statisticsFromMetadata(meta: Metadata): SummaryStatistics = {
@@ -390,18 +406,23 @@ case object SanityCheckerSummary {
     val wrapped = meta.wrapped
     // Try parsing as an older version of metadata (pre-3.3.0) if this doesn't work
     Try {
+      val corr =
+        if (wrapped.underlyingMap.contains("correlationsWithLabel")) {
+          wrapped.get[Metadata]("correlationsWithLabel")
+        } else wrapped.get[Metadata](SanityCheckerNames.Correlations)
       SanityCheckerSummary(
-        correlationsWLabel = correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel)),
+        correlations = correlationsFromMetadata(corr),
         dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
         featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
         names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
         categoricalStats = wrapped.getArray[Metadata](SanityCheckerNames.CategoricalStats)
           .map(categoricalGroupStatsFromMetadata)
       )
-    } match {
-      case Success(summary) => summary
-      // Parse it under the old format
-      case Failure(_) => throw new IllegalArgumentException(s"failed to parse SanityCheckerSummary from $meta")
     }
+  } match {
+    case Success(summary) => summary
+    // Parse it under the old format
+    case Failure(_) => throw new IllegalArgumentException(s"failed to parse SanityCheckerSummary from $meta")
   }
 }
+

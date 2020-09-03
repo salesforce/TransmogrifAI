@@ -69,7 +69,7 @@ class AvroFieldTest extends FlatSpec with TestCommon with Assertions {
     val allSchemas = (enum::unions)++simpleSchemas // NULL does not work
 
     val fields = allSchemas.zipWithIndex map {
-      case (s, i) => new Schema.Field("x" + i, s, "Who", null)
+      case (s, i) => new Schema.Field("x" + i, s, "Who", null: Object)
     }
 
     val expected = List(
@@ -86,7 +86,7 @@ class AvroFieldTest extends FlatSpec with TestCommon with Assertions {
 
     an[IllegalArgumentException] should be thrownBy {
       val nullSchema = Schema.create(Schema.Type.NULL)
-      val nullField = new Schema.Field("xxx", null, "Nobody", null)
+      val nullField = new Schema.Field("xxx", null, "Nobody", null: Object)
       AvroField from nullField
     }
 

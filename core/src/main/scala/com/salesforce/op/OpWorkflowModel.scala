@@ -35,6 +35,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
@@ -75,13 +76,13 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     this
   }
 
-  protected[op] def setBlacklist(features: Array[OPFeature]): this.type = {
-    blacklistedFeatures = features
+  protected[op] def setBlocklist(features: Array[OPFeature]): this.type = {
+    blocklistedFeatures = features
     this
   }
 
-  protected[op] def setBlacklistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
-    blacklistedMapKeys = mapKeys
+  protected[op] def setBlocklistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
+    blocklistedMapKeys = mapKeys
     this
   }
 
@@ -91,9 +92,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    require(reader.nonEmpty, "Data reader must be set")
-    checkReadersAndFeatures()
-    reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
+      require(reader.nonEmpty, "Data reader must be set")
+      checkReadersAndFeatures()
+      reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    }
   }
 
   /**
@@ -135,7 +138,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Updated instance of feature
    */
   def getUpdatedFeatures(features: Array[OPFeature]): Array[OPFeature] = {
-    val allFeatures = getRawFeatures() ++ getBlacklist() ++ getStages().map(_.getOutput())
+    val allFeatures = getRawFeatures() ++ getBlocklist() ++ getStages().map(_.getOutput())
     features.map { f =>
       allFeatures.find(_.sameOrigin(f))
         .getOrElse(throw new IllegalArgumentException(s"feature $f is not a part of this workflow"))
@@ -172,7 +175,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
         val parentStageIds = feature.traverse[Set[String]](Set.empty[String])((s, f) => s + f.originStage.uid)
         val modelStages = stages.filter(s => parentStageIds.contains(s.uid))
         ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams,
-          getBlacklist(), getBlacklistMapKeys(), getRawFeatureFilterResults())
+          getBlocklist(), getBlocklistMapKeys(), getRawFeatureFilterResults())
     }
   }
 
@@ -217,8 +220,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
    */
-  def save(path: String, overwrite: Boolean = true): Unit =
+  def save(path: String, overwrite: Boolean = true): Unit = {
     OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+  }
 
   /**
    * Gets the fitted stage that generates the input feature
@@ -416,7 +420,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     if (persistScores) scores.persist()
 
     // Save the scores if a path was provided
-    path.foreach(scores.saveAvro(_))
+    JobGroupUtil.withJobGroup(OpStep.ResultsSaving) {
+      path.foreach(scores.saveAvro(_))
+    }
 
     scores -> metrics
   }
@@ -434,8 +440,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     val copy =
       new OpWorkflowModel(uid = uid, trainingParams = trainingParams.copy())
         .setFeatures(copyFeatures(resultFeatures))
-        .setBlacklist(copyFeatures(blacklistedFeatures))
-        .setBlacklistMapKeys(blacklistedMapKeys)
+        .setBlocklist(copyFeatures(blocklistedFeatures))
+        .setBlocklistMapKeys(blocklistedMapKeys)
         .setRawFeatureFilterResults(rawFeatureFilterResults.copy())
         .setStages(stages.map(_.copy(ParamMap.empty)))
         .setParameters(parameters.copy())
@@ -458,8 +464,10 @@ case object OpWorkflowModel {
    * Load a previously trained workflow model from path
    *
    * @param path to the trained workflow model
+   * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
    * @return workflow model
    */
-  def load(path: String): OpWorkflowModel = new OpWorkflowModelReader(None).load(path)
+  def load(path: String, asSpark: Boolean = true): OpWorkflowModel =
+    new OpWorkflowModelReader(None, asSpark).load(path)
 
 }

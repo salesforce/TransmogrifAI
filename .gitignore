@@ -30,3 +30,10 @@ metastore_db/
 *.bak
 
 docs/_build
+
+.bloop
+.classpath
+.project
+.settings
+*/bin
+.vscode

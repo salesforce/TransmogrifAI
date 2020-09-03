@@ -33,7 +33,7 @@ package com.salesforce.op.dsl
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.stages.impl.preparators.{CorrelationExclusion, CorrelationType, SanityChecker}
+import com.salesforce.op.stages.impl.preparators.{CorrelationExclusion, CorrelationLevel, CorrelationType, SanityChecker}
 import com.salesforce.op.stages.impl.regression.IsotonicRegressionCalibrator
 
 import scala.language.postfixOps
@@ -474,6 +474,7 @@ trait RichNumericFeature {
       sampleUpperLimit: Int = SanityChecker.SampleUpperLimit,
       maxCorrelation: Double = SanityChecker.MaxCorrelation,
       minCorrelation: Double = SanityChecker.MinCorrelation,
+      maxFeatureCorr: Double = SanityChecker.MaxFeatureCorr,
       maxCramersV: Double = SanityChecker.MaxCramersV,
       correlationType: CorrelationType = SanityChecker.CorrelationTypeDefault,
       minVariance: Double = SanityChecker.MinVariance,
@@ -482,7 +483,7 @@ trait RichNumericFeature {
       protectTextSharedHash: Boolean = SanityChecker.ProtectTextSharedHash,
       maxRuleConfidence: Double = SanityChecker.MaxRuleConfidence,
       minRequiredRuleSupport: Double = SanityChecker.MinRequiredRuleSupport,
-      featureLabelCorrOnly: Boolean = SanityChecker.FeatureLabelCorrOnly,
+      featureFeatureCorrLevel: CorrelationLevel = SanityChecker.FeatureFeatureCorrLevel,
       correlationExclusion: CorrelationExclusion = SanityChecker.CorrelationExclusionDefault,
       categoricalLabel: Option[Boolean] = None
     ): FeatureLike[OPVector] = {
@@ -494,6 +495,7 @@ trait RichNumericFeature {
         .setSampleUpperLimit(sampleUpperLimit)
         .setMaxCorrelation(maxCorrelation)
         .setMinCorrelation(minCorrelation)
+        .setMaxFeatureCorrelation(maxFeatureCorr)
         .setMaxCramersV(maxCramersV)
         .setCorrelationType(correlationType)
         .setMinVariance(minVariance)
@@ -502,7 +504,7 @@ trait RichNumericFeature {
         .setProtectTextSharedHash(protectTextSharedHash)
         .setMaxRuleConfidence(maxRuleConfidence)
         .setMinRequiredRuleSupport(minRequiredRuleSupport)
-        .setFeatureLabelCorrOnly(featureLabelCorrOnly)
+        .setFeatureFeatureCorrLevel(featureFeatureCorrLevel)
         .setCorrelationExclusion(correlationExclusion)
         .setInput(f, featureVector)
 

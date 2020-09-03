@@ -34,8 +34,9 @@ import com.salesforce.op._
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, OpLinearRegressionParams}
+import ml.combust.mleap.core.regression.{LinearRegressionModel => MleapLinearRegressionModel}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -205,7 +206,4 @@ class OpLinearRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[LinearRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-) {
-  @transient lazy val predictMirror = reflectMethod(getSparkMlStage().get, "predict")
-}
-
+)
