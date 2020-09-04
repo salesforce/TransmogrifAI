@@ -244,7 +244,7 @@ private object WorkflowFileReader {
           Try {
             readAsString( new Path(pathString) )
           } recoverWith {
-            case th =>th.addSuppressed(suppressed2)
+            case th => th.addSuppressed(suppressed2)
               Failure(th)
           }
         }
