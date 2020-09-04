@@ -34,6 +34,7 @@ package com.salesforce.op
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
+import com.salesforce.op.WorkflowFileReader.readAsString
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
@@ -234,16 +235,31 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 private object WorkflowFileReader {
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
-    val path = new Path(pathString)
+    Try {
+      readAsString( new Path(pathString, "part-00000.gz") )
+    } recoverWith { case suppressed1 =>
+      Try {
+        readAsString( new Path(pathString, "part-00000") )
+      } recoverWith { case suppressed2 => suppressed2.addSuppressed(suppressed1)
+          Try {
+            readAsString( new Path(pathString) )
+          } recoverWith {
+            case th =>th.addSuppressed(suppressed2)
+              Failure(th)
+          }
+        }
+      } match {
+      case Failure(e) => throw new RuntimeException(s"Failed to load workflow because of $e")
+      case Success(v) => v
+    }
+  }
+
+
+  private def readAsString(path: Path)(implicit conf: Configuration): String = {
     val fs = path.getFileSystem(conf)
-
-    val partFile = new Path(pathString, "part-00000")
-    val partZipped = new Path(pathString, "part-00000.gz")
-    val finalPath = if (fs.exists(partZipped)) partZipped else if (fs.exists(partFile)) partFile else path
-
     val codecFactory = new CompressionCodecFactory(conf)
-    val codec = Option(codecFactory.getCodec(finalPath))
-    val in = fs.open(finalPath)
+    val codec = Option(codecFactory.getCodec(path))
+    val in = fs.open(path)
     val read = codec.map( c => Source.fromInputStream(c.createInputStream(in)).mkString )
       .getOrElse( IOUtils.toString(in, "UTF-8") )
     in.close()
