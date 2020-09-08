@@ -49,7 +49,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext {
-  val numRecs = 100 // Number or records to use in threshold metrics tests
+  val numRecs = 400 // Number or records to use in threshold metrics tests
 
   val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
@@ -229,6 +229,30 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   /* Thresholds are defined on the probability piece of the prediction (specifically, the probability to be positive
      which is the second element of the probability array here), so we manually create a dataset where whenever
      records classified as positive (threshold <= probability) the label is negative for certain threshold ranges. */
+
+  it should "produce deterministic threshold metrics" in {
+    val numComparisons = 5
+    val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
+      (0 to numRecs).map(x =>
+        (RealNN(math.round(math.random)), Prediction(
+          prediction = 1.0, // prediction field not used here, doesn't need to agree with prob
+          rawPrediction = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs),
+          probability = Array(1.0 - x*1.0/numRecs, x*1.0/numRecs)))
+      )
+    )
+    val labelSynth = rawLabelSynth.copy(isResponse = true)
+    val testEvaluatorSynth = new OpBinaryClassificationEvaluator()
+      .setLabelCol(labelSynth)
+      .setPredictionCol(predictionSynth)
+
+    for {_ <- 1 to numComparisons} {
+      val metrics = testEvaluatorSynth.evaluateAll(dsSynth)
+      val metrics2 = testEvaluatorSynth.evaluateAll(dsSynth)
+
+      metrics.ThresholdMetrics shouldBe metrics2.ThresholdMetrics
+    }
+  }
+
   it should "produce correct thresholded metrics when there are no positive labels" in {
     val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
       (0 to numRecs).map(x =>
@@ -288,14 +312,16 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     val thresholdMetrics = metrics.ThresholdMetrics
 
     // Check that the lengths of all the thresholded metrics agree
-    val numTresholds = thresholdMetrics.thresholds.length
-    thresholdMetrics.truePositivesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.falsePositivesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.trueNegativesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.falseNegativesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.falsePositiveRateByThreshold.length shouldBe numTresholds
-    thresholdMetrics.precisionByThreshold.length shouldBe numTresholds
-    thresholdMetrics.recallByThreshold.length shouldBe numTresholds
+    val numThresholds = thresholdMetrics.thresholds.length
+    thresholdMetrics.truePositivesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.falsePositivesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.trueNegativesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.falseNegativesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.falsePositiveRateByThreshold.length shouldBe numThresholds
+    thresholdMetrics.precisionByThreshold.length shouldBe numThresholds
+    thresholdMetrics.recallByThreshold.length shouldBe numThresholds
+
+    print(s"numThresholds: ${numThresholds}")
 
     // Check that the confusion matrix element counts are consistent
     Seq(

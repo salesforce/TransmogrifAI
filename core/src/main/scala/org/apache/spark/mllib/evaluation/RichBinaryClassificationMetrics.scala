@@ -18,7 +18,9 @@
 package org.apache.spark.mllib.evaluation
 
 import org.apache.spark.mllib.evaluation.binary._
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{RDD, UnionRDD}
+import org.apache.spark.sql.DataFrame
+import org.slf4j.LoggerFactory
 
 /**
  * Evaluator for binary classification.
@@ -38,16 +40,107 @@ import org.apache.spark.rdd.RDD
  *                partition boundaries.
  */
 class RichBinaryClassificationMetrics(
-  override val scoreAndLabels: RDD[(Double, Double)],
-  override val numBins: Int
-) extends BinaryClassificationMetrics(scoreAndLabels, numBins) {
+  val scoreAndLabels: RDD[(Double, Double)],
+  val numBins: Int
+) {
+
+  require(numBins >= 0, "numBins must be nonnegative")
+
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
+
+  /**
+   * Defaults `numBins` to 0.
+   */
+  def this(scoreAndLabels: RDD[(Double, Double)]) = this(scoreAndLabels, 0)
+
+  /**
+   * An auxiliary constructor taking a DataFrame.
+   * @param scoreAndLabels a DataFrame with two double columns: score and label
+   */
+  private[mllib] def this(scoreAndLabels: DataFrame) =
+    this(scoreAndLabels.rdd.map(r => (r.getDouble(0), r.getDouble(1))))
+
+  /**
+   * Unpersist intermediate RDDs used in the computation.
+   */
+  def unpersist(): Unit = {
+    cumulativeCounts.unpersist()
+  }
 
   /**
    * Returns the confusion matrix at each threshold.
    */
   def confusionMatrixByThreshold(): RDD[(Double, BinaryConfusionMatrix)] = confusions
 
-  private[mllib] lazy val confusions: RDD[(Double, BinaryConfusionMatrix)] = {
+  /**
+   * Returns thresholds in descending order.
+   */
+  def thresholds(): RDD[Double] = cumulativeCounts.map(_._1)
+
+  /**
+   * Returns the receiver operating characteristic (ROC) curve,
+   * which is an RDD of (false positive rate, true positive rate)
+   * with (0.0, 0.0) prepended and (1.0, 1.0) appended to it.
+   * @see <a href="http://en.wikipedia.org/wiki/Receiver_operating_characteristic">
+   * Receiver operating characteristic (Wikipedia)</a>
+   */
+  def roc(): RDD[(Double, Double)] = {
+    val rocCurve = createCurve(FalsePositiveRate, Recall)
+    val sc = confusions.context
+    val first = sc.makeRDD(Seq((0.0, 0.0)), 1)
+    val last = sc.makeRDD(Seq((1.0, 1.0)), 1)
+    new UnionRDD[(Double, Double)](sc, Seq(first, rocCurve, last))
+  }
+
+  /**
+   * Computes the area under the receiver operating characteristic (ROC) curve.
+   */
+  def areaUnderROC(): Double = AreaUnderCurve.of(roc())
+
+  /**
+   * Returns the precision-recall curve, which is an RDD of (recall, precision),
+   * NOT (precision, recall), with (0.0, p) prepended to it, where p is the precision
+   * associated with the lowest recall on the curve.
+   * @see <a href="http://en.wikipedia.org/wiki/Precision_and_recall">
+   * Precision and recall (Wikipedia)</a>
+   */
+  def pr(): RDD[(Double, Double)] = {
+    val prCurve = createCurve(Recall, Precision)
+    val (_, firstPrecision) = prCurve.first()
+    confusions.context.parallelize(Seq((0.0, firstPrecision)), 1).union(prCurve)
+  }
+
+  /**
+   * Computes the area under the precision-recall curve.
+   */
+  def areaUnderPR(): Double = AreaUnderCurve.of(pr())
+
+  /**
+   * Returns the (threshold, F-Measure) curve.
+   * @param beta the beta factor in F-Measure computation.
+   * @return an RDD of (threshold, F-Measure) pairs.
+   * @see <a href="http://en.wikipedia.org/wiki/F1_score">F1 score (Wikipedia)</a>
+   */
+  def fMeasureByThreshold(beta: Double): RDD[(Double, Double)] = createCurve(FMeasure(beta))
+
+  /**
+   * Returns the (threshold, F-Measure) curve with beta = 1.0.
+   */
+  def fMeasureByThreshold(): RDD[(Double, Double)] = fMeasureByThreshold(1.0)
+
+  /**
+   * Returns the (threshold, precision) curve.
+   */
+  def precisionByThreshold(): RDD[(Double, Double)] = createCurve(Precision)
+
+  /**
+   * Returns the (threshold, recall) curve.
+   */
+  def recallByThreshold(): RDD[(Double, Double)] = createCurve(Recall)
+
+  private lazy val (
+    cumulativeCounts: RDD[(Double, BinaryLabelCounter)],
+    confusions: RDD[(Double, BinaryConfusionMatrix)]) = {
     // Create a bin for each distinct score value, count positives and negatives within each bin,
     // and then sort by score values in descending order.
     val counts = scoreAndLabels.combineByKey(
@@ -68,11 +161,11 @@ class RichBinaryClassificationMetrics(
         var grouping = countsSize / numBins
         if (grouping < 2) {
           // numBins was more than half of the size; no real point in down-sampling to bins
-          logInfo(s"Curve is too small ($countsSize) for $numBins bins to be useful")
+          log.info(s"Curve is too small ($countsSize) for $numBins bins to be useful")
           counts
         } else {
           if (grouping >= Int.MaxValue) {
-            logWarning(
+            log.warn(
               s"Curve too large ($countsSize) for $numBins bins; capping at ${Int.MaxValue}")
             grouping = Int.MaxValue
           }
@@ -98,7 +191,7 @@ class RichBinaryClassificationMetrics(
     val partitionwiseCumulativeCounts =
       agg.scanLeft(new BinaryLabelCounter())((agg, c) => agg.clone() += c)
     val totalCount = partitionwiseCumulativeCounts.last
-    logInfo(s"Total counts: $totalCount")
+    log.info(s"Total counts: $totalCount")
     val cumulativeCounts = binnedCounts.mapPartitionsWithIndex(
       (index: Int, iter: Iterator[(Double, BinaryLabelCounter)]) => {
         val cumCount = partitionwiseCumulativeCounts(index)
@@ -108,8 +201,26 @@ class RichBinaryClassificationMetrics(
         }
       }, preservesPartitioning = true)
     cumulativeCounts.persist()
-    cumulativeCounts.map { case (score, cumCount) =>
+    val confusions = cumulativeCounts.map { case (score, cumCount) =>
       (score, BinaryConfusionMatrixImpl(cumCount, totalCount).asInstanceOf[BinaryConfusionMatrix])
+    }
+    confusions.persist()
+    (cumulativeCounts, confusions)
+  }
+
+  /** Creates a curve of (threshold, metric). */
+  private def createCurve(y: BinaryClassificationMetricComputer): RDD[(Double, Double)] = {
+    confusions.map { case (s, c) =>
+      (s, y(c))
+    }
+  }
+
+  /** Creates a curve of (metricX, metricY). */
+  private def createCurve(
+    x: BinaryClassificationMetricComputer,
+    y: BinaryClassificationMetricComputer): RDD[(Double, Double)] = {
+    confusions.map { case (_, c) =>
+      (x(c), y(c))
     }
   }
 }
