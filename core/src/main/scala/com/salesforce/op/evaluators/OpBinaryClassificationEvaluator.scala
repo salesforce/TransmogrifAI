@@ -36,7 +36,7 @@ import com.salesforce.op.utils.spark.RichEvaluator._
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.evaluation.{MulticlassMetrics, RichBinaryClassificationMetrics}
+import org.apache.spark.mllib.evaluation.{MulticlassMetrics, SparkBinaryClassificationMetrics}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
@@ -107,7 +107,7 @@ private[op] class OpBinaryClassificationEvaluator
           case Row(prob: Vector, label: Double) => (prob(1), label)
           case Row(prob: Double, label: Double) => (prob, label)
         }
-      val sparkMLMetrics = new RichBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
+      val sparkMLMetrics = new SparkBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
       val thresholds = sparkMLMetrics.thresholds().collect()
       val precisionByThreshold = sparkMLMetrics.precisionByThreshold().collect().map(_._2)
       val recallByThreshold = sparkMLMetrics.recallByThreshold().collect().map(_._2)

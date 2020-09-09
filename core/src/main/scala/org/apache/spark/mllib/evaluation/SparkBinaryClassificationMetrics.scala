@@ -23,7 +23,7 @@ import org.apache.spark.sql.DataFrame
 import org.slf4j.LoggerFactory
 
 /**
- * Evaluator for binary classification.
+ * Evaluator for binary classification - copied from Spark 2.4.5 to expose confusion matrices by threshold.
  *
  * @param scoreAndLabels an RDD of (score, label) pairs.
  * @param numBins if greater than 0, then the curves (ROC curve, PR curve) computed internally
@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory
  *                be smaller as a result, meaning there may be an extra sample at
  *                partition boundaries.
  */
-class RichBinaryClassificationMetrics(
+class SparkBinaryClassificationMetrics(
   val scoreAndLabels: RDD[(Double, Double)],
   val numBins: Int
 ) {
