@@ -7,6 +7,7 @@ buildscript {
     dependencies {
         classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
         classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.16.0'
+        classpath 'com.adtran:scala-multiversion-plugin:1.+'
     }
 }
 
@@ -46,6 +47,7 @@ configure(allProjs) {
     apply plugin: 'net.minecrell.licenser'
     apply plugin: 'com.github.jk1.dependency-license-report'
     apply plugin: 'com.github.johnrengelman.shadow'
+    apply plugin: 'com.adtran.scala-multiversion-plugin'
 
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
@@ -54,8 +56,6 @@ configure(allProjs) {
     mainClassName = "please.set.main.class.in.build.gradle"
 
     ext {
-        scalaVersion = '2.11'
-        scalaVersionRevision = '12'
         scalaTestVersion = '3.0.5'
         scalaCheckVersion = '1.14.0'
         junitVersion = '4.12'
@@ -100,28 +100,28 @@ configure(allProjs) {
     dependencies {
         // Scala
         zinc 'com.typesafe.zinc:zinc:0.3.15'
-        scoverage "org.scoverage:scalac-scoverage-plugin_$scalaVersion:$scoveragePluginVersion"
-        scoverage "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
-        scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
-        scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
-        compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+        scoverage "org.scoverage:scalac-scoverage-plugin_%%:$scoveragePluginVersion"
+        scoverage "org.scoverage:scalac-scoverage-runtime_%%:$scoveragePluginVersion"
+        scalaLibrary "org.scala-lang:scala-library:%scala-version%"
+        scalaCompiler "org.scala-lang:scala-compiler:%scala-version%"
+        compile "org.scala-lang:scala-library:%scala-version%"
 
         // Spark
-        compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-        testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-        compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-        testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-        compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-        testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+        compileOnly "org.apache.spark:spark-core_%%:$sparkVersion"
+        testCompile "org.apache.spark:spark-core_%%:$sparkVersion"
+        compileOnly "org.apache.spark:spark-mllib_%%:$sparkVersion"
+        testCompile "org.apache.spark:spark-mllib_%%:$sparkVersion"
+        compileOnly "org.apache.spark:spark-sql_%%:$sparkVersion"
+        testCompile "org.apache.spark:spark-sql_%%:$sparkVersion"
 
         // Test
-        compileOnly "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
-        testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
-        compileOnly "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
-        testCompile "org.scoverage:scalac-scoverage-plugin_$scalaVersion:$scoveragePluginVersion"
-        testCompile "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
-        testCompile "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
-        testCompile ("com.holdenkarau:spark-testing-base_$scalaVersion:$sparkTestingBaseVersion") { transitive = false }
+        compileOnly "org.scalatest:scalatest_%%:$scalaTestVersion"
+        testCompile "org.scalatest:scalatest_%%:$scalaTestVersion"
+        compileOnly "org.scalacheck:scalacheck_%%:$scalaCheckVersion"
+        testCompile "org.scoverage:scalac-scoverage-plugin_%%:$scoveragePluginVersion"
+        testCompile "org.scoverage:scalac-scoverage-runtime_%%:$scoveragePluginVersion"
+        testCompile "org.scalacheck:scalacheck_%%:$scalaCheckVersion"
+        testCompile ("com.holdenkarau:spark-testing-base_%%:$sparkTestingBaseVersion") { transitive = false }
         testCompile "junit:junit:$junitVersion"
         testRuntime "org.pegdown:pegdown:$pegdownVersion"
     }
@@ -129,8 +129,8 @@ configure(allProjs) {
     configurations.all {
         resolutionStrategy {
             force "commons-collections:commons-collections:$collectionsVersion",
-                    "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
-                    "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+                    "org.scala-lang:scala-library:$scalaVersion",
+                    "org.scala-lang:scala-reflect:$scalaVersion"
         }
     }
     configurations.zinc {

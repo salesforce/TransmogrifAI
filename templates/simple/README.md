@@ -5,7 +5,7 @@ This is an TransmogrifAI project created with the 'simple' template.
 ## Prerequisites
 
 - Java 1.8
-- Scala ${scalaVersion}.${scalaVersionRevision}
+- Scala ${scalaVersion}
 - Spark ${sparkVersion}
 - IntelliJ Idea 2017+ recommended
 - TransmogrifAI ${transmogrifaiVersion}
