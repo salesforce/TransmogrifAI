@@ -108,8 +108,12 @@ case object OpXGBoost {
   /**
    * Hack to access [[ml.dmlc.xgboost4j.scala.spark.XGBoost.processMissingValues]] private method
    */
-  def processMissingValues(xgbLabelPoints: Iterator[LabeledPoint], missing: Float): Iterator[LabeledPoint] =
-    XGBoost.processMissingValues(xgbLabelPoints, missing)
+  def processMissingValues(
+    xgbLabelPoints: Iterator[LabeledPoint],
+    missing: Float,
+    allowNonZeroMissing: Boolean
+  ): Iterator[LabeledPoint] =
+    XGBoost.processMissingValues(xgbLabelPoints, missing, allowNonZeroMissing)
 }
 
 /**
