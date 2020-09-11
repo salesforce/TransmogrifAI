@@ -105,10 +105,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
           nameDetectMapFun(input))
       ).toArray).reduce(_ + _).unzip
     }
-    // val valueStats: Dataset[Array[TextStats]] = dataset.map(
-    //   _.map(TextStats.computeTextStats(_, shouldCleanText, shouldTokenizeForLengths, maxCard)).toArray
-    // )
-    // val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
     val isNameArr: Array[Boolean] = aggNameDetectStats.map(computeTreatAsName)
 
