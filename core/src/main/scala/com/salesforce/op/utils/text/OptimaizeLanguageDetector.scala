@@ -52,13 +52,14 @@ class OptimaizeLanguageDetector extends LanguageDetector {
    */
   def detectLanguages(s: String): Seq[(Language, Double)] = {
     OptimaizeLanguageDetector.detector.getProbabilities(s).asScala
+      .sortBy(_.getProbability)
+      .reverse
       .map(r => makeLanguage(r.getLocale) -> r.getProbability)
-      .sortBy(-_._2)
   }
 
   private def makeLanguage(locale: LdLocale): Language = {
     val maybeRegion = if (locale.getRegion.isPresent) s"-${locale.getRegion.get()}" else ""
-    Language.withNameInsensitive(s"${locale.getLanguage}$maybeRegion")
+    Language.fromString(s"${locale.getLanguage}$maybeRegion")
   }
 
 }

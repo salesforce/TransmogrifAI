@@ -43,7 +43,6 @@ class OpenNLPLanguageDetector extends LanguageDetector {
    */
   def detectLanguages(s: String): Seq[(Language, Double)] = {
     OpenNLPLanguageDetector.detector.predict(s)
-      .sortBy(-_._2)
   }
 }
 
@@ -56,8 +55,10 @@ case class OpenNLPLanguageDetectorME(
     languageDetectorModel
       .eval(contextGenerator.getContext(str))
       .zipWithIndex
-      .map { case (prob, i) =>
-        (Language.withNameInsensitive(languageDetectorModel.getOutcome(i)), prob)
+      .sortBy { case (confidence, _) => confidence }
+      .reverse
+      .map { case (prob, index) =>
+        (Language.fromString(languageDetectorModel.getOutcome(index)), prob)
       }
   }
 }
@@ -73,10 +74,8 @@ private[op] object OpenNLPLanguageDetector {
     val ldm = OpenNLPModels.getLanguageDetection()
     val model = ldm.getMaxentModel
     val contextGenerator = ldm.getFactory.getContextGenerator
-    val languages = (0 until model.getNumOutcomes).map(model.getOutcome(_)).mkString(",\n")
-    println(s"Loaded OpenNLP Language Model for ${model.getNumOutcomes} languages. " +
+    println(s"GERA DEBUG Loaded OpenNLP Language Model for ${model.getNumOutcomes} languages. " +
       s"Time elapsed: ${System.currentTimeMillis() - start}ms")
-    print(languages)
     OpenNLPLanguageDetectorME(model, contextGenerator)
   }
 }

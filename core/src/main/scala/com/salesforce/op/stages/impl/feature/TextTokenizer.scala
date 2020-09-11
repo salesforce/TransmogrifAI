@@ -134,7 +134,7 @@ class TextTokenizer[T <: Text]
 }
 
 object TextTokenizer {
-  val LanguageDetector: LanguageDetector = new OpenNLPLanguageDetector()
+  val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
   val Analyzer: TextAnalyzer = new LuceneTextAnalyzer()
   val AnalyzerHtmlStrip: TextAnalyzer = new LuceneHtmlStripTextAnalyzer()
   val AutoDetectLanguage = false
@@ -177,6 +177,7 @@ object TextTokenizer {
           .collectFirst { case (lang, confidence) if confidence > autoDetectThreshold => lang }
           .getOrElse(defaultLanguage)
       }
+    println(s"GERA DEBUG detected language $language for $textString")
     val lowerTxt = if (toLowercase) textString.toLowerCase else textString
 
     val sentences = sentenceSplitter.map(_.getSentences(lowerTxt, language))
