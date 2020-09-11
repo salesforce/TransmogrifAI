@@ -237,7 +237,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
-    getSensitiveFeatureMode
 
     val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, aggregatedStats.map(_.nameDetectStats))
     setMetadata(vecMetadata.toMetadata)

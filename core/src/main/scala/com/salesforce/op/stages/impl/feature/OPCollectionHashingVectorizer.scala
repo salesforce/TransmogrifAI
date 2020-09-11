@@ -324,26 +324,24 @@ private[op] trait MapHashingFun extends HashingFun {
   ): Array[OpVectorColumnMetadata] = {
     val numHashes = params.numFeatures
     val numFeatures = hashKeys.map(_.length).sum
-    val hashColumns = if (hashFeatures.nonEmpty) {
-      if (isSharedHashSpace(params, Some(numFeatures))) {
-        (0 until numHashes).map { i =>
-          OpVectorColumnMetadata(
-            parentFeatureName = hashFeatures.map(_.name),
-            parentFeatureType = hashFeatures.map(_.typeName),
-            grouping = None,
-            indicatorValue = None
-          )
-        }.toArray
-      } else {
-        for {
-          // Need to filter out empty key sequences since the hashFeatures only contain a map feature if one of their
-          // keys is to be hashed, but hashKeys contains a sequence per map (whether it's empty or not)
-          (keys, f) <- hashKeys.filter(_.nonEmpty).zip(hashFeatures)
-          key <- keys
-          i <- 0 until numHashes
-        } yield f.toColumnMetaData().copy(grouping = Option(key))
-        }.toArray
-    } else Array.empty[OpVectorColumnMetadata]
+    val hashColumns = if (isSharedHashSpace(params, Some(numFeatures))) {
+      (0 until numHashes).map { i =>
+        OpVectorColumnMetadata(
+          parentFeatureName = hashFeatures.map(_.name),
+          parentFeatureType = hashFeatures.map(_.typeName),
+          grouping = None,
+          indicatorValue = None
+        )
+      }.toArray
+    } else {
+      for {
+        // Need to filter out empty key sequences since the hashFeatures only contain a map feature if one of their
+        // keys is to be hashed, but hashKeys contains a sequence per map (whether it's empty or not)
+        (keys, f) <- hashKeys.filter(_.nonEmpty).zip(hashFeatures)
+        key <- keys
+        i <- 0 until numHashes
+      } yield f.toColumnMetaData().copy(grouping = Option(key))
+    }.toArray
 
     // All columns get null tracking or text length tracking, whether their contents are hashed or ignored
     val allTextKeys = hashKeys.zip(ignoreKeys).map{ case(h, i) => h ++ i }

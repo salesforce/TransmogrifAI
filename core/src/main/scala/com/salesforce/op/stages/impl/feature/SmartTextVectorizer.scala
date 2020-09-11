@@ -37,8 +37,7 @@ import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.salesforce.op.utils.stages.SensitiveFeatureMode.Off
-import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
+import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats, SensitiveFeatureMode}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup, Tuple2Semigroup}
@@ -96,7 +95,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     implicit val statsTupleMonoid: Semigroup[StatsTuple] = new Tuple2Semigroup[TextStats, NameDetectStats]()
 
     val (aggregatedStats, aggNameDetectStats): (Array[TextStats], Array[NameDetectStats]) =
-      if (getSensitiveFeatureMode == Off) {
+      if (getSensitiveFeatureMode == SensitiveFeatureMode.Off) {
         (dataset.map(_.map(TextStats.computeTextStats(_, shouldCleanText, shouldTokenizeForLengths, maxCard)).toArray)
           .reduce(_ + _),
         Array.fill[NameDetectStats](inN.length)(NameDetectStats.empty))

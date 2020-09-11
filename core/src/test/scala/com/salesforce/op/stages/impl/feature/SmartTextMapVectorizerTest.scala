@@ -31,29 +31,40 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+<<<<<<< HEAD
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
+=======
+import com.salesforce.op.features.FeatureLike
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
+>>>>>>> 4d461814d1791ef7e6dd14b262cf6a8a303ffcde
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
+<<<<<<< HEAD
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
 import org.apache.log4j.Level
+=======
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+>>>>>>> 4d461814d1791ef7e6dd14b262cf6a8a303ffcde
 import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
-import com.salesforce.op.testkit.RandomText
-import org.apache.spark.sql.{DataFrame, Encoder, Encoders}
 import org.scalatest.Assertion
+import org.scalatest.junit.JUnitRunner
+
 import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
   extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], SmartTextMapVectorizer[TextMap]]
     with AttributeAsserts {
+
+  Random.setSeed(42)
 
   lazy val (inputData, m1, m2, f1, f2) = TestFeatureBuilder("textMap1", "textMap2", "text1", "text2",
     Seq[(TextMap, TextMap, Text, Text)](
@@ -1061,7 +1072,7 @@ class SmartTextMapVectorizerTest
     // Check value counts
     res.keyValueCounts("f1").valueCounts.size shouldBe 1
     res.keyValueCounts("f1").valueCounts should contain
-      ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
     res.keyValueCounts("f2").valueCounts.size shouldBe 1
     res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
 
