@@ -381,10 +381,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
+    val testSeed = 424242
 
     val pred = BinaryClassificationModelSelector.withCrossValidation(
-      seed = 4242,
-      splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = 4242)),
+      seed = testSeed,
+      splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = testSeed)),
       modelsAndParameters = Seq(lr -> lrParams))
       .setInput(survivedNum, checked)
       .getOutput()

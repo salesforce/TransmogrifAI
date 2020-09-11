@@ -451,7 +451,7 @@ case object ModelInsights {
   ): ModelInsights = {
 
     // TODO support other model types?
-    val models = stages.collect{
+    val models: Array[OPStage with Model[_]] = stages.collect{
       case s: SelectedModel => s
       case s: OpPredictorWrapperModel[_] => s
       case s: SelectedCombinerModel => s

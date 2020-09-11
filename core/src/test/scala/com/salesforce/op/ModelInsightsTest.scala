@@ -46,6 +46,7 @@ import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
+import com.twitter.algebird.Moments
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.DataFrame

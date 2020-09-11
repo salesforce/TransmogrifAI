@@ -56,14 +56,14 @@ class OpRandomForestRegressorTest extends OpEstimatorSpec[Prediction,
     )
   )
   val label = rawLabel.copy(isResponse = true)
-  val estimator = new OpRandomForestRegressor().setInput(label, features)
+  val estimator = new OpRandomForestRegressor().setInput(label, features).setSeed(42L)
 
   val expectedResult = Seq(
-    Prediction(20.0),
-    Prediction(23.5),
-    Prediction(31.5),
+    Prediction(21.5),
+    Prediction(25.0),
+    Prediction(28.5),
     Prediction(35.5),
-    Prediction(37.0)
+    Prediction(45.5)
   )
 
   it should "allow the user to set the desired spark parameters" in {

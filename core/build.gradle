@@ -24,7 +24,7 @@ dependencies {
     compile "com.github.scopt:scopt_%%:$scoptVersion"
 
     // XGBoost
-    compile ("ml.dmlc:xgboost4j-spark:$xgboostVersion") { exclude group: 'com.esotericsoftware.kryo', module: 'kryo' }
+    compile ("ml.dmlc:xgboost4j-spark_$scalaVersion:$xgboostVersion") { exclude group: 'com.esotericsoftware.kryo', module: 'kryo' }
     // Akka slfj4 logging (version matches XGBoost dependency)
     testCompile "com.typesafe.akka:akka-slf4j_%%:$akkaSlf4jVersion"
 }

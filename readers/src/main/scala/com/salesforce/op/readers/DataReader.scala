@@ -235,7 +235,7 @@ trait AggregatedReader[T] extends DataReader[T] {
         implicit val rowEnc = RowEncoder(schema)
         ds.map(record => (key(record), Seq(record)))
           .groupByKey(_._1)
-          .reduceGroups((l, r) => (l._1, l._2 ++ r._2))
+          .reduceGroups((l: (String, Seq[T]), r: (String, Seq[T])) => (l._1, l._2 ++ r._2))
           .flatMap { case (key, (_, records)) => generateRow(key, records, rawFeatures) }
     }
   }

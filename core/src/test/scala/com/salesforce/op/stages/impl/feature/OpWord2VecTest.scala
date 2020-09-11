@@ -38,6 +38,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
+import org.scalactic.TolerantNumerics
 
 
 @RunWith(classOf[JUnitRunner])
