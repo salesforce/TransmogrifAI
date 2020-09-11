@@ -31,26 +31,16 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-<<<<<<< HEAD
 import com.salesforce.op.features.{Feature, FeatureLike}
-import com.salesforce.op.features.types.Text
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
-=======
-import com.salesforce.op.features.FeatureLike
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
->>>>>>> 4d461814d1791ef7e6dd14b262cf6a8a303ffcde
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
-<<<<<<< HEAD
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
 import org.apache.log4j.Level
-=======
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
->>>>>>> 4d461814d1791ef7e6dd14b262cf6a8a303ffcde
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
