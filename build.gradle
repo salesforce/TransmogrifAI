@@ -102,9 +102,9 @@ configure(allProjs) {
         zinc 'com.typesafe.zinc:zinc:0.3.15'
         scoverage "org.scoverage:scalac-scoverage-plugin_%%:$scoveragePluginVersion"
         scoverage "org.scoverage:scalac-scoverage-runtime_%%:$scoveragePluginVersion"
-        scalaLibrary "org.scala-lang:scala-library:%scala-version%"
-        scalaCompiler "org.scala-lang:scala-compiler:%scala-version%"
-        compile "org.scala-lang:scala-library:%scala-version%"
+        scalaLibrary "org.scala-lang:scala-library:$scalaVersion"
+        scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion"
+        compile "org.scala-lang:scala-library:$scalaVersion"
 
         // Spark
         compileOnly "org.apache.spark:spark-core_%%:$sparkVersion"
@@ -160,6 +160,7 @@ configure(allProjs) {
     }
 
     scalaStyle {
+        scalaVersion = '$scalaVersion'
         configLocation = "$rootProject.rootDir/gradle/scalastyle-config.xml"
         includeTestSourceDirectory = true
         source = "src/main/scala"
