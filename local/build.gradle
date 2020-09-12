@@ -2,10 +2,6 @@ dependencies {
     compile project(':core')
     testCompile project(':testkit')
 
-    // MLeap serialization & runtime for Spark models
-    compile "ml.combust.mleap:mleap-spark_$scalaVersion:$mleapVersion"
-    compile "ml.combust.mleap:mleap-runtime_$scalaVersion:$mleapVersion"
-
     // In-memory file system (needed for MLeap serialization of models)
     compile "com.github.marschall:memoryfilesystem:$memoryFilesystemVersion"
 }

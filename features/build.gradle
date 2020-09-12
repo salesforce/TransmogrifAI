@@ -17,4 +17,10 @@ dependencies {
 
     // Json4s extensions (needed for Joda time)
     compile "org.json4s:json4s-ext_$scalaVersion:$json4sVersion"
+
+    // MLeap serialization & runtime for Spark models
+    compile "ml.combust.mleap:mleap-spark_$scalaVersion:$mleapVersion"
+    compile "ml.combust.mleap:mleap-runtime_$scalaVersion:$mleapVersion"
+    compile "ml.combust.mleap:mleap-xgboost-spark_$scalaVersion:$mleapVersion"
+    compile "ml.combust.mleap:mleap-xgboost-runtime_$scalaVersion:$mleapVersion"
 }

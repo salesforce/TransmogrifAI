@@ -27,38 +27,34 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.op.stages.impl.feature
 
-package com.salesforce.op.stages.sparkwrappers.specific
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features.types._
+import com.salesforce.op.utils.spark.RichDataset._
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
+@RunWith(classOf[JUnitRunner])
+class TopNLabelJoinerTest extends MultiLabelJoinerBaseTest[TopNLabelJoiner] {
+  val transformer = new TopNLabelJoiner(topN = 2).setInput(classIndexFeature, probVecFeature)
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
+  val expectedResult = Seq(
+    Map(classes(0) -> 40.0, classes(1) -> 30.0).toRealMap,
+    Map(classes(1) -> 40.0, classes(2) -> 30.0).toRealMap,
+    Map(classes(2) -> 40.0, classes(0) -> 30.0).toRealMap
+  )
 
-/**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
- */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-)(
-  implicit ctag: ClassTag[T]
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
+  it should "return top 4" in {
+    val stage = new TopNLabelJoiner(topN = 4).setInput(classIndexFeature, probVecFeature)
+    val actual = stage.transform(inputData).collect(idFeature, stage.getOutput())
 
-  /**
-   * Function used to convert input to output
-   */
-  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) =>
-    Prediction(prediction = predict(features.value))
+    val expected = Array(
+      (1001.toIntegral, Map(classes(0) -> 40.0, classes(1) -> 30.0, classes(2) -> 20.0).toRealMap),
+      (1002.toIntegral, Map(classes(1) -> 40.0, classes(2) -> 30.0, classes(0) -> 20.0).toRealMap),
+      (1003.toIntegral, Map(classes(2) -> 40.0, classes(0) -> 30.0, classes(1) -> 20.0).toRealMap)
+    )
+    actual shouldBe expected
+  }
+
 }
+
