@@ -49,7 +49,7 @@ class ExtendedBinaryClassificationMetricsTest extends FlatSpec with TestSparkCon
     val numComparisons = 5
 
     for {i <- 1 to numComparisons} {
-      val sparkMLMetrics = new ExtendedBinaryClassificationMetrics(scoreAndLabels = synthRDD, numBins = numBins)
+      val sparkMLMetrics = ExtendedBinaryClassificationMetrics(scoreAndLabels = synthRDD, numBins = numBins)
       sparkMLMetrics.confusionMatrixByThreshold().map(_._1).collect() should contain theSameElementsInOrderAs
         sparkMLMetrics.thresholds().collect()
     }

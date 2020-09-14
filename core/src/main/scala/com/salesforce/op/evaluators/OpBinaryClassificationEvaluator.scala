@@ -107,7 +107,7 @@ private[op] class OpBinaryClassificationEvaluator
           case Row(prob: Vector, label: Double) => (prob(1), label)
           case Row(prob: Double, label: Double) => (prob, label)
         }
-      val sparkMLMetrics = new ExtendedBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
+      val sparkMLMetrics = ExtendedBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
       val thresholds = sparkMLMetrics.thresholds().collect()
       val precisionByThreshold = sparkMLMetrics.precisionByThreshold().collect().map(_._2)
       val recallByThreshold = sparkMLMetrics.recallByThreshold().collect().map(_._2)
