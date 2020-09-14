@@ -249,7 +249,7 @@ private object WorkflowFileReader {
           }
         }
       } match {
-      case Failure(e) => throw new RuntimeException(s"Failed to load workflow because of $e")
+      case Failure(e) => throw new RuntimeException(s"Failed to load workflow because of $e", e)
       case Success(v) => v
     }
   }
