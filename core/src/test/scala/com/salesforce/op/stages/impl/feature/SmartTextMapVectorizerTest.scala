@@ -32,24 +32,27 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
-import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.ml.linalg.Vectors
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
-import org.apache.spark.sql.{DataFrame, Encoder, Encoders}
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.DataFrame
+import org.junit.runner.RunWith
 import org.scalatest.Assertion
+import org.scalatest.junit.JUnitRunner
+
 import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
   extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], SmartTextMapVectorizer[TextMap]]
     with AttributeAsserts {
+
+  Random.setSeed(42)
 
   lazy val (inputData, m1, m2, f1, f2) = TestFeatureBuilder("textMap1", "textMap2", "text1", "text2",
     Seq[(TextMap, TextMap, Text, Text)](
@@ -709,7 +712,7 @@ class SmartTextMapVectorizerTest
     // Check value counts
     res.keyValueCounts("f1").valueCounts.size shouldBe 1
     res.keyValueCounts("f1").valueCounts should contain
-      ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
     res.keyValueCounts("f2").valueCounts.size shouldBe 1
     res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
 
