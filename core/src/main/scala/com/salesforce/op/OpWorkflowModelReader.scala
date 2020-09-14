@@ -254,7 +254,6 @@ private object WorkflowFileReader {
     }
   }
 
-
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
     val fs = path.getFileSystem(conf)
     val codecFactory = new CompressionCodecFactory(conf)
