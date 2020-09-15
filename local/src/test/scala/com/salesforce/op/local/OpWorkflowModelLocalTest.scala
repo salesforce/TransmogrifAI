@@ -181,7 +181,11 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
         deindexed.name -> deindexedV.value.orNull
       )
     } withClue(s"Record index $i: ") {
-      score shouldBe expected
+      val scoresFound = score(prediction.name).asInstanceOf[Map[String, Double]]
+      val scoresExp = expected(prediction.name).asInstanceOf[Map[String, Double]]
+      val keys = scoresExp.keySet.union(scoresFound.keySet)
+      keys.foreach(k => compareWithTol(scoresFound(k), scoresExp(k), 1e-1))
+      score.filterNot(_._1 == prediction.name) shouldEqual expected.filterNot(_._1 == prediction.name)
     }
   }
 
