@@ -49,7 +49,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext {
-  val numRecs = 100 // Number or records to use in threshold metrics tests
+  val numRecs = 400 // Number or records to use in threshold metrics tests
 
   val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
@@ -288,14 +288,14 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     val thresholdMetrics = metrics.ThresholdMetrics
 
     // Check that the lengths of all the thresholded metrics agree
-    val numTresholds = thresholdMetrics.thresholds.length
-    thresholdMetrics.truePositivesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.falsePositivesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.trueNegativesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.falseNegativesByThreshold.length shouldBe numTresholds
-    thresholdMetrics.falsePositiveRateByThreshold.length shouldBe numTresholds
-    thresholdMetrics.precisionByThreshold.length shouldBe numTresholds
-    thresholdMetrics.recallByThreshold.length shouldBe numTresholds
+    val numThresholds = thresholdMetrics.thresholds.length
+    thresholdMetrics.truePositivesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.falsePositivesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.trueNegativesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.falseNegativesByThreshold.length shouldBe numThresholds
+    thresholdMetrics.falsePositiveRateByThreshold.length shouldBe numThresholds
+    thresholdMetrics.precisionByThreshold.length shouldBe numThresholds
+    thresholdMetrics.recallByThreshold.length shouldBe numThresholds
 
     // Check that the confusion matrix element counts are consistent
     Seq(
