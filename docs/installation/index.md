@@ -2,7 +2,7 @@
 
 * Download and install Java 1.8
     * To stay sane, some prefer to use JENV to manage different versions of Java: [Recommended Blog](https://medium.com/@danielnenkov/multiple-jdk-versions-on-mac-os-x-with-jenv-5ea5522ddc9b)
-    * On a Mac you might install Java 1.8 with: `brew cask install homebrew/cask-versions/zulu8`
+    * On a Mac you might install Java 1.8 (on Mac) with: `brew cask install homebrew/cask-versions/zulu8`
     * Add this new version to your JENV (on Mac): `jenv add /Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/`
 * Determine which Java version you are using (See JENV above):
   * `$ which java`
