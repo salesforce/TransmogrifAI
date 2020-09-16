@@ -151,7 +151,14 @@ trait OpPipelineStageAsserts extends AppendedClues {
       stage.getInputFeatures() should contain theSameElementsAs expected.getInputFeatures()
     }
     clue("Input schemas don't match:") {
-      stage.getInputSchema() shouldBe expected.getInputSchema()
+      stage.getInputSchema().fields.size shouldEqual expected.getInputSchema().fields.size
+      stage.getInputSchema().fields.zip(expected.getInputSchema().fields).foreach{
+        case (sf, ef) =>
+          sf.name shouldBe ef.name
+          sf.dataType shouldBe ef.dataType
+          sf.metadata.deepEquals(ef.metadata) shouldBe true
+          sf.nullable shouldBe ef.nullable
+      }
     }
     clue("Metadata values don't match:") {
       stage.getMetadata().deepEquals(expected.getMetadata()) shouldBe true

@@ -32,7 +32,11 @@ package org.apache.spark.ml
 
 import com.salesforce.op.stages.SparkStageParam
 import com.salesforce.op.test.TestSparkContext
-import org.apache.spark.ml.feature.StandardScaler
+import org.apache.spark.ml.bundle.SparkBundleContext
+import org.apache.spark.ml.feature.{Bucketizer}
+import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
 import org.joda.time.DateTime
 import org.json4s.JsonDSL._
 import org.json4s._
@@ -47,38 +51,46 @@ class SparkStageParamTest extends FlatSpec with TestSparkContext with BeforeAndA
   import SparkStageParam._
 
   var savePath: String = _
-  var param: SparkStageParam[StandardScaler] = _
-  var stage: StandardScaler = _
+  var param: SparkStageParam[Bucketizer] = _
+  var stage: Bucketizer = _
+  var dataset: Dataset[Row] = _
 
   override def beforeEach(): Unit = {
     super.beforeEach()
     savePath = tempDir + "/op-stage-param-test-" + DateTime.now().getMillis
-    param = new SparkStageParam[StandardScaler](parent = "test" , name = "test", doc = "none")
+    param = new SparkStageParam[Bucketizer](parent = "test" , name = "test", doc = "none")
     // by setting both to be the same, we guarantee that at least one isn't the default value
-    stage = new StandardScaler().setWithMean(true).setWithStd(false)
+    val splits = Array(Double.NegativeInfinity, -0.5, 0.0, 0.5, Double.PositiveInfinity)
+    stage = new Bucketizer().setInputCol("test").setOutputCol("bucket").setSplits(splits)
+    dataset = stage.transform(spark.emptyDataset[Row](
+      RowEncoder(StructType(Array(StructField(name = "test", dataType = DoubleType, nullable = true))))
+    ))
   }
 
   // easier if test both at the same time
   Spec[SparkStageParam[_]] should "encode and decode properly when is set" in {
     param.savePath = Option(savePath)
+    param.sbc = Option(SparkBundleContext().withDataset(dataset))
     val jsonOut = param.jsonEncode(Option(stage))
     val parsed = parse(jsonOut).asInstanceOf[JObject]
-    val updated = parsed ~ ("path" -> savePath) // inject path for decoding
+    val updated = parsed ~ ("path" -> savePath) ~ ("asSpark" -> true) // inject path for decoding
 
     updated shouldBe JObject(
       "className" -> JString(stage.getClass.getName),
       "uid" -> JString(stage.uid),
-      "path" -> JString(savePath)
+      "path" -> JString(savePath),
+      "asSpark" -> JBool(true)
     )
     val updatedJson = compact(updated)
 
     param.jsonDecode(updatedJson) match {
       case None => fail("Failed to recover the stage")
       case Some(stageRecovered) =>
-        stageRecovered shouldBe a[StandardScaler]
+        stageRecovered shouldBe a[Bucketizer]
         stageRecovered.uid shouldBe stage.uid
-        stageRecovered.getWithMean shouldBe stage.getWithMean
-        stageRecovered.getWithStd shouldBe stage.getWithStd
+        stageRecovered.getSplits shouldBe stage.getSplits
+        stageRecovered.getInputCol shouldBe stage.getInputCol
+        stageRecovered.getOutputCol shouldBe stage.getOutputCol
     }
   }
 
@@ -89,6 +101,7 @@ class SparkStageParamTest extends FlatSpec with TestSparkContext with BeforeAndA
 
   it should "have empty path if stage is empty" in {
     param.savePath = Option(savePath)
+    param.sbc = Option(SparkBundleContext().withDataset(dataset))
     val jsonOut = param.jsonEncode(None)
     val parsed = parse(jsonOut)
 

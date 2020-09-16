@@ -1,0 +1,743 @@
+{
+  "uid": "OpWorkflow_00000000000c",
+  "resultFeaturesUids": [
+    "Real_00000000000b"
+  ],
+  "blacklistedFeaturesUids": [
+    "Real_000000000001"
+  ],
+  "blacklistedMapKeys": {
+    "numericMap": [
+      "gender"
+    ]
+  },
+  "blacklistedStages": [
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053559,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000001",
+      "paramMap": {
+        "outputFeatureName": "age"
+      },
+      "defaultParamMap": {
+        "outputMetadata": {},
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "inputFeatures": []
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.Real",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.MaxReal$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.MaxReal$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$AgeExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$AgeExtract"
+          }
+        },
+        "outputName": "age",
+        "uid": "FeatureGeneratorStage_000000000001",
+        "extractSource": "new PassengerFeaturesTest.AgeExtract()",
+        "outputIsResponse": false
+      }
+    }
+  ],
+  "stages": [
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053560,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000008",
+      "paramMap": {
+        "outputFeatureName": "boarded"
+      },
+      "defaultParamMap": {
+        "outputMetadata": {},
+        "inputFeatures": [],
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        }
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.DateList",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.ConcatDateList$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.ConcatDateList$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$BoardedToDateListExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$BoardedToDateListExtract"
+          }
+        },
+        "outputName": "boarded",
+        "uid": "FeatureGeneratorStage_000000000008",
+        "extractSource": "new PassengerFeaturesTest.BoardedToDateListExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053560,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_00000000000b",
+      "paramMap": {
+        "outputFeatureName": "booleanMap"
+      },
+      "defaultParamMap": {
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "inputFeatures": [],
+        "outputMetadata": {}
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.BinaryMap",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.UnionBinaryMap$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.UnionBinaryMap$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$BooleanMapExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$BooleanMapExtract"
+          }
+        },
+        "outputName": "booleanMap",
+        "uid": "FeatureGeneratorStage_00000000000b",
+        "extractSource": "new PassengerFeaturesTest.BooleanMapExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053561,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000007",
+      "paramMap": {
+        "outputFeatureName": "description"
+      },
+      "defaultParamMap": {
+        "outputMetadata": {},
+        "inputFeatures": [],
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        }
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.Text",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.ConcatText$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.ConcatText$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$DescriptionExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$DescriptionExtract"
+          }
+        },
+        "outputName": "description",
+        "uid": "FeatureGeneratorStage_000000000007",
+        "extractSource": "new PassengerFeaturesTest.DescriptionExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053561,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000002",
+      "paramMap": {
+        "outputFeatureName": "gender"
+      },
+      "defaultParamMap": {
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "outputMetadata": {},
+        "inputFeatures": []
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.MultiPickList",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.UnionMultiPickList$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.UnionMultiPickList$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$GenderAsMultiPickListExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$GenderAsMultiPickListExtract"
+          }
+        },
+        "outputName": "gender",
+        "uid": "FeatureGeneratorStage_000000000002",
+        "extractSource": "new PassengerFeaturesTest.GenderAsMultiPickListExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053561,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000004",
+      "paramMap": {
+        "outputFeatureName": "height",
+        "inputFeatures": []
+      },
+      "defaultParamMap": {
+        "outputMetadata": {},
+        "inputFeatures": [],
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        }
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.RealNN",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.SumRealNN$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.SumRealNN$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$HeightToRealNNExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$HeightToRealNNExtract"
+          }
+        },
+        "outputName": "height",
+        "aggregateWindow": 300,
+        "uid": "FeatureGeneratorStage_000000000004",
+        "extractSource": "new PassengerFeaturesTest.HeightToRealNNExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053562,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_00000000000a",
+      "paramMap": {
+        "outputFeatureName": "numericMap"
+      },
+      "defaultParamMap": {
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "outputMetadata": {},
+        "inputFeatures": []
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.RealMap",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.UnionRealMap$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.UnionRealMap$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$NumericMapExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$NumericMapExtract"
+          }
+        },
+        "outputName": "numericMap",
+        "uid": "FeatureGeneratorStage_00000000000a",
+        "extractSource": "new PassengerFeaturesTest.NumericMapExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053562,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000009",
+      "paramMap": {
+        "outputFeatureName": "stringMap"
+      },
+      "defaultParamMap": {
+        "outputMetadata": {},
+        "inputFeatures": [],
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        }
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.TextMap",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.UnionConcatTextMap$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.UnionConcatTextMap$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$StringMapExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$StringMapExtract"
+          }
+        },
+        "outputName": "stringMap",
+        "uid": "FeatureGeneratorStage_000000000009",
+        "extractSource": "new PassengerFeaturesTest.StringMapExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053562,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_00000000000c",
+      "paramMap": {
+        "outputFeatureName": "survived"
+      },
+      "defaultParamMap": {
+        "outputMetadata": {},
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "inputFeatures": []
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.Binary",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.LogicalOr$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.LogicalOr$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$SurvivedExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$SurvivedExtract"
+          }
+        },
+        "outputName": "survived",
+        "uid": "FeatureGeneratorStage_00000000000c",
+        "extractSource": "new PassengerFeaturesTest.SurvivedExtract()",
+        "outputIsResponse": true
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.FeatureGeneratorStage",
+      "timestamp": 1594758053563,
+      "sparkVersion": "2.4.5",
+      "uid": "FeatureGeneratorStage_000000000006",
+      "paramMap": {
+        "outputFeatureName": "weight",
+        "inputFeatures": []
+      },
+      "defaultParamMap": {
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "outputMetadata": {},
+        "inputFeatures": []
+      },
+      "ctorArgs": {
+        "tti": "com.salesforce.op.test.Passenger",
+        "tto": "com.salesforce.op.features.types.Real",
+        "aggregator": {
+          "className": "com.salesforce.op.aggregators.SumReal$",
+          "value": {
+            "className": "com.salesforce.op.aggregators.SumReal$"
+          }
+        },
+        "extractFn": {
+          "className": "com.salesforce.op.test.PassengerFeaturesTest$WeightToRealExtract",
+          "value": {
+            "className": "com.salesforce.op.test.PassengerFeaturesTest$WeightToRealExtract"
+          }
+        },
+        "outputName": "weight",
+        "uid": "FeatureGeneratorStage_000000000006",
+        "extractSource": "new PassengerFeaturesTest.WeightToRealExtract()",
+        "outputIsResponse": false
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.impl.feature.DateListVectorizer",
+      "timestamp": 1594758053565,
+      "sparkVersion": "2.4.5",
+      "uid": "DateListVectorizer_000000000003",
+      "paramMap": {
+        "fillWithPivotModeMonth": false,
+        "trackNulls": true,
+        "outputFeatureName": "boarded_1-stagesApplied_OPVector_000000000003",
+        "withTimeSince": true,
+        "referenceDate": 1594758052735,
+        "fillWithPivotModeDay": false,
+        "fillWithPivotModeHour": false,
+        "first": false,
+        "outputMetadata": {
+          "ml_attr": {
+            "attrs": {
+              "numeric": [
+                {
+                  "idx": 0,
+                  "name": "boarded_0"
+                }
+              ]
+            },
+            "num_attrs": 1
+          },
+          "vector_history": {
+            "boarded": {
+              "stages": [
+                "vecDateList_DateListVectorizer_000000000003"
+              ],
+              "origin_features": [
+                "boarded"
+              ]
+            }
+          },
+          "vector_detected_sensitive": {},
+          "vector_columns": [
+            {
+              "indices": [
+                0
+              ],
+              "parent_feature_type": [
+                "com.salesforce.op.features.types.DateList"
+              ],
+              "parent_feature": [
+                "boarded"
+              ]
+            }
+          ]
+        },
+        "inputFeatures": [
+          {
+            "name": "boarded",
+            "isResponse": false,
+            "isRaw": true,
+            "uid": "DateList_000000000008",
+            "typeName": "com.salesforce.op.features.types.DateList",
+            "originFeatures": [
+              "boarded"
+            ],
+            "stages": []
+          }
+        ]
+      },
+      "defaultParamMap": {
+        "fillWithPivotModeMonth": false,
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "fillValue": 0.0,
+        "trackNulls": true,
+        "withTimeSince": true,
+        "referenceDate": 1594758052735,
+        "fillWithPivotModeDay": false,
+        "fillWithPivotModeHour": false,
+        "first": true,
+        "outputMetadata": {},
+        "inputFeatures": []
+      },
+      "ctorArgs": {
+        "uid": {
+          "type": "Value",
+          "value": "DateListVectorizer_000000000003",
+          "valueClass": "java.lang.String"
+        },
+        "tti": {
+          "type": "TypeTag",
+          "value": "com.salesforce.op.features.types.DateList"
+        }
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.impl.feature.RealNNVectorizer",
+      "timestamp": 1594758053567,
+      "sparkVersion": "2.4.5",
+      "uid": "RealNNVectorizer_000000000007",
+      "paramMap": {
+        "outputFeatureName": "height_1-stagesApplied_OPVector_000000000007",
+        "inputFeatures": [
+          {
+            "name": "height",
+            "isResponse": false,
+            "isRaw": true,
+            "uid": "RealNN_000000000004",
+            "typeName": "com.salesforce.op.features.types.RealNN",
+            "originFeatures": [
+              "height"
+            ],
+            "stages": []
+          }
+        ],
+        "outputMetadata": {
+          "ml_attr": {
+            "attrs": {
+              "numeric": [
+                {
+                  "idx": 0,
+                  "name": "height_0"
+                }
+              ]
+            },
+            "num_attrs": 1
+          },
+          "vector_history": {
+            "height": {
+              "stages": [
+                "vecNum_RealNNVectorizer_000000000007"
+              ],
+              "origin_features": [
+                "height"
+              ]
+            }
+          },
+          "vector_detected_sensitive": {},
+          "vector_columns": [
+            {
+              "indices": [
+                0
+              ],
+              "parent_feature_type": [
+                "com.salesforce.op.features.types.RealNN"
+              ],
+              "parent_feature": [
+                "height"
+              ]
+            }
+          ]
+        }
+      },
+      "defaultParamMap": {
+        "inputFeatures": [],
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "outputMetadata": {}
+      },
+      "ctorArgs": {
+        "uid": {
+          "type": "Value",
+          "value": "RealNNVectorizer_000000000007",
+          "valueClass": "java.lang.String"
+        }
+      }
+    },
+    {
+      "class": "com.salesforce.op.stages.impl.feature.BinaryVectorizer",
+      "timestamp": 1594758053569,
+      "sparkVersion": "2.4.5",
+      "uid": "BinaryVectorizer_000000000001",
+      "paramMap": {
+        "fillValue": false,
+        "trackNulls": true,
+        "inputFeatures": [
+          {
+            "name": "survived",
+            "isResponse": true,
+            "isRaw": true,
+            "uid": "Binary_00000000000c",
+            "typeName": "com.salesforce.op.features.types.Binary",
+            "originFeatures": [
+              "survived"
+            ],
+            "stages": []
+          }
+        ],
+        "outputFeatureName": "survived_1-stagesApplied_OPVector_000000000001",
+        "outputMetadata": {
+          "ml_attr": {
+            "attrs": {
+              "binary": [
+                {
+                  "idx": 0,
+                  "name": "survived_0"
+                }
+              ]
+            },
+            "num_attrs": 1
+          },
+          "vector_history": {
+            "survived": {
+              "stages": [
+                "vecBin_BinaryVectorizer_000000000001"
+              ],
+              "origin_features": [
+                "survived"
+              ]
+            }
+          },
+          "vector_detected_sensitive": {},
+          "vector_columns": [
+            {
+              "indices": [
+                0
+              ],
+              "parent_feature_type": [
+                "com.salesforce.op.features.types.Binary"
+              ],
+              "parent_feature": [
+                "survived"
+              ]
+            }
+          ]
+        }
+      },
+      "defaultParamMap": {
+        "fillValue": false,
+        "trackNulls": true,
+        "inputFeatures": [],
+        "inputSchema": {
+          "type": "struct",
+          "fields": []
+        },
+        "outputMetadata": {}
+      },
+      "ctorArgs": {
+        "uid": {
+          "type": "Value",
+          "value": "BinaryVectorizer_000000000001",
+          "valueClass": "java.lang.String"
+        }
+      }
+    }
+  ],
+  "allFeatures": [
+    {
+      "typeName": "com.salesforce.op.features.types.DateList",
+      "uid": "DateList_000000000008",
+      "name": "boarded",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_000000000008",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.BinaryMap",
+      "uid": "BinaryMap_00000000000b",
+      "name": "booleanMap",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_00000000000b",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.Text",
+      "uid": "Text_000000000007",
+      "name": "description",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_000000000007",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.MultiPickList",
+      "uid": "MultiPickList_000000000002",
+      "name": "gender",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_000000000002",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.RealNN",
+      "uid": "RealNN_000000000004",
+      "name": "height",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_000000000004",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.RealMap",
+      "uid": "RealMap_00000000000a",
+      "name": "numericMap",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_00000000000a",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.TextMap",
+      "uid": "TextMap_000000000009",
+      "name": "stringMap",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_000000000009",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.Binary",
+      "uid": "Binary_00000000000c",
+      "name": "survived",
+      "isResponse": true,
+      "originStage": "FeatureGeneratorStage_00000000000c",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.Real",
+      "uid": "Real_000000000006",
+      "name": "weight",
+      "isResponse": false,
+      "originStage": "FeatureGeneratorStage_000000000006",
+      "parents": []
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.OPVector",
+      "uid": "OPVector_000000000001",
+      "name": "survived_1-stagesApplied_OPVector_000000000001",
+      "isResponse": true,
+      "originStage": "BinaryVectorizer_000000000001",
+      "parents": [
+        "Binary_00000000000c"
+      ]
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.OPVector",
+      "uid": "OPVector_000000000003",
+      "name": "boarded_1-stagesApplied_OPVector_000000000003",
+      "isResponse": false,
+      "originStage": "DateListVectorizer_000000000003",
+      "parents": [
+        "DateList_000000000008"
+      ]
+    },
+    {
+      "typeName": "com.salesforce.op.features.types.OPVector",
+      "uid": "OPVector_000000000007",
+      "name": "height_1-stagesApplied_OPVector_000000000007",
+      "isResponse": false,
+      "originStage": "RealNNVectorizer_000000000007",
+      "parents": [
+        "RealNN_000000000004"
+      ]
+    }
+  ],
+  "parameters": "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}",
+  "trainParameters": "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}",
+  "rawFeatureFilterResults": "{\"rawFeatureFilterConfig\":{\"minFill\":0.0,\"maxFillDifference\":\"Infinity\",\"maxFillRatioDiff\":\"Infinity\",\"maxJSDivergence\":1.0,\"maxCorrelation\":1.0,\"correlationType\":\"Pearson\",\"jsDivergenceProtectedFeatures\":[],\"protectedFeatures\":[]},\"rawFeatureDistributions\":[],\"rawFeatureFilterMetrics\":[],\"exclusionReasons\":[]}"
+}

@@ -291,7 +291,8 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
       grouping = Option(key),
-      indicatorValue = None
+      indicatorValue = None,
+      descriptorValue = col.descriptorValue
     )
     meta.withColumns(cols.toArray)
   }

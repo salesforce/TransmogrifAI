@@ -36,7 +36,7 @@ import com.salesforce.op.utils.spark.RichEvaluator._
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
+import org.apache.spark.mllib.evaluation.{MulticlassMetrics, ExtendedBinaryClassificationMetrics}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
@@ -49,8 +49,8 @@ import org.slf4j.LoggerFactory
  * Default evaluation returns AUROC
  *
  * @param name           name of default metric
- * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
+ * @param numBins        max number of thresholds to track for thresholded metrics
  */
 
 private[op] class OpBinaryClassificationEvaluator
@@ -81,7 +81,9 @@ private[op] class OpBinaryClassificationEvaluator
 
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Seq(), Seq(), Seq(), Seq())
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        BinaryThresholdMetrics(Seq(), Seq(), Seq(), Seq(), Seq(), Seq(), Seq(), Seq())
+      )
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -105,17 +107,27 @@ private[op] class OpBinaryClassificationEvaluator
           case Row(prob: Vector, label: Double) => (prob(1), label)
           case Row(prob: Double, label: Double) => (prob, label)
         }
-      val sparkMLMetrics = new SparkMLBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
+      val sparkMLMetrics = ExtendedBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
       val thresholds = sparkMLMetrics.thresholds().collect()
       val precisionByThreshold = sparkMLMetrics.precisionByThreshold().collect().map(_._2)
       val recallByThreshold = sparkMLMetrics.recallByThreshold().collect().map(_._2)
       val falsePositiveRateByThreshold = sparkMLMetrics.roc().collect().map(_._1).slice(1, thresholds.length + 1)
       val aUROC = sparkMLMetrics.areaUnderROC()
       val aUPR = sparkMLMetrics.areaUnderPR()
+
+      val confusionMatrixByThreshold = sparkMLMetrics.confusionMatrixByThreshold().collect()
+      val (copiedTupPos, copiedTupNeg) = confusionMatrixByThreshold.map { case (_, confusionMatrix) =>
+          ((confusionMatrix.numTruePositives, confusionMatrix.numFalsePositives),
+            (confusionMatrix.numTrueNegatives, confusionMatrix.numFalseNegatives))
+        }.unzip
+      val (tpByThreshold, fpByThreshold) = copiedTupPos.unzip
+      val (tnByThreshold, fnByThreshold) = copiedTupNeg.unzip
+
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
         AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn,
-        thresholds, precisionByThreshold, recallByThreshold, falsePositiveRateByThreshold
+        BinaryThresholdMetrics(thresholds, precisionByThreshold, recallByThreshold, falsePositiveRateByThreshold,
+        tpByThreshold, fpByThreshold, tnByThreshold, fnByThreshold)
       )
       log.info("Evaluated metrics: {}", metrics.toString)
       metrics
@@ -163,18 +175,19 @@ private[op] class OpBinaryClassificationEvaluator
 
 
 /**
- * Metrics of Binary Classification Problem
+ * Metrics for binary classification models
  *
- * @param Precision
- * @param Recall
- * @param F1
- * @param AuROC
- * @param AuPR
- * @param Error
- * @param TP
- * @param TN
- * @param FP
- * @param FN
+ * @param Precision                         Overall precision of model, TP / (TP + FP)
+ * @param Recall                            Overall recall of model, TP / (TP + FN)
+ * @param F1                                Overall F1 score of model, 2 / (1 / Precision + 1 / Recall)
+ * @param AuROC                             AuROC of model
+ * @param AuPR                              AuPR of model
+ * @param Error                             Error of model
+ * @param TP                                True positive count at Spark's default decision threshold (0.5)
+ * @param TN                                True negative count at Spark's default decision threshold (0.5)
+ * @param FP                                False positive count at Spark's default decision threshold (0.5)
+ * @param FN                                False negative count at Spark's default decision threshold (0.5)
+ * @param ThresholdMetrics                  Metrics across different threshold values
  */
 case class BinaryClassificationMetrics
 (
@@ -188,6 +201,27 @@ case class BinaryClassificationMetrics
   TN: Double,
   FP: Double,
   FN: Double,
+  ThresholdMetrics: BinaryThresholdMetrics
+) extends EvaluationMetrics {
+  def rocCurve: Seq[(Double, Double)] = ThresholdMetrics.recallByThreshold.
+    zip(ThresholdMetrics.falsePositiveRateByThreshold)
+  def prCurve: Seq[(Double, Double)] = ThresholdMetrics.precisionByThreshold.zip(ThresholdMetrics.recallByThreshold)
+}
+
+/**
+ * Threshold metrics for binary classification predictions
+ *
+ * @param thresholds                        Sequence of thresholds for subsequent threshold metrics
+ * @param precisionByThreshold              Sequence of precision values at thresholds
+ * @param recallByThreshold                 Sequence of recall values at thresholds
+ * @param falsePositiveRateByThreshold      Sequence of false positive rates, FP / (FP + TN), at thresholds
+ * @param truePositivesByThreshold          Sequence of true positive counts at thresholds
+ * @param falsePositivesByThreshold         Sequence of false positive counts at thresholds
+ * @param trueNegativesByThreshold          Sequence of true negative counts at thresholds
+ * @param falseNegativesByThreshold         Sequence of false negative counts at thresholds
+ */
+case class BinaryThresholdMetrics
+(
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   thresholds: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
@@ -195,8 +229,13 @@ case class BinaryClassificationMetrics
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   recallByThreshold: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
-  falsePositiveRateByThreshold: Seq[Double]
-) extends EvaluationMetrics {
-  def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
-  def prCurve: Seq[(Double, Double)] = precisionByThreshold.zip(recallByThreshold)
-}
+  falsePositiveRateByThreshold: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  truePositivesByThreshold: Seq[Long],
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  falsePositivesByThreshold: Seq[Long],
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  trueNegativesByThreshold: Seq[Long],
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  falseNegativesByThreshold: Seq[Long]
+)

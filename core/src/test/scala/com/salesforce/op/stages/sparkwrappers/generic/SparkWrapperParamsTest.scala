@@ -30,15 +30,17 @@
 
 package com.salesforce.op.stages.sparkwrappers.generic
 
+import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestCommon
+import com.salesforce.op.test.PassengerFeaturesTest.HeightToRealNNExtract
+import com.salesforce.op.test.{Passenger, TestCommon, TestSparkContext}
 import org.apache.spark.ml.feature.{StandardScaler, StandardScalerModel}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 
 @RunWith(classOf[JUnitRunner])
-class SparkWrapperParamsTest extends FlatSpec with BeforeAndAfterEach with TestCommon {
+class SparkWrapperParamsTest extends FlatSpec with BeforeAndAfterEach with TestSparkContext {
 
   private def estimator(sparkMlStageIn: Option[StandardScaler] = None) = {
     new SwUnaryEstimator[Real, Real, StandardScalerModel, StandardScaler](
@@ -46,6 +48,7 @@ class SparkWrapperParamsTest extends FlatSpec with BeforeAndAfterEach with TestC
       operationName = "test-op", sparkMlStageIn = sparkMlStageIn
     )
   }
+  private val feature = FeatureBuilder.Real[Passenger].extract(new HeightToRealNNExtract).asPredictor
 
   Spec[SparkWrapperParams[_]] should "have proper default values for path and stage" in {
     val stage = estimator()
@@ -53,13 +56,13 @@ class SparkWrapperParamsTest extends FlatSpec with BeforeAndAfterEach with TestC
     stage.getSparkMlStage() shouldBe None
   }
   it should "when setting path, it should also set path to the stage param" in {
-    val stage = estimator()
+    val stage = estimator().setInput(feature)
     stage.setStageSavePath("/test/path")
     stage.getStageSavePath() shouldBe Some("/test/path")
   }
   it should "allow set/get spark params on a wrapped stage" in {
     val sparkStage = new StandardScaler()
-    val stage = estimator(sparkMlStageIn = Some(sparkStage))
+    val stage = estimator(sparkMlStageIn = Some(sparkStage)).setInput(feature)
     stage.getSparkMlStage() shouldBe Some(sparkStage)
     for {
       sparkStage <- stage.getSparkMlStage()

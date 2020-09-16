@@ -30,6 +30,7 @@
 
 package com.salesforce.op.local
 
+import ml.combust.mleap.runtime.transformer.feature._
 import ml.combust.mleap.core.feature._
 import org.apache.spark.ml.linalg.Vector
 
@@ -40,12 +41,12 @@ case object MLeapModelConverter {
 
   /**
    * Convert MLeap model instance to a model apply function
-   *
    * @param model MLeap model
    * @throws RuntimeException if model type is not supported
    * @return runnable model apply function
    */
   def modelToFunction(model: Any): Array[Any] => Any = model match {
+    // TODO look into applying transform directly rather than using the model apply
     case m: BinarizerModel => x => m.apply(x(0).asInstanceOf[Number].doubleValue())
     case m: BucketedRandomProjectionLSHModel => x => m.apply(x(0).asInstanceOf[Vector])
     case m: BucketizerModel => x => m.apply(x(0).asInstanceOf[Number].doubleValue())

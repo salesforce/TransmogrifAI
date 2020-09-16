@@ -102,7 +102,7 @@ private[op] class OpMultiClassificationEvaluator
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
       MultiClassificationMetrics(0.0, 0.0, 0.0, 0.0,
-        ThresholdMetrics(Seq.empty, Seq.empty, Map.empty, Map.empty, Map.empty))
+        MulticlassThresholdMetrics(Seq.empty, Seq.empty, Map.empty, Map.empty, Map.empty))
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val error = 1.0 - multiclassMetrics.accuracy
@@ -154,7 +154,7 @@ private[op] class OpMultiClassificationEvaluator
     data: RDD[(Array[Double], Double)],
     topNs: Seq[Int],
     thresholds: Seq[Double]
-  ): ThresholdMetrics = {
+  ): MulticlassThresholdMetrics = {
     require(thresholds.nonEmpty, "thresholds sequence in cannot be empty")
     require(thresholds.forall(x => x >= 0 && x <= 1.0), "thresholds sequence elements must be in the range [0, 1]")
     require(topNs.nonEmpty, "topN sequence in cannot be empty")
@@ -228,7 +228,7 @@ private[op] class OpMultiClassificationEvaluator
     val agg: MetricsMap = data.treeAggregate[MetricsMap](zeroValue)(combOp = _ + _, seqOp = _ + computeMetrics(_))
 
     val nRows = data.count()
-    ThresholdMetrics(
+    MulticlassThresholdMetrics(
       topNs = topNs,
       thresholds = thresholds,
       correctCounts = agg.map { case (k, (cor, _)) => k -> cor.toSeq },
@@ -271,7 +271,7 @@ case class MultiClassificationMetrics
   Recall: Double,
   F1: Double,
   Error: Double,
-  ThresholdMetrics: ThresholdMetrics
+  ThresholdMetrics: MulticlassThresholdMetrics
 ) extends EvaluationMetrics
 
 /**
@@ -291,7 +291,7 @@ case class MultiClassificationMetrics
  * @param incorrectCounts    map from topN value to an array of counts of incorrect classifications at each threshold
  * @param noPredictionCounts map from topN value to an array of counts of no prediction at each threshold
  */
-case class ThresholdMetrics
+case class MulticlassThresholdMetrics
 (
   @JsonDeserialize(contentAs = classOf[java.lang.Integer])
   topNs: Seq[Int],
