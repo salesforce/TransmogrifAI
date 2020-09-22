@@ -75,6 +75,16 @@ private[op] class OpMultiClassificationEvaluator
 
   def setTopNs(v: Array[Int]): this.type = set(topNs, v)
 
+  final val topKs = new IntArrayParam(
+    parent = this,
+    name = "topKs",
+    doc = "sequence of topK values to use for top K metrics",
+    isValid = _.forall(_ > 0)
+  )
+  setDefault(topKs, Array(5, 10, 20, 50, 100, 200))
+
+  def setTopKs(v: Array[Int]): this.type = set(topKs, v)
+
   final val thresholds = new DoubleArrayParam(
     parent = this,
     name = "thresholds",
@@ -102,7 +112,8 @@ private[op] class OpMultiClassificationEvaluator
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
       MultiClassificationMetrics(0.0, 0.0, 0.0, 0.0,
-        MulticlassThresholdMetrics(Seq.empty, Seq.empty, Map.empty, Map.empty, Map.empty))
+        MulticlassThresholdMetrics(Seq.empty, Seq.empty, Map.empty, Map.empty, Map.empty),
+        MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty))
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val error = 1.0 - multiclassMetrics.accuracy
@@ -118,17 +129,66 @@ private[op] class OpMultiClassificationEvaluator
         thresholds = $(thresholds)
       )
 
+      val metricsTopK = calculateTopKMetrics(
+        data = dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map{
+          case Row(prob: Vector, label: Double) => (prob.toArray, label)
+        },
+        topKs = $(topKs)
+      )
+
       val metrics = MultiClassificationMetrics(
         Precision = precision,
         Recall = recall,
         F1 = f1,
         Error = error,
-        ThresholdMetrics = thresholdMetrics
+        ThresholdMetrics = thresholdMetrics,
+        TopKMetrics = metricsTopK
       )
 
       log.info("Evaluated metrics: {}", metrics.toString)
       metrics
     }
+  }
+
+/**
+ * @param data       Input RDD consisting of (vector of score probabilities, label), where label corresponds to the
+ *                   index of the true class and the score vector consists of probabilities for each class
+ * @param topKs      Sequence of topK values to calculate multiclass classification metrics for
+ */
+  def calculateTopKMetrics(
+    data: RDD[(Array[Double], Double)],
+    topKs: Seq[Int]
+  ): MultiClassificationMetricsTopK = {
+    type Label = Int
+
+    def computeMetrics(scoresAndLabels: (Array[Double], Double)): (Array[Double], Double) = {
+      val scores: Array[Double] = scoresAndLabels._1
+      val label: Label = scoresAndLabels._2.toInt
+      val topKsAndScores: Map[Label, Array[(Double, Int)]] = topKs.map(t => t -> scores.zipWithIndex.sortBy(-_._1)
+        .take(t)).toMap
+      val topKIndices: Map[Label, Array[Int]] = topKsAndScores.mapValues(_.map(_._2))
+      val topKContainsLabel: Map[Label, Double] = topKIndices.mapValues(k => if (k contains label) label else -1)
+      (topKContainsLabel.values.toArray, label)
+    }
+
+    val topKPredictions: Seq[RDD[(Double, Double)]] = topKs.map {
+      k => data.map(x => computeMetrics(x)).map(x => (x._1(k), x._2))
+    }
+    val multiclassMetrics: Seq[MulticlassMetrics] = topKPredictions.map(x => new MulticlassMetrics(x))
+
+    val errorTopK: Seq[Double] = multiclassMetrics.map(x => 1.0 - x.accuracy)
+    val precisionTopK: Seq[Double] = multiclassMetrics.map(x => x.weightedPrecision)
+    val recallTopK: Seq[Double] = multiclassMetrics.map(x => x.weightedRecall)
+    val f1TopK: Seq[Double] = (precisionTopK zip recallTopK).map {
+      x => if (x._1 + x._2 == 0.0) 0.0 else 2 * x._1 * x._2 / (x._1 + x._2)
+    }
+
+    MultiClassificationMetricsTopK(
+      PrecisionTopK = precisionTopK,
+      RecallTopK = recallTopK,
+      F1TopK = f1TopK,
+      ErrorTopK = errorTopK
+    )
   }
 
 
@@ -271,7 +331,24 @@ case class MultiClassificationMetrics
   Recall: Double,
   F1: Double,
   Error: Double,
-  ThresholdMetrics: MulticlassThresholdMetrics
+  ThresholdMetrics: MulticlassThresholdMetrics,
+  TopKMetrics: MultiClassificationMetricsTopK
+) extends EvaluationMetrics
+
+/**
+ * Metrics for topK multiclass classification
+ *
+ * @param PrecisionTopK
+ * @param RecallTopK
+ * @param F1TopK
+ * @param ErrorTopK
+ */
+case class MultiClassificationMetricsTopK
+(
+  PrecisionTopK: Seq[Double],
+  RecallTopK: Seq[Double],
+  F1TopK: Seq[Double],
+  ErrorTopK: Seq[Double]
 ) extends EvaluationMetrics
 
 /**
