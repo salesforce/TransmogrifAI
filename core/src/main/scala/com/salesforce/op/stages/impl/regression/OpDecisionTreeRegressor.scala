@@ -33,6 +33,8 @@ package com.salesforce.op.stages.impl.regression
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
+import org.apache.spark.ml.linalg.Vector
+import ml.combust.mleap.core.regression.{DecisionTreeRegressionModel => MleapDecisionTreeRegressionModel}
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
 import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, DecisionTreeRegressor, OpDecisionTreeRegressorParams}
 

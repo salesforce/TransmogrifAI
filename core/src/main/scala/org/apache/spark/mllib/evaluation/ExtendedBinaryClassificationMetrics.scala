@@ -28,37 +28,43 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.sparkwrappers.specific
+package org.apache.spark.mllib.evaluation
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
+import java.lang.reflect.Method
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
+import org.apache.spark.mllib.evaluation.binary.BinaryConfusionMatrix
+import org.apache.spark.rdd.RDD
 
-/**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
- */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-)(
-  implicit ctag: ClassTag[T]
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
+class ExtendedBinaryClassificationMetrics(
+  override val scoreAndLabels: RDD[(Double, Double)],
+  override val numBins: Int
+) extends BinaryClassificationMetrics(scoreAndLabels, numBins) {
+
+  def confusionMatrixByThreshold(): RDD[(Double, BinaryConfusionMatrix)] = {
+    ExtendedBinaryClassificationMetrics.confusionMatrixByThreshold(this)
+  }
+}
+
+
+object ExtendedBinaryClassificationMetrics {
+  private lazy val confusionsLazyVal: Method = {
+    val m = classOf[BinaryClassificationMetrics].getDeclaredMethod("confusions")
+    m.setAccessible(true)
+    m
+  }
+
+  def apply(
+    scoreAndLabels: RDD[(Double, Double)],
+    numBins: Int
+  ): ExtendedBinaryClassificationMetrics = {
+    new ExtendedBinaryClassificationMetrics(scoreAndLabels, numBins)
+  }
 
   /**
-   * Function used to convert input to output
+   * Exposes the thresholded confusion matrices that Spark uses to calculate other derived metrics.
+   * @return RDD of (threshold, BinaryConfusionMatrix) over all thresholds calculated
    */
-  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) =>
-    Prediction(prediction = predict(features.value))
+  private def confusionMatrixByThreshold(bcm: BinaryClassificationMetrics) = {
+    confusionsLazyVal.invoke(bcm).asInstanceOf[RDD[(Double, BinaryConfusionMatrix)]]
+  }
 }

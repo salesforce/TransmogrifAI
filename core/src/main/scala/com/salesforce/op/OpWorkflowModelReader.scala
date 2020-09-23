@@ -30,19 +30,24 @@
 
 package com.salesforce.op
 
+
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
+import com.salesforce.op.WorkflowFileReader.readAsString
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
-import org.apache.spark.ml.util.MLReader
+import org.apache.commons.io.IOUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
 import scala.collection.mutable.ArrayBuffer
+import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -51,8 +56,9 @@ import scala.util.{Failure, Success, Try}
  * NOTE: The FeatureGeneratorStages will not be recovered into the Model object, because they are part of each feature.
  *
  * @param workflowOpt optional workflow that produced the trained model
+ * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
  */
-class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReader[OpWorkflowModel] {
+class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Boolean = true) {
 
   /**
    * Load a previously trained workflow model from path
@@ -60,14 +66,14 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @param path to the trained workflow model
    * @return workflow model
    */
-  final override def load(path: String): OpWorkflowModel = {
-    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
-      Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString)
-        .flatMap(loadJson(_, path = path)) match {
-        case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
-        case Success(wf) => wf
-      }
-    }(this.sparkSession)
+  final def load(path: String): OpWorkflowModel = {
+    implicit val conf = new org.apache.hadoop.conf.Configuration()
+    Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
+      .flatMap(loadJson(_, path = path)) match {
+      case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
+      case Success(wf) => wf
+
+    }
   }
 
   /**
@@ -116,7 +122,8 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     val stagesJs = (json \ field.entryName).extract[JArray].arr
     val (recoveredStages, recoveredFeatures) = ArrayBuffer.empty[OPStage] -> ArrayBuffer.empty[OPFeature]
     for {j <- stagesJs} {
-      val stage = new OpPipelineStageReader(recoveredFeatures).loadFromJson(j, path = path).asInstanceOf[OPStage]
+      val stage = new OpPipelineStageReader(recoveredFeatures)
+        .loadFromJson(j, path = path, asSpark = asSpark).asInstanceOf[OPStage]
       recoveredStages += stage
       recoveredFeatures += stage.getOutput()
     }
@@ -131,7 +138,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       val originalStage = workflow.getStages().find(_.uid == stageUid)
       originalStage match {
         case Some(os) => Option(
-          new OpPipelineStageReader(os).loadFromJson(j, path = path)).map(_.asInstanceOf[OPStage]
+          new OpPipelineStageReader(os).loadFromJson(j, path = path, asSpark = asSpark)).map(_.asInstanceOf[OPStage]
         )
         case None if generators.exists(_.uid == stageUid) => None // skip the generator since they are in the workflow
         case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
@@ -224,3 +231,40 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   }
 
 }
+
+private object WorkflowFileReader {
+
+  def loadFile(pathString: String)(implicit conf: Configuration): String = {
+    Try {
+      readAsString( new Path(pathString, "part-00000.gz") )
+    } recoverWith { case suppressed1 =>
+      Try {
+        readAsString( new Path(pathString, "part-00000") )
+      } recoverWith { case suppressed2 => suppressed2.addSuppressed(suppressed1)
+          Try {
+            readAsString( new Path(pathString) )
+          } recoverWith {
+            case th => th.addSuppressed(suppressed2)
+              Failure(th)
+          }
+        }
+      } match {
+      case Failure(e) => throw new RuntimeException(s"Failed to load workflow because of $e", e)
+      case Success(v) => v
+    }
+  }
+
+  private def readAsString(path: Path)(implicit conf: Configuration): String = {
+    val fs = path.getFileSystem(conf)
+    val codecFactory = new CompressionCodecFactory(conf)
+    val codec = Option(codecFactory.getCodec(path))
+    val in = fs.open(path)
+    val read = codec.map( c => Source.fromInputStream(c.createInputStream(in)).mkString )
+      .getOrElse( IOUtils.toString(in, "UTF-8") )
+    in.close()
+    read
+  }
+}
+
+
+

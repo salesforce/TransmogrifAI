@@ -28,37 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.sparkwrappers.specific
+package com.salesforce.op.evaluators
 
-import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
-import org.apache.spark.ml.PredictionModel
-import org.apache.spark.ml.linalg.Vector
+import com.salesforce.op.test.TestSparkContext
+import org.apache.spark.mllib.evaluation.ExtendedBinaryClassificationMetrics
+import org.junit.runner.RunWith
+import org.scalatest.{Assertions, FlatSpec}
+import org.scalatest.junit.JUnitRunner
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
+@RunWith(classOf[JUnitRunner])
+class ExtendedBinaryClassificationMetricsTest extends FlatSpec with TestSparkContext {
+  val numRecs = 400 // Number or records to use in threshold metrics tests
+  val numBins = 100 // Number of bins for threshold metrics
+  val scores = Seq.fill(numRecs)(math.random)
+  val labels = Seq.fill(numRecs)(math.round(math.random).toDouble)
 
-/**
- * Class that takes in a spark PredictionModel and wraps it into an OP model which returns a
- * Prediction feature
- *
- * @param sparkModel    model to wrap
- * @param uid           uid to give stage
- * @param operationName unique name of the operation this stage performs
- * @tparam T type of the model to wrap
- */
-abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
-(
-  sparkModel: T,
-  uid: String,
-  operationName: String
-)(
-  implicit ctag: ClassTag[T]
-) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
+  val synthRDD = spark.sparkContext.parallelize(scores.zip(labels))
 
-  /**
-   * Function used to convert input to output
-   */
-  override def transformFn: (RealNN, OPVector) => Prediction = (_, features) =>
-    Prediction(prediction = predict(features.value))
+  Spec[ExtendedBinaryClassificationMetrics] should "produce deterministic threshold metrics" in {
+    val numComparisons = 5
+
+    for {i <- 1 to numComparisons} {
+      val sparkMLMetrics = ExtendedBinaryClassificationMetrics(scoreAndLabels = synthRDD, numBins = numBins)
+      sparkMLMetrics.confusionMatrixByThreshold().map(_._1).collect() should contain theSameElementsInOrderAs
+        sparkMLMetrics.thresholds().collect()
+    }
+  }
+
 }

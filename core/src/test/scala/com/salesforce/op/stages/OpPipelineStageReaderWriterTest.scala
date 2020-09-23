@@ -60,7 +60,6 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   private lazy val writer = new OpPipelineStageWriter(stage)
   private lazy val stageJsonString: String = writer.writeToJsonString(savePath)
   private lazy val stageJson: JValue = parse(stageJsonString)
-  private lazy val isModel = stage.isInstanceOf[Model[_]]
   private val FN = FieldNames
 
   Spec(this.getClass) should "write stage uid" in {
@@ -82,7 +81,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "write outputMetadata" in {
     val params = extractParams(stageJson)
-    val metadataStr = compact(render(extractParams(stageJson) \ "outputMetadata"))
+    val metadataStr = compact(render(params \ "outputMetadata"))
     val metadata = Metadata.fromJson(metadataStr)
     metadata shouldBe stage.getMetadata()
   }
@@ -106,7 +105,21 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "load stage correctly" in {
     val reader = new OpPipelineStageReader(stage)
-    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, asSpark = true)
+    stageLoaded shouldBe a[OpPipelineStageBase]
+    stageLoaded shouldBe a[Transformer]
+    stageLoaded.getOutput() shouldBe a[FeatureLike[_]]
+    val _ = stage.asInstanceOf[Transformer].transform(passengersDataSet)
+    val transformed = stageLoaded.asInstanceOf[Transformer].transform(passengersDataSet)
+    transformed.collect(stageLoaded.getOutput().asInstanceOf[FeatureLike[Real]]) shouldBe expected
+    stageLoaded.uid shouldBe stage.uid
+    stageLoaded.operationName shouldBe stage.operationName
+    stageLoaded.getInputFeatures() shouldBe stage.getInputFeatures()
+    stageLoaded.getInputSchema() shouldBe stage.getInputSchema()
+  }
+  it should "load stage correctly with spark as false" in {
+    val reader = new OpPipelineStageReader(stage)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, asSpark = false)
     stageLoaded shouldBe a[OpPipelineStageBase]
     stageLoaded shouldBe a[Transformer]
     stageLoaded.getOutput() shouldBe a[FeatureLike[_]]
