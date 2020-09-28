@@ -130,9 +130,7 @@ private[op] class OpMultiClassificationEvaluator
       )
 
       val metricsTopK = calculateTopKMetrics(
-        data = dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map{
-          case Row(prob: Vector, label: Double) => (prob.toArray, label)
-        },
+        data = rdd,
         topKs = $(topKs)
       )
 
@@ -156,29 +154,19 @@ private[op] class OpMultiClassificationEvaluator
  * @param topKs      Sequence of topK values to calculate multiclass classification metrics for
  */
   def calculateTopKMetrics(
-    data: RDD[(Array[Double], Double)],
+    data: RDD[(Double, Double)],
     topKs: Seq[Int]
   ): MultiClassificationMetricsTopK = {
-    type Label = Int
+    val sortedLabels: RDD[Double] = data.map(_._2).groupBy(identity).mapValues(_.size).sortBy(-_._2).map(_._1)
+    val topKLabels: Seq[Array[Double]] = topKs.map(k => sortedLabels.take(k))
+    val topKMetrics: Seq[MulticlassMetrics] = topKLabels.map(topKLabel => {
+      val filteredRdd: RDD[(Double, Double)] = data.map(x => if (topKLabel contains x._2) x else (x._1, -1))
+      new MulticlassMetrics(filteredRdd)
+    })
 
-    def computeMetrics(scoresAndLabels: (Array[Double], Double)): (Array[Double], Double) = {
-      val scores: Array[Double] = scoresAndLabels._1
-      val label: Label = scoresAndLabels._2.toInt
-      val topKsAndScores: Map[Label, Array[(Double, Int)]] = topKs.map(t => t -> scores.zipWithIndex.sortBy(-_._1)
-        .take(t)).toMap
-      val topKIndices: Map[Label, Array[Int]] = topKsAndScores.mapValues(_.map(_._2))
-      val topKContainsLabel: Map[Label, Double] = topKIndices.mapValues(k => if (k contains label) label else -1)
-      (topKContainsLabel.values.toArray, label)
-    }
-
-    val topKPredictions: Seq[RDD[(Double, Double)]] = topKs.map {
-      k => data.map(x => computeMetrics(x)).map(x => (x._1(k), x._2))
-    }
-    val multiclassMetrics: Seq[MulticlassMetrics] = topKPredictions.map(x => new MulticlassMetrics(x))
-
-    val errorTopK: Seq[Double] = multiclassMetrics.map(x => 1.0 - x.accuracy)
-    val precisionTopK: Seq[Double] = multiclassMetrics.map(x => x.weightedPrecision)
-    val recallTopK: Seq[Double] = multiclassMetrics.map(x => x.weightedRecall)
+    val errorTopK: Seq[Double] = topKMetrics.map(1.0 - _.accuracy)
+    val precisionTopK: Seq[Double] = topKMetrics.map(_.weightedPrecision)
+    val recallTopK: Seq[Double] = topKMetrics.map(_.weightedRecall)
     val f1TopK: Seq[Double] = (precisionTopK zip recallTopK).map {
       x => if (x._1 + x._2 == 0.0) 0.0 else 2 * x._1 * x._2 / (x._1 + x._2)
     }
