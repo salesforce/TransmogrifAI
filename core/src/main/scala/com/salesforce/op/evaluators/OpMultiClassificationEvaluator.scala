@@ -79,9 +79,9 @@ private[op] class OpMultiClassificationEvaluator
     parent = this,
     name = "topKs",
     doc = "sequence of topK values to use for top K metrics",
-    isValid = _.forall(_ > 0)
+    isValid = l => l.length <= 10 && l.forall(_ > 0)
   )
-  setDefault(topKs, Array(5, 10, 20, 50, 100, 200))
+  setDefault(topKs, Array(5, 10, 20, 50, 100))
 
   def setTopKs(v: Array[Int]): this.type = set(topKs, v)
 
@@ -129,7 +129,7 @@ private[op] class OpMultiClassificationEvaluator
         thresholds = $(thresholds)
       )
 
-      val metricsTopK = calculateTopKMetrics(
+      val topKMetrics = calculateTopKMetrics(
         data = rdd,
         topKs = $(topKs)
       )
@@ -140,7 +140,7 @@ private[op] class OpMultiClassificationEvaluator
         F1 = f1,
         Error = error,
         ThresholdMetrics = thresholdMetrics,
-        TopKMetrics = metricsTopK
+        TopKMetrics = topKMetrics
       )
 
       log.info("Evaluated metrics: {}", metrics.toString)
@@ -149,6 +149,12 @@ private[op] class OpMultiClassificationEvaluator
   }
 
 /**
+ * Function that calculates Multi Classification Metrics for different topK most occuring labels given an RDD
+ * of scores & labels, and a list of topK values to consider.
+ *
+ * Output: MultiClassificationMetricsTopK object, containing an array of metrics of Precision, Recall, F1
+ * and Error Rate for each of the topK values.
+ *
  * @param data       Input RDD consisting of (vector of score probabilities, label), where label corresponds to the
  *                   index of the true class and the score vector consists of probabilities for each class
  * @param topKs      Sequence of topK values to calculate multiclass classification metrics for
@@ -157,25 +163,27 @@ private[op] class OpMultiClassificationEvaluator
     data: RDD[(Double, Double)],
     topKs: Seq[Int]
   ): MultiClassificationMetricsTopK = {
-    val sortedLabels: RDD[Double] = data.map(_._2).groupBy(identity).mapValues(_.size).sortBy(-_._2).map(_._1)
+    val labelCounts: RDD[(Double, Int)] = data.map { case (_, label) => (label, 1)}.reduceByKey(_ + _)
+    val sortedLabels: RDD[Double] = labelCounts.sortBy { case (_, count) => -1 * count}.map { case (label, _) => label}
     val topKLabels: Seq[Array[Double]] = topKs.map(k => sortedLabels.take(k))
     val topKMetrics: Seq[MulticlassMetrics] = topKLabels.map(topKLabel => {
-      val filteredRdd: RDD[(Double, Double)] = data.map(x => if (topKLabel contains x._2) x else (x._1, -1))
+      val filteredRdd: RDD[(Double, Double)] =
+        data.map { case (pred, label) => if (topKLabel contains label) (pred, label) else (pred, -1) }
       new MulticlassMetrics(filteredRdd)
     })
 
-    val errorTopK: Seq[Double] = topKMetrics.map(1.0 - _.accuracy)
-    val precisionTopK: Seq[Double] = topKMetrics.map(_.weightedPrecision)
-    val recallTopK: Seq[Double] = topKMetrics.map(_.weightedRecall)
-    val f1TopK: Seq[Double] = (precisionTopK zip recallTopK).map {
-      x => if (x._1 + x._2 == 0.0) 0.0 else 2 * x._1 * x._2 / (x._1 + x._2)
+    val error: Seq[Double] = topKMetrics.map(1.0 - _.accuracy)
+    val precision: Seq[Double] = topKMetrics.map(_.weightedPrecision)
+    val recall: Seq[Double] = topKMetrics.map(_.weightedRecall)
+    val f1: Seq[Double] = (precision zip recall).map {
+      case (precision, recall) => if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
     }
 
     MultiClassificationMetricsTopK(
-      PrecisionTopK = precisionTopK,
-      RecallTopK = recallTopK,
-      F1TopK = f1TopK,
-      ErrorTopK = errorTopK
+      Precision = precision,
+      Recall = recall,
+      F1 = f1,
+      Error = error
     )
   }
 
@@ -324,19 +332,22 @@ case class MultiClassificationMetrics
 ) extends EvaluationMetrics
 
 /**
- * Metrics for topK multiclass classification
+ * Metrics for topK MultiClassification
  *
- * @param PrecisionTopK
- * @param RecallTopK
- * @param F1TopK
- * @param ErrorTopK
+ * Each metric contains a list of metrics corresponding to each of the topK most occurring labels.  If the predicted
+ * label is outside of the topK most occurring labels, it is treated as incorrect.
+ *
+ * @param Precision
+ * @param Recall
+ * @param F1
+ * @param Error
  */
 case class MultiClassificationMetricsTopK
 (
-  PrecisionTopK: Seq[Double],
-  RecallTopK: Seq[Double],
-  F1TopK: Seq[Double],
-  ErrorTopK: Seq[Double]
+  Precision: Seq[Double],
+  Recall: Seq[Double],
+  F1: Seq[Double],
+  Error: Seq[Double]
 ) extends EvaluationMetrics
 
 /**
