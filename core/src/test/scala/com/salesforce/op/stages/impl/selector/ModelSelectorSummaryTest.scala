@@ -96,7 +96,7 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
         ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
           correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
           noPredictionCounts = Map(3 -> Seq(300L))),
-        TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty)),
+        TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty)),
       holdoutEvaluation = None
     )
 
@@ -121,7 +121,7 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
       ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
         correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
         noPredictionCounts = Map(3 -> Seq(300L))),
-      TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty))
+      TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty))
 
     val evalMetricsJson = evalMetrics.toJson()
     val roundTripEvalMetrics = ModelSelectorSummary.evalMetFromJson(

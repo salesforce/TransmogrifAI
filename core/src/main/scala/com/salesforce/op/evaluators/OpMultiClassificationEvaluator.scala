@@ -113,7 +113,7 @@ private[op] class OpMultiClassificationEvaluator
       log.warn("The dataset is empty. Returning empty metrics.")
       MultiClassificationMetrics(0.0, 0.0, 0.0, 0.0,
         MulticlassThresholdMetrics(Seq.empty, Seq.empty, Map.empty, Map.empty, Map.empty),
-        MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty))
+        MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty))
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val error = 1.0 - multiclassMetrics.accuracy
@@ -163,7 +163,7 @@ private[op] class OpMultiClassificationEvaluator
     data: RDD[(Double, Double)],
     topKs: Seq[Int]
   ): MultiClassificationMetricsTopK = {
-    val labelCounts: RDD[(Double, Int)] = data.map { case (_, label) => (label, 1)}.reduceByKey(_ + _)
+    val labelCounts: RDD[(Double, Long)] = data.map { case (_, label) => (label, 1L)}.reduceByKey(_ + _)
     val sortedLabels: RDD[Double] = labelCounts.sortBy { case (_, count) => -1 * count}.map { case (label, _) => label}
     val topKLabels: Seq[Array[Double]] = topKs.map(k => sortedLabels.take(k))
     val topKMetrics: Seq[MulticlassMetrics] = topKLabels.map(topKLabel => {
@@ -180,6 +180,7 @@ private[op] class OpMultiClassificationEvaluator
     }
 
     MultiClassificationMetricsTopK(
+      topKs = topKs,
       Precision = precision,
       Recall = recall,
       F1 = f1,
@@ -337,6 +338,7 @@ case class MultiClassificationMetrics
  * Each metric contains a list of metrics corresponding to each of the topK most occurring labels.  If the predicted
  * label is outside of the topK most occurring labels, it is treated as incorrect.
  *
+ * @param topKs
  * @param Precision
  * @param Recall
  * @param F1
@@ -344,6 +346,7 @@ case class MultiClassificationMetrics
  */
 case class MultiClassificationMetricsTopK
 (
+  topKs: Seq[Int],
   Precision: Seq[Double],
   Recall: Seq[Double],
   F1: Seq[Double],
