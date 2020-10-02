@@ -67,20 +67,22 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    * @param path to the trained workflow model
    * @return workflow model
    */
-  final def load(path: String, localDir: String = s"${sys.env("PWD")}/tmp/localModel"): OpWorkflowModel = {
+  final def load(path: String, localDir: String = "tmp/model"): OpWorkflowModel = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val zipFile = localDir + "/localModel.zip"
-    val modelDir = localDir + "/unzippedModel"
+    val localPath = new Path(localDir)
     val savePath = new Path(path)
     val fs = savePath.getFileSystem(conf)
-    fs.copyToLocalFile(savePath, new Path(localDir))
+    fs.delete(localPath, true)
+    val zipFile = localDir + "/Model.zip"
+    val modelDir = localDir + "/rawModel"
+    fs.copyToLocalFile(savePath, new Path(zipFile))
     FileCompress.unzip(zipFile, modelDir)
     val model = Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelDir)))
       .flatMap(loadJson(_, path = modelDir)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
-    fs.delete(new Path(localDir), true)
+    fs.delete(localPath, true)
     model
   }
 

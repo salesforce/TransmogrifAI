@@ -21,19 +21,20 @@ case object FileCompress {
     val allFiles = FileUtils.listFiles(inPath.toFile, null, true)
     val zipFile = new ZipOutputStream(new FileOutputStream(zipPath.toString))
     for {entry <- allFiles.asScala} {
-      val name = entry.getPath.stripPrefix("file:")
-      zipFile.putNextEntry(new ZipEntry(name))
-      val in = new BufferedInputStream(new FileInputStream(name))
-      var b = in.read()
-      while (b > -1) {
-        zipFile.write(b)
-        b = in.read()
+      if (!entry.getName.startsWith(".")) {
+        val name = entry.getPath
+        zipFile.putNextEntry(new ZipEntry(name))
+        val in = new BufferedInputStream(new FileInputStream(name))
+        var b = in.read()
+        while (b > -1) {
+          zipFile.write(b)
+          b = in.read()
+        }
+        in.close()
+        zipFile.closeEntry()
       }
-      in.close()
-      zipFile.closeEntry()
     }
     zipFile.close()
-    FileUtils.deleteDirectory(inPath.toFile)
   }
 
   /**
@@ -54,7 +55,6 @@ case object FileCompress {
         Files.copy(zipFile.getInputStream(entry), path)
       }
     }
-    FileUtils.deleteDirectory(zipPath.toFile)
   }
 
 }

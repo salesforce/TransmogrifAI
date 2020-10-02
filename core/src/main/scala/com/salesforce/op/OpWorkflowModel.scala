@@ -223,17 +223,19 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
    */
-  def save(path: String, overwrite: Boolean = true, localDir: String = s"${sys.env("PWD")}/tmp/model"): Unit = {
+  def save(path: String, overwrite: Boolean = true,
+    localDir: String = "tmp/model"): Unit = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
+    val localPath = new Path(localDir)
+    val finalPath = new Path(path)
+    val fs = finalPath.getFileSystem(conf)
+    if (overwrite) fs.delete(localPath, true)
     val uncompressed = localDir + "/rawModel"
     val compressed = localDir + "/Model.zip"
     OpWorkflowModelWriter.save(this, path = uncompressed, overwrite = overwrite)
-    // TODO override compression codec ?
     FileCompress.zip(uncompressed, compressed)
-    val finalPath = new Path(path)
-    val fs = finalPath.getFileSystem(conf)
-    fs.copyFromLocalFile(true, new Path(compressed), finalPath)
-    fs.delete(new Path(localDir), true)
+    fs.copyFromLocalFile(false, new Path(compressed), finalPath)
+    fs.delete(localPath, true)
   }
 
   /**
