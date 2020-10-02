@@ -39,6 +39,7 @@ import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeatur
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
+import com.salesforce.op.utils.io.file.FileCompress
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -66,14 +67,21 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    * @param path to the trained workflow model
    * @return workflow model
    */
-  final def load(path: String): OpWorkflowModel = {
+  final def load(path: String, localDir: String = s"${sys.env("PWD")}/tmp/localModel"): OpWorkflowModel = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
-      .flatMap(loadJson(_, path = path)) match {
+    val zipFile = localDir + "/localModel.zip"
+    val modelDir = localDir + "/unzippedModel"
+    val savePath = new Path(path)
+    val fs = savePath.getFileSystem(conf)
+    fs.copyToLocalFile(savePath, new Path(localDir))
+    FileCompress.unzip(zipFile, modelDir)
+    val model = Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelDir)))
+      .flatMap(loadJson(_, path = modelDir)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
-
     }
+    fs.delete(new Path(localDir), true)
+    model
   }
 
   /**

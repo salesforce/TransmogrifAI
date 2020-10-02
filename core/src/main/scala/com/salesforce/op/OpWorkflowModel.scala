@@ -35,10 +35,12 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
+import com.salesforce.op.utils.io.file.FileCompress
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.functions._
@@ -46,6 +48,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
 import org.json4s.jackson.JsonMethods.{pretty, render}
+import org.apache.hadoop.fs.Path
 
 import scala.reflect.ClassTag
 
@@ -220,8 +223,17 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
    */
-  def save(path: String, overwrite: Boolean = true): Unit = {
-    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+  def save(path: String, overwrite: Boolean = true, localDir: String = s"${sys.env("PWD")}/tmp/model"): Unit = {
+    implicit val conf = new org.apache.hadoop.conf.Configuration()
+    val uncompressed = localDir + "/rawModel"
+    val compressed = localDir + "/Model.zip"
+    OpWorkflowModelWriter.save(this, path = uncompressed, overwrite = overwrite)
+    // TODO override compression codec ?
+    FileCompress.zip(uncompressed, compressed)
+    val finalPath = new Path(path)
+    val fs = finalPath.getFileSystem(conf)
+    fs.copyFromLocalFile(true, new Path(compressed), finalPath)
+    fs.delete(new Path(localDir), true)
   }
 
   /**
