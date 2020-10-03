@@ -228,18 +228,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    */
   def save(path: String, overwrite: Boolean = true,
     localDir: String = WorkflowFileReader.localDir): Unit = {
-    implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val localPath = new Path(new File(localDir).getAbsolutePath)
-    val finalPath = new Path(path)
-    val fs = finalPath.getFileSystem(conf)
-    if (overwrite) fs.delete(localPath, true)
-    val raw = localPath + WorkflowFileReader.rawModel
-    val compressed = localPath + WorkflowFileReader.zipModel
-    OpWorkflowModelWriter.save(this, path = raw, overwrite = overwrite)
-    ZipUtil.pack(new File(raw), new File(compressed))
-    // fs.copyFromLocalFile(false, new Path(compressed), finalPath)
-    fs.copyFromLocalFile(false, new Path(compressed), finalPath)
-    fs.delete(localPath, true)
+    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite, localDir)
   }
 
   /**

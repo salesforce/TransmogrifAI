@@ -77,6 +77,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     fs.delete(localPath, true)
     val modelDir = localPath + WorkflowFileReader.rawModel
     val zipFile = new File(localPath + WorkflowFileReader.zipModel)
+
     fs.copyToLocalFile(savePath, new Path(zipFile.getAbsolutePath))
     val fileToLoad = Try {
       val subZip = // TODO figure out why it puts the files like this
@@ -87,6 +88,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       case Success(_) => modelDir
       case Failure(_) => zipFile.getAbsolutePath
     }
+
     val model = Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(fileToLoad)))
       .flatMap(loadJson(_, path = fileToLoad)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)

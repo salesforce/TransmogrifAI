@@ -30,6 +30,8 @@
 
 package com.salesforce.op
 
+import java.io.File
+
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
@@ -42,6 +44,7 @@ import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats}
+import org.zeroturnaround.zip.ZipUtil
 
 /**
  * Writes the [[OpWorkflowModel]] to json format.
@@ -196,11 +199,29 @@ object OpWorkflowModelWriter {
    * @param model workflow model instance
    * @param path      path to save the model and its stages
    * @param overwrite should overwrite the destination
+   * @param localDir local folder to copy and unpack stored model to for loading
    */
-  def save(model: OpWorkflowModel, path: String, overwrite: Boolean = true): Unit = {
+  def save(
+    model: OpWorkflowModel,
+    path: String,
+    overwrite: Boolean = true,
+    localDir: String = WorkflowFileReader.localDir
+  ): Unit = {
+    implicit val conf = new org.apache.hadoop.conf.Configuration()
+    val localPath = new Path(new File(localDir).getAbsolutePath)
+    val finalPath = new Path(path)
+    val fs = finalPath.getFileSystem(conf)
+    if (overwrite) fs.delete(localPath, true)
+    val raw = localPath + WorkflowFileReader.rawModel
+    val compressed = localPath + WorkflowFileReader.zipModel
+
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
     writer.save(path)
+
+    ZipUtil.pack(new File(raw), new File(compressed))
+    fs.copyFromLocalFile(false, new Path(compressed), finalPath)
+    fs.delete(localPath, true)
   }
 
   /**
