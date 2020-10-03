@@ -475,10 +475,11 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Load a previously trained workflow model from path
    *
    * @param path to the trained workflow model
+   * @param localDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  def loadModel(path: String): OpWorkflowModel = {
-    new OpWorkflowModelReader(Some(this)).load(path)
+  def loadModel(path: String, localDir: String = WorkflowFileReader.localDir): OpWorkflowModel = {
+    new OpWorkflowModelReader(Some(this)).load(path, localDir)
   }
 
   /**

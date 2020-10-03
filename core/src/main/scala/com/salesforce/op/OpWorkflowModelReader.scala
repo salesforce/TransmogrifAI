@@ -31,15 +31,16 @@
 package com.salesforce.op
 
 
+import java.io.File
+
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
-import com.salesforce.op.WorkflowFileReader.readAsString
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
-import com.salesforce.op.utils.io.file.FileCompress
+import org.zeroturnaround.zip.ZipUtil
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -65,20 +66,29 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    * Load a previously trained workflow model from path
    *
    * @param path to the trained workflow model
+   * @param localDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  final def load(path: String, localDir: String = "tmp/model"): OpWorkflowModel = {
+  final def load(path: String, localDir: String = WorkflowFileReader.localDir): OpWorkflowModel = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val localPath = new Path(localDir)
+    val localPath = new Path(new File(localDir).getAbsolutePath)
     val savePath = new Path(path)
     val fs = savePath.getFileSystem(conf)
     fs.delete(localPath, true)
-    val zipFile = localDir + "/Model.zip"
-    val modelDir = localDir + "/rawModel"
-    fs.copyToLocalFile(savePath, new Path(zipFile))
-    FileCompress.unzip(zipFile, modelDir)
-    val model = Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelDir)))
-      .flatMap(loadJson(_, path = modelDir)) match {
+    val modelDir = localPath + WorkflowFileReader.rawModel
+    val zipFile = new File(localPath + WorkflowFileReader.zipModel)
+    fs.copyToLocalFile(savePath, new Path(zipFile.getAbsolutePath))
+    val fileToLoad = Try {
+      val subZip = // TODO figure out why it puts the files like this
+        if (zipFile.isDirectory) new File(zipFile.getAbsolutePath + WorkflowFileReader.zipModel)
+        else zipFile
+      ZipUtil.unpack(subZip, new File(modelDir))
+    } match { // For backwards compatibility since old models will not be zipped
+      case Success(_) => modelDir
+      case Failure(_) => zipFile.getAbsolutePath
+    }
+    val model = Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(fileToLoad)))
+      .flatMap(loadJson(_, path = fileToLoad)) match {
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
@@ -243,6 +253,10 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 }
 
 private object WorkflowFileReader {
+
+  val rawModel = "/rawModel"
+  val zipModel = "/Model.zip"
+  def localDir: String = s"tmp/model-${System.currentTimeMillis}"
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     Try {

@@ -30,12 +30,13 @@
 
 package com.salesforce.op
 
+import java.io.File
+
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
-import com.salesforce.op.utils.io.file.FileCompress
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -49,6 +50,7 @@ import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
 import org.json4s.jackson.JsonMethods.{pretty, render}
 import org.apache.hadoop.fs.Path
+import org.zeroturnaround.zip.ZipUtil
 
 import scala.reflect.ClassTag
 
@@ -222,18 +224,20 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    *
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
+   * @param localDir local folder to copy and unpack stored model to for loading
    */
   def save(path: String, overwrite: Boolean = true,
-    localDir: String = "tmp/model"): Unit = {
+    localDir: String = WorkflowFileReader.localDir): Unit = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val localPath = new Path(localDir)
+    val localPath = new Path(new File(localDir).getAbsolutePath)
     val finalPath = new Path(path)
     val fs = finalPath.getFileSystem(conf)
     if (overwrite) fs.delete(localPath, true)
-    val uncompressed = localDir + "/rawModel"
-    val compressed = localDir + "/Model.zip"
-    OpWorkflowModelWriter.save(this, path = uncompressed, overwrite = overwrite)
-    FileCompress.zip(uncompressed, compressed)
+    val raw = localPath + WorkflowFileReader.rawModel
+    val compressed = localPath + WorkflowFileReader.zipModel
+    OpWorkflowModelWriter.save(this, path = raw, overwrite = overwrite)
+    ZipUtil.pack(new File(raw), new File(compressed))
+    // fs.copyFromLocalFile(false, new Path(compressed), finalPath)
     fs.copyFromLocalFile(false, new Path(compressed), finalPath)
     fs.delete(localPath, true)
   }
@@ -479,9 +483,9 @@ case object OpWorkflowModel {
    *
    * @param path to the trained workflow model
    * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
+   * @param localDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  def load(path: String, asSpark: Boolean = true): OpWorkflowModel =
-    new OpWorkflowModelReader(None, asSpark).load(path)
-
+  def load(path: String, asSpark: Boolean = true, localDir: String = WorkflowFileReader.localDir): OpWorkflowModel =
+    new OpWorkflowModelReader(None, asSpark).load(path, localDir)
 }
