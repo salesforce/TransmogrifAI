@@ -217,7 +217,7 @@ object OpWorkflowModelWriter {
 
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(path)
+    writer.save(raw)
 
     ZipUtil.pack(new File(raw), new File(compressed))
     fs.copyFromLocalFile(false, new Path(compressed), finalPath)
