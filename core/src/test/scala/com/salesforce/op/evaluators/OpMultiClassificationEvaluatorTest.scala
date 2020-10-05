@@ -47,6 +47,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
   val numRows = 1000L
   val defaultThresholds = (0 to 100).map(_ / 100.0).toArray
   val defaultTopNs = Array(1, 3)
+  val defaultTopKs = Array(5, 10, 20, 50, 100)
 
 
   val (dsMulti, labelRawMulti, predictionMulti) =
@@ -72,6 +73,9 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     3 -> (Seq.fill(26)(0L) ++ Seq.fill(71 - 26)(0L) ++ Seq.fill(defaultThresholds.length - 71)(numRows))
   )
 
+  val expectedTopKZero = Seq.fill(defaultTopKs.length)(0.0)
+  val expectedTopKOne = Seq.fill(defaultTopKs.length)(1.0)
+
   Spec[OpMultiClassificationEvaluator] should
     "determine incorrect/correct counts from the thresholds with one prediciton input" in {
     val evaluatorMulti = new OpMultiClassificationEvaluator()
@@ -87,17 +91,27 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       incorrectCounts = expectedIncorrects,
       noPredictionCounts = expectedNoPredictons
     )
+
+    metricsMulti.TopKMetrics shouldEqual MultiClassificationMetricsTopK(
+      topKs = defaultTopKs,
+      Precision = expectedTopKZero,
+      Recall = expectedTopKZero,
+      F1 = expectedTopKZero,
+      Error = expectedTopKOne
+    )
   }
 
-  it should "have settable thresholds and topNs" in {
+  it should "have settable thresholds, topNs, and topKs" in {
     val thresholds = Array(0.1, 0.2, 0.5, 0.8, 0.9, 1.0)
     val topNs = Array(1, 4, 12)
+    val topKs = Array(1, 5, 15, 30)
 
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(labelMulti)
       .setPredictionCol(predictionMulti)
       .setThresholds(thresholds)
       .setTopNs(topNs)
+      .setTopKs(topKs)
 
     val metricsMulti = evaluatorMulti.evaluateAll(dsMulti)
 
@@ -121,12 +135,23 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       12 -> Seq(0L, 0L, 0L, numRows, numRows, numRows)
     )
 
+    val expectedTopKZero = Seq.fill(topKs.length)(0.0)
+    val expectedTopKOne = Seq.fill(topKs.length)(1.0)
+
     metricsMulti.ThresholdMetrics shouldEqual MulticlassThresholdMetrics(
       topNs = topNs,
       thresholds = thresholds,
       correctCounts = expectedCorrects,
       incorrectCounts = expectedIncorrects,
       noPredictionCounts = expectedNoPredictons
+    )
+
+    metricsMulti.TopKMetrics shouldEqual MultiClassificationMetricsTopK(
+      topKs = topKs,
+      Precision = expectedTopKZero,
+      Recall = expectedTopKZero,
+      F1 = expectedTopKZero,
+      Error = expectedTopKOne
     )
   }
 
@@ -171,6 +196,26 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     metricsMulti.ThresholdMetrics.noPredictionCounts.foreach{
       case (_, v) => v.head shouldBe 0L
     }
+
+    // Metrics for topK 100 should always equal the regular metrics if the label cardinality is less than or equal
+    metricsMulti.TopKMetrics.Precision(4) shouldBe metricsMulti.Precision
+    metricsMulti.TopKMetrics.Recall(4) shouldBe metricsMulti.Recall
+    metricsMulti.TopKMetrics.F1(4) shouldBe metricsMulti.F1
+    metricsMulti.TopKMetrics.Error(4) shouldBe metricsMulti.Error
+
+    // Metrics should improve or be equal as topK increases
+    (metricsMulti.TopKMetrics.Precision, metricsMulti.TopKMetrics.Precision.drop(1)).zipped.foreach{
+      case (a, b) => a should be <= b
+    }
+    (metricsMulti.TopKMetrics.Recall, metricsMulti.TopKMetrics.Recall.drop(1)).zipped.foreach{
+      case (a, b) => a should be <= b
+    }
+    (metricsMulti.TopKMetrics.F1, metricsMulti.TopKMetrics.F1.drop(1)).zipped.foreach{
+      case (a, b) => a should be <= b
+    }
+    (metricsMulti.TopKMetrics.Error, metricsMulti.TopKMetrics.Error.drop(1)).zipped.foreach{
+      case (a, b) => a should be >= b
+    }
   }
 
   it should "work on probability vectors where there are many ties (low unique score cardinality)" in {
@@ -200,10 +245,12 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val (rawDF, rawLabel, rawPred) = TestFeatureBuilder(generatedData)
 
     val topNs = Array(1, 3, 5, 10)
+    val topKs = Array(5, 10, 20, 50, 100, 200)
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(rawLabel)
       .setPredictionCol(rawPred)
       .setTopNs(topNs)
+      .setTopKs(topKs)
     val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
 
     // The accuracy at threshold zero should be the same as what Spark calculates (error = 1 - accuracy)
@@ -220,6 +267,26 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     // The no prediction count should always be 0 when the threshold is 0
     metricsMulti.ThresholdMetrics.noPredictionCounts.foreach{
       case (_, v) => v.head shouldBe 0L
+    }
+
+    // Metrics for topK 200 should always equal the regular metrics if the label cardinality is less than or equal
+    metricsMulti.TopKMetrics.Precision(5) shouldBe metricsMulti.Precision
+    metricsMulti.TopKMetrics.Recall(5) shouldBe metricsMulti.Recall
+    metricsMulti.TopKMetrics.F1(5) shouldBe metricsMulti.F1
+    metricsMulti.TopKMetrics.Error(5) shouldBe metricsMulti.Error
+
+    // Metrics should improve or be equal as topK increases
+    (metricsMulti.TopKMetrics.Precision, metricsMulti.TopKMetrics.Precision.drop(1)).zipped.foreach{
+      case (a, b) => a should be <= b
+    }
+    (metricsMulti.TopKMetrics.Recall, metricsMulti.TopKMetrics.Recall.drop(1)).zipped.foreach{
+      case (a, b) => a should be <= b
+    }
+    (metricsMulti.TopKMetrics.F1, metricsMulti.TopKMetrics.F1.drop(1)).zipped.foreach{
+      case (a, b) => a should be <= b
+    }
+    (metricsMulti.TopKMetrics.Error, metricsMulti.TopKMetrics.Error.drop(1)).zipped.foreach{
+      case (a, b) => a should be >= b
     }
   }
 
@@ -263,6 +330,16 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
   it should "not allow thresholds to be out of the range [0.0, 1.0]" in {
     intercept[java.lang.IllegalArgumentException](new OpMultiClassificationEvaluator().setThresholds(Array(-0.1, 0.4)))
     intercept[java.lang.IllegalArgumentException](new OpMultiClassificationEvaluator().setThresholds(Array(1.1, 0.4)))
+  }
+
+  it should "not allow topKs to be negative or 0" in {
+    intercept[java.lang.IllegalArgumentException](new OpMultiClassificationEvaluator().setTopKs(Array(0, 1, 5)))
+    intercept[java.lang.IllegalArgumentException](new OpMultiClassificationEvaluator().setTopKs(Array(-3, 3, 10)))
+  }
+
+  it should "not allow topKs to have a length greater than 10" in {
+    intercept[java.lang.IllegalArgumentException](new OpMultiClassificationEvaluator().
+      setTopKs(Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)))
   }
 
 }
