@@ -33,6 +33,7 @@ package com.salesforce.op.utils.stages
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
+import com.salesforce.op.{GenderDetectionResults, SensitiveFeatureInformation, SensitiveNameInformation}
 import com.salesforce.op.features.types.NameStats.GenderValue
 import com.salesforce.op.features.types.NameStats.GenderValue._
 import com.salesforce.op.features.types.Text
@@ -40,9 +41,10 @@ import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenize
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.twitter.algebird._
 import com.twitter.algebird.macros.caseclass
+import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.ml.param.{BooleanParam, DoubleParam, IntParam, ParamValidators, Params}
+import org.apache.spark.ml.param._
 import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
 
 import scala.io.Source
@@ -195,6 +197,61 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     val ordered: Seq[(String, GenderStats)] = results.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
     ordered map { case (strategy, _) => GenderDetectStrategy.fromString(strategy) }
   }
+
+  private[op] def createSensitiveFeatureInformation(
+    aggNameDetectStats: Seq[NameDetectStats],
+    features: Seq[String]
+  ): Map[String, Seq[SensitiveFeatureInformation]] = {
+    createSensitiveFeatureInformation(
+      features.zip(aggNameDetectStats) map { case (name, stats) => (name, None) -> stats } toMap
+    )
+  }
+
+  /**
+   * Creates a Map from feature name to SensitiveFeatureInformation objects.
+   * Notes:
+   * - Seq[SensitiveFeatureInformation] of length greater than one are only created for Map feature types
+   * - Non-empty Seq[SensitiveFeatureInformation] are created for features _not_ detected as sensitive only when
+   *   debugging is turned on
+   * - Each createdSensitiveFeatureInformation will only contain information about _all_ the gender detection
+   *   strategies only if debugging is turned on; Otherwise, only stats from the best performing strategy are created
+   *
+   * @param nameDetectStatsMap map where the keys are the feature name and optionally the key name
+   *                           (if the base feature is a map) and the values are the NameDetectStats aggregator
+   *                           from a reduce over all of the rows
+   * @return Map from feature name to (many) SensitiveFeatureInformation objects
+   */
+  private[op] def createSensitiveFeatureInformation(
+    nameDetectStatsMap: Map[(String, Option[String]), NameDetectStats]
+  ): Map[String, Seq[SensitiveFeatureInformation]] = {
+    nameDetectStatsMap collect {
+      // Only create SensitiveFeatureInformation for features detected as Sensitive unless debugging is enabled
+      // In which case create SensitiveFeatureInformation for all features
+      case ((feature: String, key: Option[String]), stats: NameDetectStats)
+        if log.isDebugEnabled || computeTreatAsName(stats) =>
+        val N = stats.dictCheckResult.count.toDouble
+        val genderStrategies: Seq[(String, GenderStats)] = stats.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
+        val (bestGenderStats: GenderStats, genderStratResults: Seq[GenderDetectionResults]) = genderStrategies match {
+          case first +: tail =>
+            val bestGenderStats = first._2
+            // Log all gender detection results only if debug is enabled
+            val genderStratResults = (if (log.isDebugEnabled) first +: tail else Seq(first)) map {
+              case (strategyString, genderStats) => GenderDetectionResults(strategyString, genderStats.numOther / N)
+            }
+            (bestGenderStats, genderStratResults)
+          case _ => sys.error("There ought to be gender strategies from name detection.")
+        }
+
+        feature -> SensitiveNameInformation(
+          probName = stats.dictCheckResult.value,
+          genderDetectResults = genderStratResults,
+          probMale = bestGenderStats.numMale.toDouble / N,
+          probFemale = bestGenderStats.numFemale.toDouble / N,
+          probOther = bestGenderStats.numOther.toDouble / N,
+          feature, key, actionTaken = shouldRemoveSensitive && computeTreatAsName(stats)
+        )
+    } groupBy (_._1) map { case (name, nameToStatsMap) => name -> nameToStatsMap.values.toSeq }
+  }
 }
 
 /**
@@ -329,6 +386,15 @@ private[op] case object NameDetectStats {
   val kryo: Encoder[NameDetectStats] = Encoders.kryo[NameDetectStats]
 }
 
+private[op] sealed class SensitiveFeatureMode extends EnumEntry with Serializable
+object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
+  val values: Seq[SensitiveFeatureMode] = findValues
+
+  case object Off extends SensitiveFeatureMode
+  case object DetectOnly extends SensitiveFeatureMode
+  case object DetectAndRemove extends SensitiveFeatureMode
+}
+
 private[op] trait NameDetectParams extends Params {
   val nameThreshold = new DoubleParam(
     parent = this,
@@ -432,5 +498,16 @@ private[op] trait NameDetectParams extends Params {
     set(guardMinStdDev, minStdDev)
     set(guardMinCountForUniqueCheck, minCountForUniqueCheck)
     set(guardMinUniqueCheck, minUniqueCheck)
+  }
+
+  val sensitiveFeatureMode: Param[String] = new Param[String](this, "sensitiveFeatureMode",
+    "Whether to detect sensitive features and how to handle them",
+    (value: String) => SensitiveFeatureMode.withNameInsensitiveOption(value).isDefined
+  )
+  setDefault(sensitiveFeatureMode, SensitiveFeatureMode.Off.toString)
+  def setSensitiveFeatureMode(v: SensitiveFeatureMode): this.type = set(sensitiveFeatureMode, v.entryName)
+  def getSensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode))
+  def shouldRemoveSensitive: Boolean = {
+    SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode)) == SensitiveFeatureMode.DetectAndRemove
   }
 }
