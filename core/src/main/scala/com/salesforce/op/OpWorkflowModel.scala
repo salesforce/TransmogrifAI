@@ -30,27 +30,22 @@
 
 package com.salesforce.op
 
-import java.io.File
-
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.stages.FitStagesUtil
-import org.apache.hadoop.conf.Configuration
 import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
 import org.json4s.jackson.JsonMethods.{pretty, render}
-import org.apache.hadoop.fs.Path
-import org.zeroturnaround.zip.ZipUtil
 
 import scala.reflect.ClassTag
 
