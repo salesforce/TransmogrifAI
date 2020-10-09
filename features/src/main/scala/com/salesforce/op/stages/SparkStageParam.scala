@@ -163,9 +163,9 @@ class SparkStageParam[S <: PipelineStage with Params]
         None
       case (Some(path), Some(stageUid), asSpark, className) =>
         savePath = Option(path)
-        println(className)
         val loaded = for {bundle <- managed(BundleFile(s"file:$path/$stageUid"))} yield {
           // TODO remove random forest regression when mleap spark deserialization is fixed
+          // https://github.com/combust/mleap/issues/721
           if (asSpark.getOrElse(true) && className.forall(_ != RandomForestRegressor)) {
             Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
           } else {
