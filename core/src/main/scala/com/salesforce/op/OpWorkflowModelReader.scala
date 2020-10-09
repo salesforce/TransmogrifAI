@@ -258,7 +258,7 @@ private object WorkflowFileReader {
 
   val rawModel = "/rawModel"
   val zipModel = "/Model.zip"
-  def localDir: String = s"tmp/model-${System.currentTimeMillis}"
+  def localDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     Try {

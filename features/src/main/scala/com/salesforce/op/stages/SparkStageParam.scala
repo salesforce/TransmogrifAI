@@ -106,12 +106,13 @@ class SparkStageParam[S <: PipelineStage with Params]
     }
   }
 
-  private def getPathUid(jsonStr: String): (Option[String], Option[String], Option[Boolean]) = {
+  private def getPathUid(jsonStr: String): (Option[String], Option[String], Option[Boolean], Option[String]) = {
     val json = parse(jsonStr)
     val uid = (json \ "uid").extractOpt[String]
     val path = (json \ "path").extractOpt[String]
     val asSpark = (json \ "asSpark").extractOpt[Boolean]
-    (path, uid, asSpark)
+    val className = (json \ "className").extractOpt[String]
+    (path, uid, asSpark, className)
   }
 
 
@@ -128,8 +129,9 @@ class SparkStageParam[S <: PipelineStage with Params]
       case Left(spark) => Option(spark)
     }.orElse { // for backwards compatibility
       getPathUid(jsonStr) match {
-        case (_, Some(NoUID), _) => None
-        case (Some(path), Some(stageUid), Some(true)) =>
+        case (_, Some(NoUID), _, _) => None
+        case (_, _, _, Some(RandomForestRegressor)) => None
+        case (Some(path), Some(stageUid), Some(true), _) =>
           val stagePath = new Path(path, stageUid).toString
           val json = parse(jsonStr)
           val className = (json \ "className").extract[String]
@@ -156,14 +158,17 @@ class SparkStageParam[S <: PipelineStage with Params]
    */
   def jsonDecodeMleap(jsonStr: String): Option[Either[S, MLeapTransformer]] = {
     getPathUid(jsonStr) match {
-      case (None, _, _) | (_, None, _) | (_, Some(NoUID), _) =>
+      case (None, _, _, _) | (_, None, _, _) | (_, Some(NoUID), _, _) =>
         savePath = None
         None
-      case (Some(path), Some(stageUid), asSpark) =>
+      case (Some(path), Some(stageUid), asSpark, className) =>
         savePath = Option(path)
+        println(className)
         val loaded = for {bundle <- managed(BundleFile(s"file:$path/$stageUid"))} yield {
-          if (asSpark.getOrElse(true)) Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
-          else {
+          // TODO remove random forest regression when mleap spark deserialization is fixed
+          if (asSpark.getOrElse(true) && className.forall(_ != RandomForestRegressor)) {
+            Left(loadError(bundle.loadSparkBundle()).root.asInstanceOf[S])
+          } else {
             implicitly[ml.combust.mleap.runtime.MleapContext].bundleRegistry
               .register(new XGBoostRegressionOp)
               .register(new XGBoostClassificationOp)
@@ -180,6 +185,7 @@ object SparkStageParam {
   implicit val formats: Formats = DefaultFormats
   val NoClass = ""
   val NoUID = ""
+  val RandomForestRegressor = "org.apache.spark.ml.regression.RandomForestRegressionModel"
 
   def updateParamsMetadataWithPath(jValue: JValue, path: String, asSpark: Boolean): JValue = jValue match {
     case JObject(pairs) => JObject(
