@@ -52,7 +52,6 @@ import org.slf4j.LoggerFactory
  * Default evaluation returns F1 score
  *
  * @param name           name of default metric
- * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
  */
 private[op] class OpMultiClassificationEvaluator

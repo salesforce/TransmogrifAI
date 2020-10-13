@@ -35,13 +35,13 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.stages.FitStagesUtil
 import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
@@ -219,9 +219,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    *
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
+   * @param modelStagingDir local folder to copy and unpack stored model to for loading
    */
-  def save(path: String, overwrite: Boolean = true): Unit = {
-    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+  def save(path: String, overwrite: Boolean = true,
+    modelStagingDir: String = WorkflowFileReader.modelStagingDir): Unit = {
+    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite, modelStagingDir)
   }
 
   /**
@@ -465,9 +467,13 @@ case object OpWorkflowModel {
    *
    * @param path to the trained workflow model
    * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
+   * @param modelStagingDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  def load(path: String, asSpark: Boolean = true): OpWorkflowModel =
-    new OpWorkflowModelReader(None, asSpark).load(path)
-
+  def load(
+    path: String,
+    asSpark: Boolean = true,
+    modelStagingDir: String = WorkflowFileReader.modelStagingDir
+  ): OpWorkflowModel =
+    new OpWorkflowModelReader(None, asSpark).load(path, modelStagingDir)
 }
