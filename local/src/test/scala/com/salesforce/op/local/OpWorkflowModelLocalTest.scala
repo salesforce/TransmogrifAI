@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempDirectoryTest with TestCommon {
   val log = LoggerFactory.getLogger(this.getClass)
-  val numRecords = 100
+  val numRecords = 500
 
   // First set up the raw features
   val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.2).take(numRecords).toList
