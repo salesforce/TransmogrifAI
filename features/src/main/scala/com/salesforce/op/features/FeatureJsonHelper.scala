@@ -118,9 +118,9 @@ object FeatureJsonHelper {
     val isResponse = (json \ "isResponse").extract[Boolean]
     val originStageUid = (json \ "originStage").extract[String]
     val parentUids = (json \ "parents").extract[Array[String]]
-    // TODO get this to work
+    // TODO move base class so this can work
     // val distributions = (json \ "distributions").extract[Array[String]]
-    //  .flatMap(JsonUtils.fromString[FeatureDistributionLike](_).toOption)
+    // .flatMap(JsonUtils.fromString[FeatureDistribution](_).toOption)
     val metadata = (json \ "metadata").extractOpt[String]
       .flatMap(JsonUtils.fromString[Metadata](_).toOption)
 

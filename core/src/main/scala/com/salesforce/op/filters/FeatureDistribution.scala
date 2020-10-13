@@ -36,8 +36,8 @@ import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionT
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
-import com.twitter.algebird._
 import com.twitter.algebird.Operators._
+import com.twitter.algebird._
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, FieldSerializer, Formats}

@@ -111,6 +111,7 @@ class FeatureJsonHelperTest extends FlatSpec with PassengerFeaturesTest with Tes
     res.isResponse shouldBe withData.isResponse
     res.originStage shouldBe withData.originStage
     res.metadata shouldBe withData.metadata
+    // res.distributions shouldBe withData.distributions
     res.uid shouldBe withData.uid
     res.wtt.tpe =:= withData.wtt.tpe shouldBe true
   }

@@ -52,7 +52,7 @@ class CustomReaderTest extends FlatSpec with TestCommon with TestSparkContext {
     ))
     val testMeta = new MetadataBuilder().putString("test", "myValue").build()
     val newf1 = f1.withMetadata(testMeta)
-    
+
     val newReader = new CustomReader[Row](ReaderKey.randomKey) {
       def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(ds)
     }
