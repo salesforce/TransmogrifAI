@@ -46,10 +46,12 @@ import org.scalactic.source
 import org.scalatest.AsyncFlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
+import org.zeroturnaround.zip.ZipUtil
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.reflect.ClassTag
+import scala.util.Try
 
 
 @RunWith(classOf[JUnitRunner])
@@ -222,9 +224,14 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest 
     val res = testRunner.run(rc.runType, rc.toOpParams.get)
     for {outFile <- outFiles} {
       outFile.exists shouldBe true
-      outFile.isDirectory shouldBe true
+      val dirFile = if (outFile.getAbsolutePath.endsWith("/model")) {
+        val unpacked = new File(outFile.getAbsolutePath + "Unpacked")
+        ZipUtil.unpack(outFile, unpacked)
+        unpacked
+      } else outFile
+      dirFile.isDirectory shouldBe true
       // TODO: maybe do a thorough files inspection here
-      val files = FileUtils.listFiles(outFile, null, true)
+      val files = FileUtils.listFiles(dirFile, null, true)
       files.asScala.map(_.toString).exists(_.contains("_SUCCESS")) shouldBe true
       files.size > 1
     }

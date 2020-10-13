@@ -37,7 +37,6 @@ import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPr
 import ml.combust.mleap.core.regression.{GeneralizedLinearRegressionModel => MleapGeneralizedLinearRegressionModel}
 import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import org.apache.spark.ml.regression.{GeneralizedLinearRegression, GeneralizedLinearRegressionModel, OpGeneralizedLinearRegressionParams}
-import org.apache.spark.ml.linalg.Vector
 
 import scala.reflect.runtime.universe.TypeTag
 

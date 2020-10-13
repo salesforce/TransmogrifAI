@@ -789,15 +789,21 @@ case object ModelInsights {
     }
     val contributions = stage.collect {
       case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
-      case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: RandomForestClassificationModel => Seq(Try(m.featureImportances.toArray.toSeq)
+        .getOrElse(Seq.empty[Double]))
       case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
-      case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: GBTClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: DecisionTreeClassificationModel => Seq(Try(m.featureImportances.toArray.toSeq)
+        .getOrElse(Seq.empty[Double]))
+      case m: GBTClassificationModel => Seq(Try(m.featureImportances.toArray.toSeq)
+        .getOrElse(Seq.empty[Double]))
       case m: LinearSVCModel => Seq(m.coefficients.toArray.toSeq)
       case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: DecisionTreeRegressionModel => Seq(Try(m.featureImportances.toArray.toSeq)
+        .getOrElse(Seq.empty[Double]))
+      case m: RandomForestRegressionModel => Seq(Try(m.featureImportances.toArray.toSeq)
+        .getOrElse(Seq.empty[Double]))
+      case m: GBTRegressionModel => Seq(Try(m.featureImportances.toArray.toSeq)
+        .getOrElse(Seq.empty[Double]))
       case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
       case m: XGBoostRegressionModel =>
         Try(Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)) match {
