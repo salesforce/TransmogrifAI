@@ -474,7 +474,7 @@ trait FeatureLike[O <: FeatureType] {
   /**
    * Adds metadata to feature so can be included in extracted dataframe
    *
-   * @param metadataIn dataframe metadata to include in the
+   * @param metadataIn dataframe metadata to include in the output column
    * @return A feature with the metadata associated
    */
   def withMetadata(metadataIn: Metadata): FeatureLike[O]

@@ -184,7 +184,7 @@ trait DataReader[T] extends Reader[T] with ReaderKey[T] {
         spark.createDataFrame(d, schema)
       case Right(ds) =>
         val inputSchema = ds.schema.fields
-         if (schema.forall(fn => inputSchema.exists(
+         if (schema.forall(fn => inputSchema.exists( // check if features to be extracted already exist in dataframe
            fi => fn.name == fi.name && fn.dataType == fi.dataType && fn.nullable == fi.nullable)
          )) {
            val names = schema.fields.map(_.name).toSeq

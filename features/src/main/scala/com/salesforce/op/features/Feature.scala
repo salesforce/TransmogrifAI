@@ -42,13 +42,15 @@ import scala.reflect.runtime.universe.WeakTypeTag
  *
  * Note: can only be created using [[FeatureBuilder]].
  *
- * @param name        name of feature, represents the name of the column in the dataframe.
- * @param isResponse  whether or not this feature is a response feature, ie dependent variable
- * @param originStage reference to OpPipelineStage responsible for generating the feature.
- * @param parents     references to the features that are transformed by the originStage that produces this feature
- * @param uid         unique identifier of the feature instance
- * @param wtt         feature's value type tag
- * @tparam O feature value type
+ * @param name          name of feature, represents the name of the column in the dataframe.
+ * @param isResponse    whether or not this feature is a response feature, ie dependent variable
+ * @param originStage   reference to OpPipelineStage responsible for generating the feature.
+ * @param parents       references to the features that are transformed by the originStage that produces this feature
+ * @param uid           unique identifier of the feature instance
+ * @param distributions distributions associated with raw feature from raw feature filter
+ * @param metadata      metadata to attach to feature in dataframe
+ * @param wtt           feature's value type tag
+ * @tparam O            feature value type
  */
 case class Feature[O <: FeatureType] private[op]
 (
@@ -114,7 +116,7 @@ case class Feature[O <: FeatureType] private[op]
   /**
    * Adds metadata to feature so can override metadata on created feature
    *
-   * @param metadataIn dataframe metadata to include in the
+   * @param metadataIn dataframe metadata to include in the output column
    * @return A feature with the metadata associated
    */
   override def withMetadata(metadataIn: Metadata): FeatureLike[O] = this.copy(metadata = Option(metadataIn))
