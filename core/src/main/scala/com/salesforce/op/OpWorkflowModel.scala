@@ -470,6 +470,9 @@ case object OpWorkflowModel {
    * @param modelStagingDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  def load(path: String, asSpark: Boolean = true, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel =
+  def load(path: String,
+    asSpark: Boolean = true,
+    modelStagingDir: String = WorkflowFileReader.modelStagingDir
+  ): OpWorkflowModel =
     new OpWorkflowModelReader(None, asSpark).load(path, modelStagingDir)
 }
