@@ -33,6 +33,7 @@ package com.salesforce.op.features
 import com.salesforce.op.FeatureHistory
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages._
+import org.apache.spark.sql.types.Metadata
 import org.slf4j.LoggerFactory
 import scalax.collection.GraphPredef._
 import scalax.collection._
@@ -87,6 +88,11 @@ trait FeatureLike[O <: FeatureType] {
    * (is a sequence because map features have distribution for each key)
    */
   val distributions: Seq[FeatureDistributionLike]
+
+  /**
+   * The metadata to include in the raw feature generated
+   */
+  val metadata: Option[Metadata]
 
   /**
    * The distribution information of the feature computed during training
@@ -181,7 +187,8 @@ trait FeatureLike[O <: FeatureType] {
       "isResponse" -> isResponse,
       "originStage" -> Option(originStage).map(_.uid).orNull,
       "parents" -> parents.map(_.uid).mkString("[", ",", "]"),
-      "distributions" -> distributions.map(_.toString).mkString("[", ",", "]")
+      "distributions" -> distributions.map(_.toString).mkString("[", ",", "]"),
+      "metadata" -> metadata
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
@@ -456,11 +463,19 @@ trait FeatureLike[O <: FeatureType] {
   private[op] def copyWithNewStages(stages: Array[OPStage]): FeatureLike[O]
 
   /**
-   * Takes an a sequence of feature distributions assocaited with the feature
+   * Takes an a sequence of feature distributions associated with the feature
    *
    * @param distributions Seq of the feature distributions for the feature
-   * @return A feature with the distributions assocated
+   * @return A feature with the distributions associated
    */
   private[op] def withDistributions(distributions: Seq[FeatureDistributionLike]): FeatureLike[O]
 
+
+  /**
+   * Adds metadata to feature so can be included in extracted dataframe
+   *
+   * @param metadataIn dataframe metadata to include in the output column
+   * @return A feature with the metadata associated
+   */
+  def withMetadata(metadataIn: Metadata): FeatureLike[O]
 }

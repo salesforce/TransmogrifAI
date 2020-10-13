@@ -155,12 +155,14 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
     "toString" should {
       "produce a nice string" in {
         val f = (height / 2) * weight + 1
+        println(f)
         f.toString shouldBe
           s"Feature(name = ${f.name}, uid = ${f.uid}, " +
             s"isResponse = ${f.isResponse}, " +
             s"originStage = ${f.originStage.uid}, " +
             s"parents = ${f.parents.map(_.uid).mkString("[", ",", "]")}, " +
-            s"distributions = ${f.distributions.map(_.toString).mkString("[", ",", "]")})"
+            s"distributions = ${f.distributions.map(_.toString).mkString("[", ",", "]")}, " +
+            s"metadata = ${f.metadata})"
       }
     }
     "pretty parent stages" should {

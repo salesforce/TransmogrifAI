@@ -32,11 +32,13 @@ package com.salesforce.op.features
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage}
+import com.salesforce.op.utils.json.JsonUtils
+import org.apache.spark.sql.types.Metadata
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods._
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{DefaultFormats, Formats, JArray}
 
 import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.Try
@@ -60,7 +62,9 @@ object FeatureJsonHelper {
       ("name" -> f.name) ~
       ("isResponse" -> f.isResponse) ~
       ("originStage" -> f.originStage.uid) ~
-      ("parents" -> f.parents.map(_.uid))
+      ("parents" -> f.parents.map(_.uid)) ~
+      ("distributions" -> f.distributions.map(JsonUtils.toJsonString(_, false))) ~
+      ("metadata" -> f.metadata.map(JsonUtils.toJsonString(_, false)))
   }
 
   /**
@@ -114,6 +118,11 @@ object FeatureJsonHelper {
     val isResponse = (json \ "isResponse").extract[Boolean]
     val originStageUid = (json \ "originStage").extract[String]
     val parentUids = (json \ "parents").extract[Array[String]]
+    // TODO move base class so this can work
+    // val distributions = (json \ "distributions").extract[Array[String]]
+    // .flatMap(JsonUtils.fromString[FeatureDistribution](_).toOption)
+    val metadata = (json \ "metadata").extractOpt[String]
+      .flatMap(JsonUtils.fromString[Metadata](_).toOption)
 
     val originStage: Option[OPStage] = stages.get(originStageUid)
     if (originStage.isEmpty) {
@@ -132,7 +141,9 @@ object FeatureJsonHelper {
       name = name,
       isResponse = isResponse,
       parents = parents,
-      originStage = originStage.get.asInstanceOf[OpPipelineStage[FeatureType]]
+      originStage = originStage.get.asInstanceOf[OpPipelineStage[FeatureType]],
+      distributions = Seq.empty,
+      metadata = metadata
     )(wtt = wtt)
 
   }
