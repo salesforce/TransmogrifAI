@@ -48,7 +48,7 @@ import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.BooleanParam
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{DoubleType, StringType}
+import org.apache.spark.sql.types.{DoubleType, Metadata, MetadataBuilder, StringType}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
@@ -513,11 +513,16 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       (1.0.toReal, 2.0.toReal, 3.0.toReal),
       (1.0.toReal, 2.0.toReal, 3.0.toReal)
     ))
-    val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
-    val wf = new OpWorkflow().setResultFeatures(f).setInputDataset(ds)
+    val testMeta = new MetadataBuilder().putString("test", "myValue").build()
+    val newf1 = f1.copy(name = "test", metadata = Option(testMeta))
+    val f = (newf1 + f2 + f3).fillMissingWithMean().zNormalize()
+    val wf = new OpWorkflow().setResultFeatures(f, newf1).setInputDataset(ds)
     wf.train().save(workflowLocation5)
     val scores = wf.loadModel(workflowLocation5).setInputDataset(ds).score()
     scores.collect(f) shouldEqual Seq.fill(3)(0.0.toRealNN)
+    scores.schema.printTreeString()
+    println(scores.schema.map(_.metadata).toList)
+    scores.schema.fields.filter(_.name == newf1.name).head.metadata shouldEqual testMeta
   }
 
   it should "train a model with features of all feature types, save, load and score it" in {

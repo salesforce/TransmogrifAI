@@ -39,6 +39,7 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.util.ClosureUtils
 import org.joda.time.{DateTimeConstants, Duration}
@@ -179,21 +180,30 @@ trait DataReader[T] extends Reader[T] with ReaderKey[T] {
 
     rawData match {
       case Left(rdd) =>
-        val d = rdd.flatMap(record => generateRow(key(record), record, rawFeatures))
+        val d = rdd.flatMap(record => generateRow(key(record), record, rawFeatures, schema))
         spark.createDataFrame(d, schema)
       case Right(ds) =>
-        implicit val rowEnc = RowEncoder(schema)
-        ds.flatMap(record => generateRow(key(record), record, rawFeatures))
+        val inputSchema = ds.schema.fields
+         if (schema.forall(fn => inputSchema.exists(
+           fi => fn.name == fi.name && fn.dataType == fi.dataType && fn.nullable == fi.nullable)
+         )) {
+           val names = schema.fields.map(_.name).toSeq
+           ds.select(names.head, names.tail: _*)
+         } else {
+           implicit val rowEnc = RowEncoder(schema)
+           val df = ds.flatMap(record => generateRow(key(record), record, rawFeatures, schema))
+           spark.createDataFrame(df.rdd, schema) // because the spark row encoder does not preserve metadata
+         }
     }
   }
 
-  protected def generateRow(key: String, record: T, rawFeatures: Array[OPFeature]): Option[Row] = {
+  protected def generateRow(key: String, record: T, rawFeatures: Array[OPFeature], schema: StructType): Option[Row] = {
     val vals = rawFeatures.map { f =>
       val featureGen = getGenStage[T](f)
       val extracted = featureGen.extractFn(record)
       FeatureTypeSparkConverter.toSpark(extracted)
     }
-    Some(Row.fromSeq(key +: vals))
+    Some(new GenericRowWithSchema(key +: vals, schema))
   }
 }
 
@@ -228,7 +238,7 @@ trait AggregatedReader[T] extends DataReader[T] {
         val rowRDD =
           rdd.map(record => (key(record), Seq(record)))
             .reduceByKey(_ ++ _)
-            .flatMap { case (key, records) => generateRow(key, records, rawFeatures) }
+            .flatMap { case (key, records) => generateRow(key, records, rawFeatures, schema) }
         spark.createDataFrame(rowRDD, schema)
 
       case Right(ds) =>
@@ -236,11 +246,15 @@ trait AggregatedReader[T] extends DataReader[T] {
         ds.map(record => (key(record), Seq(record)))
           .groupByKey(_._1)
           .reduceGroups((l, r) => (l._1, l._2 ++ r._2))
-          .flatMap { case (key, (_, records)) => generateRow(key, records, rawFeatures) }
+          .flatMap { case (key, (_, records)) => generateRow(key, records, rawFeatures, schema) }
     }
   }
 
-  protected def generateRow(key: String, records: Seq[T], rawFeatures: Array[OPFeature]): Option[Row]
+  protected def generateRow(
+    key: String, records: Seq[T],
+    rawFeatures: Array[OPFeature],
+    schema: StructType
+  ): Option[Row]
 
 }
 
@@ -256,14 +270,15 @@ trait AggregateDataReader[T] extends AggregatedReader[T] {
    */
   def aggregateParams: AggregateParams[T]
 
-  final override def generateRow(key: String, records: Seq[T], rawFeatures: Array[OPFeature]): Option[Row] = {
+  final override def generateRow(key: String, records: Seq[T], rawFeatures: Array[OPFeature],
+    schema: StructType): Option[Row] = {
     val AggregateParams(timeStampFn, cutOffTime) = aggregateParams
     val vals: Array[Any] = rawFeatures.map { f =>
       val featureAgg = getGenStage[T](f).featureAggregator
       val extracted = featureAgg.extract(records = records, timeStampFn = timeStampFn, cutOffTime = cutOffTime)
       FeatureTypeSparkConverter.toSpark(extracted)
     }
-    Some(Row.fromSeq(key +: vals))
+    Some(new GenericRowWithSchema(key +: vals, schema))
   }
 }
 
@@ -292,7 +307,8 @@ trait ConditionalDataReader[T] extends AggregatedReader[T] {
    */
   def conditionalParams: ConditionalParams[T]
 
-  final override def generateRow(key: String, records: Seq[T], rawFeatures: Array[OPFeature]): Option[Row] = {
+  final override def generateRow(key: String, records: Seq[T],
+    rawFeatures: Array[OPFeature], schema: StructType): Option[Row] = {
     val ConditionalParams(
     timeStampFn, targetCondition, responseWindow,
     predictorWindow, timeStampToKeep, cutOffTimeFn,
@@ -315,7 +331,7 @@ trait ConditionalDataReader[T] extends AggregatedReader[T] {
         )
         FeatureTypeSparkConverter.toSpark(extracted)
       }
-      Some(Row.fromSeq(key +: featureVals))
+      Some(new GenericRowWithSchema(key +: featureVals, schema))
     }
   }
 
