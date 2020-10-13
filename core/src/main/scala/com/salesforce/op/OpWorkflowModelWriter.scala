@@ -199,16 +199,16 @@ object OpWorkflowModelWriter {
    * @param model workflow model instance
    * @param path      path to save the model and its stages
    * @param overwrite should overwrite the destination
-   * @param localDir local folder to copy and unpack stored model to for loading
+   * @param modelStagingDir local folder to copy and unpack stored model to for loading
    */
   def save(
     model: OpWorkflowModel,
     path: String,
     overwrite: Boolean = true,
-    localDir: String = WorkflowFileReader.localDir
+    modelStagingDir: String = WorkflowFileReader.modelStagingDir
   ): Unit = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val localPath = new Path(new File(localDir).getAbsolutePath)
+    val localPath = new Path(new File(modelStagingDir).getAbsolutePath)
     val finalPath = new Path(path)
     val fs = finalPath.getFileSystem(conf)
     if (overwrite) fs.delete(localPath, true)

@@ -66,12 +66,12 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    * Load a previously trained workflow model from path
    *
    * @param path to the trained workflow model
-   * @param localDir local folder to copy and unpack stored model to for loading
+   * @param modelStagingDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  final def load(path: String, localDir: String = WorkflowFileReader.localDir): OpWorkflowModel = {
+  final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
     implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val localPath = new Path(new File(localDir).getAbsolutePath)
+    val localPath = new Path(new File(modelStagingDir).getAbsolutePath)
     val savePath = new Path(path)
     val fs = savePath.getFileSystem(conf)
     fs.delete(localPath, true)
@@ -258,7 +258,7 @@ private object WorkflowFileReader {
 
   val rawModel = "/rawModel"
   val zipModel = "/Model.zip"
-  def localDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
+  def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     Try {

@@ -476,16 +476,16 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *
    * @param path to the trained workflow model
    * @param asSpark load the transformers as spark native or mleap transformers and tmog transformers
-   * @param localDir local folder to copy and unpack stored model to for loading
+   * @param modelStagingDir local folder to copy and unpack stored model to for loading
    *
    * @return workflow model
    */
   def loadModel(
     path: String,
     asSpark: Boolean = true,
-    localDir: String = WorkflowFileReader.localDir
+    modelStagingDir: String = WorkflowFileReader.modelStagingDir
   ): OpWorkflowModel = {
-    new OpWorkflowModelReader(Some(this), asSpark).load(path, localDir)
+    new OpWorkflowModelReader(Some(this), asSpark).load(path, modelStagingDir)
   }
 
   /**
