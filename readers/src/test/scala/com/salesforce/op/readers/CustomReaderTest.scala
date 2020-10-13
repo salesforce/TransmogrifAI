@@ -29,8 +29,6 @@ class CustomReaderTest extends FlatSpec with TestCommon with TestSparkContext {
     }
     val dataRead = newReader.generateDataFrame(Array(newf1, f2, f3), new OpParams())(spark)
     dataRead.drop(DataFrameFieldNames.KeyFieldName).collect() should contain theSameElementsAs ds.collect()
-    dataRead.printSchema()
-    println(dataRead.schema.map(_.metadata).toSeq)
     dataRead.schema.filter(_.name == newf1.name).head.metadata shouldEqual testMeta
   }
 }

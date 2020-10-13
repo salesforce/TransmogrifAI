@@ -104,9 +104,7 @@ class FeatureJsonHelperTest extends FlatSpec with PassengerFeaturesTest with Tes
     val meta = new MetadataBuilder().putString("test", "myValue").build()
     val withData = height.copy(distributions = dist, metadata = Option(meta))
     val jsonIn = withData.toJson()
-    println(jsonIn)
     val parsedFeature = FeatureJsonHelper.fromJsonString(jsonIn, stages, features)
-    println(parsedFeature)
     val res = parsedFeature.get
     res shouldBe a[Feature[_]]
     res.name shouldBe withData.name

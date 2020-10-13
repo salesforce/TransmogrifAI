@@ -520,8 +520,6 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     wf.train().save(workflowLocation5)
     val scores = wf.loadModel(workflowLocation5).setInputDataset(ds).score()
     scores.collect(f) shouldEqual Seq.fill(3)(0.0.toRealNN)
-    scores.schema.printTreeString()
-    println(scores.schema.map(_.metadata).toList)
     scores.schema.fields.filter(_.name == newf1.name).head.metadata shouldEqual testMeta
   }
 
