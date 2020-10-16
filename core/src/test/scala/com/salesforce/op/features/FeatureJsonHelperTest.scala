@@ -33,7 +33,7 @@ package com.salesforce.op.features
 import com.salesforce.op._
 import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.test.{PassengerFeaturesTest, TestCommon}
-import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.ml.attribute.NominalAttribute
 import org.json4s.MappingException
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -101,7 +101,10 @@ class FeatureJsonHelperTest extends FlatSpec with PassengerFeaturesTest with Tes
   it should "serialize and deserialize all information" in new DifferentParents {
     val dist = Seq(new FeatureDistribution(name = "dt", key = None, count = 1, nulls = 0,
     distribution = Array(0.5), summaryInfo = Array(1.0)))
-    val meta = new MetadataBuilder().putString("test", "myValue").build()
+    val meta = NominalAttribute.defaultAttr
+      .withName("test")
+      .withValues(Array("false", "true", "UnseenLabel"))
+      .toMetadata()
     val withData = height.copy(distributions = dist, metadata = Option(meta))
     val jsonIn = withData.toJson()
     val parsedFeature = FeatureJsonHelper.fromJsonString(jsonIn, stages, features)
