@@ -33,10 +33,7 @@ package com.salesforce.op.features
 import com.salesforce.op._
 import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.test.{PassengerFeaturesTest, TestCommon}
-import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.ml.attribute.NominalAttribute
-import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.sql.types.Metadata
 import org.json4s.MappingException
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
