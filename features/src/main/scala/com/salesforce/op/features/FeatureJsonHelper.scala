@@ -39,6 +39,7 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats, JArray}
+import com.salesforce.op.utils.spark.RichMetadata._
 
 import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.Try
@@ -64,7 +65,7 @@ object FeatureJsonHelper {
       ("originStage" -> f.originStage.uid) ~
       ("parents" -> f.parents.map(_.uid)) ~
       ("distributions" -> f.distributions.map(JsonUtils.toJsonString(_, false))) ~
-      ("metadata" -> f.metadata.map(JsonUtils.toJsonString(_, false)))
+      ("metadata" -> f.metadata.map(_.toString))
   }
 
   /**
@@ -122,7 +123,7 @@ object FeatureJsonHelper {
     // val distributions = (json \ "distributions").extract[Array[String]]
     // .flatMap(JsonUtils.fromString[FeatureDistribution](_).toOption)
     val metadata = (json \ "metadata").extractOpt[String]
-      .flatMap(JsonUtils.fromString[Metadata](_).toOption)
+      .map(Metadata.fromJson)
 
     val originStage: Option[OPStage] = stages.get(originStageUid)
     if (originStage.isEmpty) {
