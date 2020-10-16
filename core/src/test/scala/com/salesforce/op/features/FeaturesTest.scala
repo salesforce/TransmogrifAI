@@ -155,7 +155,6 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
     "toString" should {
       "produce a nice string" in {
         val f = (height / 2) * weight + 1
-        println(f)
         f.toString shouldBe
           s"Feature(name = ${f.name}, uid = ${f.uid}, " +
             s"isResponse = ${f.isResponse}, " +
