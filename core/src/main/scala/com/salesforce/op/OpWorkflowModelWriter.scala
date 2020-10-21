@@ -223,11 +223,7 @@ object OpWorkflowModelWriter {
 
     val finalPath = new Path(path)
     val destinationFileSystem = finalPath.getFileSystem(conf)
-//    if (destinationFileSystem.getUri != localFileSystem.getUri) {
-      destinationFileSystem.moveFromLocalFile(compressed, finalPath)
-//    } else {
-//      localFileSystem.rename(compressed, finalPath)
-//    }
+    destinationFileSystem.moveFromLocalFile(compressed, finalPath)
   }
 
   /**
