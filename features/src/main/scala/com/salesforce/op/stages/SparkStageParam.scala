@@ -62,7 +62,7 @@ class SparkStageParam[S <: PipelineStage with Params]
 
   import SparkStageParam._
 
-  val rawLocalFileSystem = new RawLocalFileSystem()
+  @transient val rawLocalFileSystem = new RawLocalFileSystem()
 
   /**
    * Spark stage saving path
