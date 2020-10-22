@@ -37,7 +37,8 @@ import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{Path, RawLocalFileSystem}
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
@@ -192,6 +193,7 @@ private[op] object OpWorkflowModelReadWriteShared {
  * Writes the OpWorkflowModel into a specified path
  */
 object OpWorkflowModelWriter {
+  val localFileSystem = new RawLocalFileSystem()
 
   /**
    * Save [[OpWorkflowModel]] to path
@@ -207,21 +209,21 @@ object OpWorkflowModelWriter {
     overwrite: Boolean = true,
     modelStagingDir: String = WorkflowFileReader.modelStagingDir
   ): Unit = {
-    implicit val conf = new org.apache.hadoop.conf.Configuration()
-    val localPath = new Path(new File(modelStagingDir).getAbsolutePath)
-    val finalPath = new Path(path)
-    val fs = finalPath.getFileSystem(conf)
-    if (overwrite) fs.delete(localPath, true)
-    val raw = localPath + WorkflowFileReader.rawModel
-    val compressed = localPath + WorkflowFileReader.zipModel
+    val localPath = new Path(modelStagingDir)
+    val conf = new Configuration()
+
+    if (overwrite) localFileSystem.delete(localPath, true)
+    val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
 
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(raw)
+    writer.save(raw.toString)
+    val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
+    ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
 
-    ZipUtil.pack(new File(raw), new File(compressed))
-    fs.copyFromLocalFile(false, new Path(compressed), finalPath)
-    fs.delete(localPath, true)
+    val finalPath = new Path(path)
+    val destinationFileSystem = finalPath.getFileSystem(conf)
+    destinationFileSystem.moveFromLocalFile(compressed, finalPath)
   }
 
   /**
