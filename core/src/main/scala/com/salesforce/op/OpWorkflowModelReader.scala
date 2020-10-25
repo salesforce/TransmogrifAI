@@ -33,20 +33,20 @@ package com.salesforce.op
 
 import java.io.File
 
-import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
-import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
+import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
+import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
-import org.zeroturnaround.zip.ZipUtil
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{Path, RawLocalFileSystem}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
+import org.zeroturnaround.zip.ZipUtil
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -72,8 +72,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
   final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
     implicit val conf = new Configuration()
     val localPath = new Path(modelStagingDir)
-    val localFileSystem = FileSystem.getLocal(conf)
-    localFileSystem.delete(localPath, true)
+    WorkflowFileReader.localFileSystem.delete(localPath, true)
 
     val savePath = new Path(path)
     val remoteFileSystem = savePath.getFileSystem(conf)
@@ -99,7 +98,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
-    localFileSystem.delete(localPath, true)
+    WorkflowFileReader.localFileSystem.delete(localPath, true)
     model
   }
 
@@ -260,6 +259,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 }
 
 private object WorkflowFileReader {
+  val localFileSystem = new RawLocalFileSystem()
 
   val rawModel = "rawModel"
   val zipModel = "Model.zip"
@@ -286,14 +286,16 @@ private object WorkflowFileReader {
   }
 
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
-    val fs = path.getFileSystem(conf)
     val codecFactory = new CompressionCodecFactory(conf)
     val codec = Option(codecFactory.getCodec(path))
-    val in = fs.open(path)
-    val read = codec.map( c => Source.fromInputStream(c.createInputStream(in)).mkString )
-      .getOrElse( IOUtils.toString(in, "UTF-8") )
-    in.close()
-    read
+    val in = localFileSystem.open(path)
+    try {
+      val read = codec.map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
+        .getOrElse(IOUtils.toString(in, "UTF-8"))
+      read
+    } finally {
+      in.close()
+    }
   }
 }
 
