@@ -71,8 +71,8 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    */
   final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
     implicit val conf = new Configuration()
-    val localPath = new Path(modelStagingDir)
-    WorkflowFileReader.localFileSystem.delete(localPath, true)
+    val localPath = WorkflowFileReader.rawLocalFileSystem.makeQualified(new Path(modelStagingDir))
+    WorkflowFileReader.rawLocalFileSystem.delete(localPath, true)
 
     val savePath = new Path(path)
     val remoteFileSystem = savePath.getFileSystem(conf)
@@ -98,7 +98,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
-    WorkflowFileReader.localFileSystem.delete(localPath, true)
+    WorkflowFileReader.rawLocalFileSystem.delete(localPath, true)
     model
   }
 
@@ -259,7 +259,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 }
 
 private object WorkflowFileReader {
-  val localFileSystem = new RawLocalFileSystem()
+  val rawLocalFileSystem = new RawLocalFileSystem()
 
   val rawModel = "rawModel"
   val zipModel = "Model.zip"
@@ -288,7 +288,7 @@ private object WorkflowFileReader {
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
     val codecFactory = new CompressionCodecFactory(conf)
     val codec = Option(codecFactory.getCodec(path))
-    val in = localFileSystem.open(path)
+    val in = rawLocalFileSystem.open(path)
     try {
       val read = codec.map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
         .getOrElse(IOUtils.toString(in, "UTF-8"))
