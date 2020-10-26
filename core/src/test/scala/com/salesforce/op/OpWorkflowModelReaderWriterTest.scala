@@ -68,12 +68,19 @@ class OpWorkflowModelReaderWriterTest
   )
   var saveFlowPath: String = _
   var saveModelPath: String = _
-  val saveFlowPathStable: String = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
+  var saveFlowPathStable: String = _
+  var modelStagingDir: String = _
+
+  override def beforeAll(): Unit = {
+    super.beforeAll
+    saveFlowPathStable = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
+  }
 
   override protected def beforeEach(): Unit = {
     super.beforeEach()
     saveFlowPath = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
     saveModelPath = tempDir + "/op-rw-wf-model-test-" + DateTime.now().getMillis
+    modelStagingDir = tempDir + "/op-rw-wf-modelStaging" + DateTime.now().getMillis
   }
 
   override def afterAll: Unit = {
@@ -231,27 +238,32 @@ class OpWorkflowModelReaderWriterTest
   }
 
   Spec[OpWorkflowModelReader] should "load proper single stage workflow" in new SingleStageFlow {
-    wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    wfM.save(path = saveModelPath, modelStagingDir = modelStagingDir)
+    val wfMR = wf.loadModel(path = saveModelPath, modelStagingDir = modelStagingDir)
+      .setReader(wfM.getReader())
     assert(wfMR, wfM)
   }
 
   it should "load proper multiple stage workflow" in new MultiStageFlow {
-    wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    wfM.save(path = saveModelPath, modelStagingDir = modelStagingDir)
+    val wfMR = wf.loadModel(path = saveModelPath, modelStagingDir = modelStagingDir)
+      .setReader(wfM.getReader())
     assert(wfMR, wfM)
   }
 
   it should "load proper raw feature workflow" in new RawFeatureFlow {
-    wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    wfM.save(path = saveModelPath, modelStagingDir = modelStagingDir)
+    val wfMR = wf.loadModel(path = saveModelPath, modelStagingDir = modelStagingDir)
+      .setReader(wfM.getReader())
     assert(wfMR, wfM)
   }
 
   it should "load proper workflow with spark wrapped stages" in new SwSingleStageFlow {
-    wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
-    val wfMRnoWF = OpWorkflowModel.load(saveModelPath).setReader(wfM.getReader())
+    wfM.save(path = saveModelPath, modelStagingDir = modelStagingDir)
+    val wfMR = wf.loadModel(path = saveModelPath, modelStagingDir = modelStagingDir)
+      .setReader(wfM.getReader())
+    val wfMRnoWF = OpWorkflowModel.load(path = saveModelPath, modelStagingDir = modelStagingDir)
+      .setReader(wfM.getReader())
     assert(wfMR, wfM)
     assert(wfMRnoWF, wfM)
   }
@@ -259,16 +271,18 @@ class OpWorkflowModelReaderWriterTest
   it should "work for models" in new SingleStageFlow {
     wf.setReader(dataReader)
     val model = wf.train()
-    model.save(saveFlowPath)
-    val wfMR = wf.loadModel(saveFlowPath).setReader(dataReader)
+    model.save(path = saveFlowPath, modelStagingDir = modelStagingDir)
+    val wfMR = wf.loadModel(path = saveFlowPath, modelStagingDir = modelStagingDir)
+      .setReader(dataReader)
     assert(model, wfMR)
   }
 
   it should "load workflow model with vectorized feature" in new VectorizedFlow {
     wf.setReader(dataReader)
     val wfM = wf.train()
-    wfM.save(saveFlowPath)
-    val wfMR = wf.loadModel(saveFlowPath).setReader(dataReader)
+    wfM.save(path = saveFlowPath, modelStagingDir = modelStagingDir)
+    val wfMR = wf.loadModel(path = saveFlowPath, modelStagingDir = modelStagingDir)
+      .setReader(dataReader)
     assert(wfMR, wfM)
   }
 
@@ -278,18 +292,19 @@ class OpWorkflowModelReaderWriterTest
       maxJSDivergence = 0.2, maxCorrelation = 0.9, minScoringRows = 0
     )
     val wfM = wf.train()
-    wfM.save(saveFlowPathStable)
+    wfM.save(path = saveFlowPathStable, modelStagingDir = modelStagingDir)
     wf.getBlocklist().map(_.name) should contain theSameElementsAs
       Seq(age, boarded, description, gender, height, weight).map(_.name)
     wf.getBlocklistMapKeys() shouldBe
       Map(booleanMap.name -> Set("Male"), stringMap.name -> Set("Male"), numericMap.name -> Set("Male"))
 
-    val wfMR = wf.loadModel(saveFlowPathStable).setReader(wfM.getReader())
+    val wfMR = wf.loadModel(path = saveFlowPathStable, modelStagingDir = modelStagingDir)
+      .setReader(wfM.getReader())
     assert(wfM, wfMR)
   }
 
   it should "load a workflow model that has a RawFeatureFilter and a different workflow" in new VectorizedFlow {
-    val wfM = wf.loadModel(saveFlowPathStable)
+    val wfM = wf.loadModel(path = saveFlowPathStable, modelStagingDir = modelStagingDir)
     wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
@@ -299,7 +314,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   it should "load a workflow model that has a RawFeatureFilter without workflow" in new VectorizedFlow {
-    val wfM = OpWorkflowModel.load(saveFlowPathStable)
+    val wfM = OpWorkflowModel.load(path = saveFlowPathStable, modelStagingDir = modelStagingDir)
     wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
@@ -309,33 +324,38 @@ class OpWorkflowModelReaderWriterTest
   }
 
   it should "load model and allow copying it" in new VectorizedFlow {
-    val wfM = wf.loadModel(saveFlowPathStable).setReader(dataReader)
+    val wfM = wf.loadModel(path = saveFlowPathStable, modelStagingDir = modelStagingDir)
+      .setReader(dataReader)
     val copy = wfM.copy().setReader(dataReader)
     assert(copy, wfM)
   }
 
   it should "load model without workflow and allow copying it" in {
-    val wfM = OpWorkflowModel.load(saveFlowPathStable).setReader(dataReader)
+    val wfM = OpWorkflowModel.load(path = saveFlowPathStable, modelStagingDir = modelStagingDir)
+      .setReader(dataReader)
     val copy = wfM.copy().setReader(dataReader)
     assert(copy, wfM)
   }
 
   it should "load a old version of a saved model" in new OldVectorizedFlow {
-    val wfM = wf.loadModel("src/test/resources/OldModelVersion")
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion",
+      modelStagingDir = modelStagingDir)
     wfM.getBlocklist().isEmpty shouldBe true
   }
 
   it should "load an old version of a saved model (v0.5.1)" in new OldVectorizedFlow {
     // note: in these old models, raw feature filter config will be set to the config defaults
     // but we never re-initialize raw feature filter when loading a model (only scoring, no training)
-    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1")
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1",
+      modelStagingDir = modelStagingDir)
     wfM.getRawFeatureFilterResults().rawFeatureFilterMetrics shouldBe empty
     wfM.getRawFeatureFilterResults().exclusionReasons shouldBe empty
   }
 
   it should "load an old version of a saved model (v0.7.1)" in new VectorizedFlow {
     // note: in these old models, "blocklist" was still called "blacklist"
-    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_7_1")
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_7_1",
+      modelStagingDir = modelStagingDir)
     wfM.getBlocklistMapKeys() should not be empty
     wfM.getBlocklist() should not be empty
   }
