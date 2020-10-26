@@ -30,21 +30,22 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.features.OPFeature
+import com.salesforce.op.features.{OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, FilteredRawData, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
+import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceTransformer}
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
-import org.apache.spark.ml.{Estimator, Transformer}
+import org.apache.spark.ml.Transformer
+import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable.{MutableList => MList}
@@ -149,7 +150,21 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           }
         val inputsChanged = blocklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
-        Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
+        Try(stg match {
+          case s: SequenceEstimator[_, _] if (inputsChanged.size > 0) => {
+            s.set(s.inputFeatures, inputsChanged.map(TransientFeature(_))).setOutputFeatureName(oldOutput.name)
+            // Resetting Metadata
+            s.setMetadata(new MetadataBuilder().build())
+            s.getOutput()
+          }
+          case s: SequenceTransformer[_, _] if (inputsChanged.size > 0) => {
+            s.set(s.inputFeatures, inputsChanged.map(TransientFeature(_))).setOutputFeatureName(oldOutput.name)
+            // Resetting Metadata
+            s.setMetadata(new MetadataBuilder().build())
+            s.getOutput()
+          }
+          case stg => stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()
+        }) match {
           case Success(out) => allUpdated += out
           case Failure(e) =>
             log.info(s"Issue updating inputs for stage $stg: $e")
