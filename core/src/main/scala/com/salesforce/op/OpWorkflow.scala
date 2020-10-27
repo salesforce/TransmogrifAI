@@ -151,13 +151,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         val inputsChanged = blocklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
         Try(stg match {
-          case s: SequenceEstimator[_, _] if (inputsChanged.size > 0) => {
-            s.set(s.inputFeatures, inputsChanged.map(TransientFeature(_))).setOutputFeatureName(oldOutput.name)
-            // Resetting Metadata
-            s.setMetadata(new MetadataBuilder().build())
-            s.getOutput()
-          }
-          case s: SequenceTransformer[_, _] if (inputsChanged.size > 0) => {
+          // For Sequence stages, we still want to keep them and remove the blocklisted inputs
+          case s @ (_ : SequenceEstimator[_, _] | _ : SequenceTransformer[_, _]) if !inputsChanged.isEmpty => {
             s.set(s.inputFeatures, inputsChanged.map(TransientFeature(_))).setOutputFeatureName(oldOutput.name)
             // Resetting Metadata
             s.setMetadata(new MetadataBuilder().build())
