@@ -42,7 +42,7 @@ import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, RawLocalFileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
@@ -71,34 +71,40 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    */
   final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
     implicit val conf = new Configuration()
-    val localPath = WorkflowFileReader.rawLocalFileSystem.makeQualified(new Path(modelStagingDir))
-    WorkflowFileReader.rawLocalFileSystem.delete(localPath, true)
+    val localFileSystem = FileSystem.getLocal(conf)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
+    localFileSystem.delete(localPath, true)
 
     val savePath = new Path(path)
     val remoteFileSystem = savePath.getFileSystem(conf)
+    val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
+    remoteFileSystem.copyToLocalFile(savePath, zipDir)
 
-    val zipPath = new Path(localPath, WorkflowFileReader.zipModel)
-
-    remoteFileSystem.copyToLocalFile(savePath, zipPath)
-
+    // New serialization:
+    //  remote: savePath (dir) -> Model.zip (file)
+    //  local:  Model.zip (dir) -> Model.zip (file)
+    // Old serialization:
+    //  remote: savePath (dir)
+    //  local:  Model.zip (dir)
     val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
-    val fileToLoad = Try {
-      val zipFile = new File(zipPath.toString)
-      val subZip = // TODO figure out why it puts the files like this
-        if (zipFile.isDirectory) new File(zipFile, WorkflowFileReader.zipModel)
-        else zipFile
-      ZipUtil.unpack(subZip, new File(modelDir.toString))
-    } match { // For backwards compatibility since old models will not be zipped
-      case Success(_) => modelDir.toString
-      case Failure(_) => zipPath.toString
-    }
+    val modelPath = Try {
+      localFileSystem.open(new Path(zipDir, WorkflowFileReader.zipModel))
+    }.map { inputStream =>
+      try {
+        ZipUtil.unpack(inputStream, new File(modelDir.toUri.getPath))
+        modelDir.toString
+      } finally inputStream.close()
+    }.getOrElse(zipDir.toString)
 
-    val model = Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(fileToLoad)))
-      .flatMap(loadJson(_, path = fileToLoad)) match {
-      case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
+    val model = Try(
+      WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
+    ).flatMap(loadJson(_, path = modelPath)) match {
+      case Failure(error) =>
+        throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
-    WorkflowFileReader.rawLocalFileSystem.delete(localPath, true)
+
+    localFileSystem.delete(localPath, true)
     model
   }
 
@@ -259,8 +265,6 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 }
 
 private object WorkflowFileReader {
-  val rawLocalFileSystem = new RawLocalFileSystem()
-
   val rawModel = "rawModel"
   val zipModel = "Model.zip"
   def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
@@ -288,7 +292,7 @@ private object WorkflowFileReader {
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
     val codecFactory = new CompressionCodecFactory(conf)
     val codec = Option(codecFactory.getCodec(path))
-    val in = rawLocalFileSystem.open(path)
+    val in = FileSystem.getLocal(conf).open(path)
     try {
       val read = codec.map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
         .getOrElse(IOUtils.toString(in, "UTF-8"))
