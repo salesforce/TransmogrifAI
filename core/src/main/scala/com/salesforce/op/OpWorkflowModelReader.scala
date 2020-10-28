@@ -46,6 +46,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
+import org.slf4j.LoggerFactory
 import org.zeroturnaround.zip.ZipUtil
 
 import scala.collection.mutable.ArrayBuffer
@@ -62,6 +63,8 @@ import scala.util.{Failure, Success, Try}
  */
 class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Boolean = true) {
 
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
+
   /**
    * Load a previously trained workflow model from path
    *
@@ -75,10 +78,15 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     localFileSystem.delete(localPath, true)
 
+    log.info(s"path: $path")
+    log.info(s"modelStagingDir: $modelStagingDir")
+    log.info(s"localPath: $localPath")
+
     val savePath = new Path(path)
     val remoteFileSystem = savePath.getFileSystem(conf)
     val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
     remoteFileSystem.copyToLocalFile(savePath, zipDir)
+    log.info(s"zipDir: $zipDir")
 
     // New serialization:
     //  remote: savePath (dir) -> Model.zip (file)
@@ -87,6 +95,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     //  remote: savePath (dir)
     //  local:  Model.zip (dir)
     val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
+    log.info(s"modelDir: $modelDir")
     val modelPath = Try {
       localFileSystem.open(new Path(zipDir, WorkflowFileReader.zipModel))
     }.map { inputStream =>
@@ -96,6 +105,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       } finally inputStream.close()
     }.getOrElse(zipDir.toString)
 
+    log.info(s"modelPath: $modelPath")
     val model = Try(
       WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
     ).flatMap(loadJson(_, path = modelPath)) match {
