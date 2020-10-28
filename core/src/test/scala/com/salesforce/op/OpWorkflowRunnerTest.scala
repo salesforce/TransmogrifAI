@@ -226,7 +226,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest 
       outFile.exists shouldBe true
       val dirFile = if (outFile.getAbsolutePath.endsWith("/model")) {
         val unpacked = new File(outFile.getAbsolutePath + "Unpacked")
-        ZipUtil.unpack(outFile, unpacked)
+        ZipUtil.unpack(new File(outFile, "Model.zip"), unpacked)
         unpacked
       } else outFile
       dirFile.isDirectory shouldBe true
