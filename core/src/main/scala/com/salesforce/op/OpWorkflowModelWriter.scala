@@ -156,7 +156,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
  * Shared functionality between [[OpWorkflowModelWriter]] and [[OpWorkflowModelReader]]
  */
 private[op] object OpWorkflowModelReadWriteShared {
-  def jsonPath(path: String): String = new Path(path.replace(".zip", ""), "op-model.json").toString
+  def jsonPath(path: String): String = new Path(path, "op-model.json").toString
 
   /**
    * Model json field names
