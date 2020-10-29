@@ -215,10 +215,11 @@ object OpWorkflowModelWriter {
     val localFileSystem = FileSystem.getLocal(conf)
     if (overwrite) localFileSystem.delete(localPath, true)
     val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
-    log.info(s"path: $raw")
+    log.info(s"path: $path")
     log.info(s"localPath: $localPath")
     log.info(s"raw: $raw")
     log.info(s"modelStagingDir: $modelStagingDir")
+
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
     writer.save(raw.toString)
