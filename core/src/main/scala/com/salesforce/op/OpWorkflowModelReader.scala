@@ -86,6 +86,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val remoteFileSystem = savePath.getFileSystem(conf)
     val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
     remoteFileSystem.copyToLocalFile(savePath, zipDir)
+    log.info(s"savePath: $savePath")
     log.info(s"zipDir: $zipDir")
 
     // New serialization:
