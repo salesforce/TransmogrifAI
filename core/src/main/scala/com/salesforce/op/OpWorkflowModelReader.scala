@@ -101,7 +101,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       localFileSystem.open(zipDir)
     }.map { inputStream =>
       try {
-        ZipUtil.unpack(inputStream, new File(modelDir.toUri.getPath))
+        ZipUtil.unpack(inputStream, new File(modelDir.toString))
         modelDir.toString
       } finally inputStream.close()
     }.getOrElse(zipDir.toString)
