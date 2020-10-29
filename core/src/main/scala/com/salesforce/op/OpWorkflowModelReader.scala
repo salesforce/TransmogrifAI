@@ -100,10 +100,9 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val modelPath = Try {
       localFileSystem.open(zipDir)
     }.map { inputStream =>
-      try {
-        ZipUtil.unpack(inputStream, new File(modelDir.toString))
-        modelDir.toString
-      } finally inputStream.close()
+      ZipUtil.unpack(inputStream, new File(modelDir.toUri.getPath))
+      inputStream.close()
+      modelDir.toString
     }.getOrElse(zipDir.toString)
 
     log.info(s"modelPath: $modelPath")

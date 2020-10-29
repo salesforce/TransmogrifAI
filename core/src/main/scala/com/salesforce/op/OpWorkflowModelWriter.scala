@@ -158,7 +158,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
 private[op] object OpWorkflowModelReadWriteShared {
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
   def jsonPath(path: String): String = {
-    log.info(s"JSON PAth: $path")
+    log.info(s"JSON Path: $path")
     new Path(path, "op-model.json").toString
   }
 
