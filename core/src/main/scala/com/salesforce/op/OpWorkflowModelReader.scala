@@ -82,7 +82,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     log.info(s"modelStagingDir: $modelStagingDir")
     log.info(s"localPath: $localPath")
 
-    val savePath = new Path(path)
+    val savePath = new Path(path, WorkflowFileReader.zipModel)
     val remoteFileSystem = savePath.getFileSystem(conf)
     val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
     remoteFileSystem.copyToLocalFile(savePath, zipDir)
