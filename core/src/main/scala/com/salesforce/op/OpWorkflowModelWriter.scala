@@ -45,6 +45,7 @@ import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats}
+import org.slf4j.LoggerFactory
 import org.zeroturnaround.zip.ZipUtil
 
 /**
@@ -155,7 +156,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
  * Shared functionality between [[OpWorkflowModelWriter]] and [[OpWorkflowModelReader]]
  */
 private[op] object OpWorkflowModelReadWriteShared {
-  def jsonPath(path: String): String = new Path(path, "op-model.json").toString
+  def jsonPath(path: String): String = new Path(path.replace(".zip", ""), "op-model.json").toString
 
   /**
    * Model json field names
@@ -193,6 +194,8 @@ private[op] object OpWorkflowModelReadWriteShared {
  * Writes the OpWorkflowModel into a specified path
  */
 object OpWorkflowModelWriter {
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
+
   /**
    * Save [[OpWorkflowModel]] to path
    *
@@ -212,16 +215,21 @@ object OpWorkflowModelWriter {
     val localFileSystem = FileSystem.getLocal(conf)
     if (overwrite) localFileSystem.delete(localPath, true)
     val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
-
+    log.info(s"path: $raw")
+    log.info(s"localPath: $localPath")
+    log.info(s"raw: $raw")
+    log.info(s"modelStagingDir: $modelStagingDir")
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
     writer.save(raw.toString)
     val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
     ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
+    log.info(s"compressed: $compressed")
 
     val finalPath = new Path(path, WorkflowFileReader.zipModel)
     val destinationFileSystem = finalPath.getFileSystem(conf)
     destinationFileSystem.moveFromLocalFile(compressed, finalPath)
+    log.info(s"finalPath: $finalPath")
   }
 
   /**
