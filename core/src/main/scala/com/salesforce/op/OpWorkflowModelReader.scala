@@ -98,7 +98,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
     log.info(s"modelDir: $modelDir")
     val modelPath = Try (ZipUtil.unpack(new File(zipDir.toString), new File(modelDir.toString)) ) match {
-      case Failure(error) => log.info(s"Unable to unpack zip : $zipDir", error)
+      case Failure(error) => log.info(s"Unable to unpack zipDir : $zipDir", error)
         zipDir.toString
       case _ =>
         log.info(s"List of files in modelDir : $modelDir")
