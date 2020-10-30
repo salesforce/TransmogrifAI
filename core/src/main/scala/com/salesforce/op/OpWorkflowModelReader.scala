@@ -97,7 +97,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     //  local:  Model.zip (dir)
     val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
     log.info(s"modelDir: $modelDir")
-    val modelPath = Try(localFileSystem.open(new Path(zipDir, WorkflowFileReader.zipModel))) match {
+    val modelPath = Try(localFileSystem.open(zipDir)) match {
       case Failure(error) =>
         log.info(s"Failed to open zipDir '$zipDir'", error)
         zipDir.toString
