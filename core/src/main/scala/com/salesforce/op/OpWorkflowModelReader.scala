@@ -109,7 +109,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
             zipDir.toString
           case _ =>
             inputStream.close()
-            modelDir.toString
+            modelDir.toUri.getPath
         }
       }
     }
