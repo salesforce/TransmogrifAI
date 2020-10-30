@@ -38,7 +38,7 @@ import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, RawLocalFileSystem}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
@@ -193,8 +193,6 @@ private[op] object OpWorkflowModelReadWriteShared {
  * Writes the OpWorkflowModel into a specified path
  */
 object OpWorkflowModelWriter {
-  val localFileSystem = new RawLocalFileSystem()
-
   /**
    * Save [[OpWorkflowModel]] to path
    *
@@ -211,7 +209,7 @@ object OpWorkflowModelWriter {
   ): Unit = {
     val localPath = new Path(modelStagingDir)
     val conf = new Configuration()
-
+    val localFileSystem = FileSystem.getLocal(conf)
     if (overwrite) localFileSystem.delete(localPath, true)
     val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
 
@@ -221,7 +219,7 @@ object OpWorkflowModelWriter {
     val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
     ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
 
-    val finalPath = new Path(path)
+    val finalPath = new Path(path, WorkflowFileReader.zipModel)
     val destinationFileSystem = finalPath.getFileSystem(conf)
     destinationFileSystem.moveFromLocalFile(compressed, finalPath)
   }

@@ -34,11 +34,12 @@ import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import ml.combust.bundle.BundleFile
 import ml.combust.bundle.dsl.Bundle
 import ml.combust.bundle.serializer.SerializationFormat
-import ml.combust.mleap.runtime.MleapSupport._
+import ml.combust.mleap.runtime.MleapSupport.MleapBundleFileOps
 import ml.combust.mleap.runtime.frame.{Transformer => MLeapTransformer}
 import ml.combust.mleap.spark.SparkSupport._
 import ml.combust.mleap.xgboost.runtime.bundle.ops.{XGBoostClassificationOp, XGBoostRegressionOp}
-import org.apache.hadoop.fs.{Path, RawLocalFileSystem}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.ml.bundle.SparkBundleContext
 import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
@@ -61,8 +62,6 @@ class SparkStageParam[S <: PipelineStage with Params]
 ) extends Param[Option[S]](parent, name, doc, isValid) {
 
   import SparkStageParam._
-
-  @transient val rawLocalFileSystem = new RawLocalFileSystem()
 
   /**
    * Spark stage saving path
@@ -92,7 +91,8 @@ class SparkStageParam[S <: PipelineStage with Params]
     def json(className: String, uid: String) = compact(render(("className" -> className) ~ ("uid" -> uid)))
     (sparkStage, savePath, sbc) match {
       case (Some(stage), Some(path), Some(c)) =>
-        val stagePath = rawLocalFileSystem.makeQualified(new Path(path, stage.uid))
+        val stagePath = SparkStageParam.localFileSystem.makeQualified(new Path(path, stage.uid))
+
         for {bundle <- managed(BundleFile(stagePath.toUri))} {
           stage.asInstanceOf[Transformer].writeBundle.format(SerializationFormat.Json).save(bundle)(c)
             .getOrElse(throw new RuntimeException(s"Failed to write $stage to $path with context $c"))
@@ -166,7 +166,7 @@ class SparkStageParam[S <: PipelineStage with Params]
         None
       case (Some(path), Some(stageUid), asSpark, className) =>
         savePath = Option(path)
-        val stagePath = rawLocalFileSystem.makeQualified(new Path(path, stageUid))
+        val stagePath = SparkStageParam.localFileSystem.makeQualified(new Path(path, stageUid))
         val loaded = for {bundle <- managed(BundleFile(stagePath.toUri))} yield {
           // TODO remove random forest regression when mleap spark deserialization is fixed
           // https://github.com/combust/mleap/issues/721
@@ -190,6 +190,8 @@ object SparkStageParam {
   val NoClass = ""
   val NoUID = ""
   val RandomForestRegressor = "org.apache.spark.ml.regression.RandomForestRegressionModel"
+
+  val localFileSystem = FileSystem.getLocal(new Configuration())
 
   def updateParamsMetadataWithPath(jValue: JValue, path: String, asSpark: Boolean): JValue = jValue match {
     case JObject(pairs) => JObject(
