@@ -115,7 +115,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
     ).flatMap(loadJson(_, path = modelPath)) match {
       case Failure(error) =>
-        throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
+        throw new RuntimeException(s"Failed to load Workflow from path $path", error)
       case Success(wf) => wf
     }
 
