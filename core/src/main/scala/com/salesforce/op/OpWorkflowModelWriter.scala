@@ -215,27 +215,34 @@ object OpWorkflowModelWriter {
     overwrite: Boolean = true,
     modelStagingDir: String = WorkflowFileReader.modelStagingDir
   ): Unit = {
-    val localPath = new Path(modelStagingDir)
     val conf = new Configuration()
+
+    val localPath = new Path(modelStagingDir)
     val localFileSystem = FileSystem.getLocal(conf)
     if (overwrite) localFileSystem.delete(localPath, true)
-    val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
-    log.info(s"path: $path")
-    log.info(s"localPath: $localPath")
-    log.info(s"raw: $raw")
-    log.info(s"modelStagingDir: $modelStagingDir")
 
+    val localRawModelPath = new Path(modelStagingDir, WorkflowFileReader.rawModel)
+    val localModelZipPath = new Path(modelStagingDir, WorkflowFileReader.zipModel)
+    val remoteModelZipPath = new Path(path, WorkflowFileReader.zipModel)
+    val remoteFileSystem = remoteModelZipPath.getFileSystem(conf)
+
+    // Write models files to local.../rawModel/
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(raw.toString)
-    val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
-    ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
-    log.info(s"compressed: $compressed")
+    writer.save(localRawModelPath.toString)
 
-    val finalPath = new Path(path, WorkflowFileReader.zipModel)
-    val destinationFileSystem = finalPath.getFileSystem(conf)
-    destinationFileSystem.moveFromLocalFile(compressed, finalPath)
-    log.info(s"finalPath: $finalPath")
+    // Pack those files from local.../rawModel/ to local.../Model.zip
+    ZipUtil.pack(new File(localRawModelPath.toString), new File(localModelZipPath.toString))
+
+    // Move local.../Model.zip to remote.../Model.zip
+    remoteFileSystem.moveFromLocalFile(localModelZipPath, remoteModelZipPath)
+
+    log.info(s"path: $path")
+    log.info(s"modelStagingDir: $modelStagingDir")
+    log.info(s"localPath: $localPath")
+    log.info(s"localRawModelPath: $localRawModelPath")
+    log.info(s"localModelZipPath: $localModelZipPath")
+    log.info(s"remoteModelZipPath: $remoteModelZipPath")
   }
 
   /**

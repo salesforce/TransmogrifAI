@@ -36,6 +36,7 @@ import java.io.File
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
+import com.salesforce.op.OpWorkflowModelWriter.log
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
@@ -74,48 +75,33 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    */
   final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
     implicit val conf = new Configuration()
+    val localPath = new Path(modelStagingDir)
     val localFileSystem = FileSystem.getLocal(conf)
-    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     localFileSystem.delete(localPath, true)
+
+    val localRawModelPath = new Path(modelStagingDir, WorkflowFileReader.rawModel)
+    val localModelZipPath = new Path(modelStagingDir, WorkflowFileReader.zipModel)
+    val remoteModelZipPath = new Path(path, WorkflowFileReader.zipModel)
+    val remoteFileSystem = remoteModelZipPath.getFileSystem(conf)
+
+    // Copy remote.../Model.zip to local.../Model.zip
+    remoteFileSystem.copyToLocalFile(remoteModelZipPath, localModelZipPath)
+
+    // Unzip local.../Model.zip to local.../rawModel
+    ZipUtil.unpack(new File(localModelZipPath.toString), new File(localRawModelPath.toString))
 
     log.info(s"path: $path")
     log.info(s"modelStagingDir: $modelStagingDir")
     log.info(s"localPath: $localPath")
+    log.info(s"localRawModelPath: $localRawModelPath")
+    log.info(s"localModelZipPath: $localModelZipPath")
+    log.info(s"remoteModelZipPath: $remoteModelZipPath")
 
-    val savePath = new Path(path, WorkflowFileReader.zipModel)
-    val remoteFileSystem = savePath.getFileSystem(conf)
-    val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
-    remoteFileSystem.copyToLocalFile(savePath, zipDir)
-    log.info(s"savePath: $savePath")
-    log.info(s"zipDir: $zipDir")
-
-    // New serialization:
-    //  remote: savePath (dir) -> Model.zip (file)
-    //  local:  Model.zip (dir) -> Model.zip (file)
-    // Old serialization:
-    //  remote: savePath (dir)
-    //  local:  Model.zip (dir)
-    val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
-    log.info(s"modelDir: $modelDir")
-    val modelPath = Try (ZipUtil.unpack(new File(zipDir.toString), new File(modelDir.toString)) ) match {
-      case Failure(error) => log.info(s"Unable to unpack zipDir : $zipDir", error)
-        zipDir.toString
-      case _ =>
-        log.info(s"List of files in modelDir : $modelDir")
-        val filesIter = localFileSystem.listFiles(modelDir, false)
-        while ( filesIter.hasNext() ) {
-          val file = filesIter.next()
-          log.info(s"File: $file")
-        }
-        modelDir.toString
-    }
-
-    log.info(s"modelPath: $modelPath")
     val model = Try(
-      WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
-    ).flatMap(loadJson(_, path = modelPath)) match {
+      WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(localRawModelPath.toString))
+    ).flatMap(loadJson(_, path = localRawModelPath.toString)) match {
       case Failure(error) =>
-        throw new RuntimeException(s"Failed to load Workflow from path $path", error)
+        throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
 
