@@ -113,7 +113,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
         }
       }
     }
-    log.info(s"List of files : $modelDir")
+    log.info(s"List of files in modelDir : $modelDir")
     val filesIter = localFileSystem.listFiles(modelDir, false)
     while ( filesIter.hasNext() ) {
       val file = filesIter.next()
