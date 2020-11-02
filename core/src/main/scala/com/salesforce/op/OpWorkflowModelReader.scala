@@ -75,8 +75,8 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    */
   final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
     implicit val conf = new Configuration()
-    val localPath = new Path(modelStagingDir)
     val localFileSystem = FileSystem.getLocal(conf)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     localFileSystem.delete(localPath, true)
 
     val localRawModelPath = new Path(modelStagingDir, WorkflowFileReader.rawModel)

@@ -231,6 +231,13 @@ object OpWorkflowModelWriter {
     val writer = if (overwrite) w.overwrite() else w
     writer.save(localRawModelPath.toString)
 
+    log.info(s"List of files in localRawModelPath : $localRawModelPath")
+    val filesIter = localFileSystem.listFiles(localRawModelPath, true)
+    while ( filesIter.hasNext() ) {
+      val file = filesIter.next()
+      log.info(s"File: $file")
+    }
+
     // Pack those files from local.../rawModel/ to local.../Model.zip
     ZipUtil.pack(new File(localRawModelPath.toString), new File(localModelZipPath.toString))
 
