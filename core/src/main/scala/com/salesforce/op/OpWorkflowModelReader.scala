@@ -266,6 +266,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 }
 
 private object WorkflowFileReader {
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
   val rawModel = "rawModel"
   val zipModel = "Model.zip"
   def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
@@ -291,6 +292,11 @@ private object WorkflowFileReader {
   }
 
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
+    val codecs = conf.get("io.compression.codecs")
+    log.info(s" Codecs: $codecs")
+    conf.set("io.compression.codecs",
+      "org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec"
+    )
     val codecFactory = new CompressionCodecFactory(conf)
     val codec = Option(codecFactory.getCodec(path))
     val in = FileSystem.getLocal(conf).open(path)
