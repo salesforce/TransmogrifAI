@@ -238,14 +238,6 @@ object OpWorkflowModelWriter {
       log.info(s"File: $file")
     }
 
-    val jsonPath = new Path(OpWorkflowModelReadWriteShared.jsonPath(localRawModelPath.toString))
-    log.info(s"List of files in jsonPath : $jsonPath")
-    val filesIter1 = localFileSystem.listFiles(jsonPath, true)
-    while ( filesIter1.hasNext() ) {
-      val file = filesIter1.next()
-      log.info(s"File: $file")
-    }
-
     // Pack those files from local.../rawModel/ to local.../Model.zip
     ZipUtil.pack(new File(localRawModelPath.toString), new File(localModelZipPath.toString))
 
