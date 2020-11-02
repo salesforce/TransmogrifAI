@@ -97,6 +97,13 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     log.info(s"localModelZipPath: $localModelZipPath")
     log.info(s"remoteModelZipPath: $remoteModelZipPath")
 
+    log.info(s"List of files in localRawModelPath : $localRawModelPath")
+    val filesIter = localFileSystem.listFiles(localRawModelPath, true)
+    while ( filesIter.hasNext() ) {
+      val file = filesIter.next()
+      log.info(s"File: $file")
+    }
+
     val model = Try(
       WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(localRawModelPath.toString))
     ).flatMap(loadJson(_, path = localRawModelPath.toString)) match {
