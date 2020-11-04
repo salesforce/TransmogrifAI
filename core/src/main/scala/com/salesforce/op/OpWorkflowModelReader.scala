@@ -46,6 +46,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
+import org.slf4j.LoggerFactory
 import org.zeroturnaround.zip.ZipUtil
 
 import scala.collection.mutable.ArrayBuffer
@@ -61,6 +62,8 @@ import scala.util.{Failure, Success, Try}
  * @param asSpark if true will load as spark models if false will load as Mleap stages for spark wrapped stages
  */
 class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Boolean = true) {
+
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Load a previously trained workflow model from path
@@ -80,6 +83,12 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
     remoteFileSystem.copyToLocalFile(savePath, zipDir)
 
+    log.info(s"path: $path")
+    log.info(s"modelStagingDir: $modelStagingDir")
+    log.info(s"localPath: $localPath")
+    log.info(s"savePath: $savePath")
+    log.info(s"zipDir: $zipDir")
+
     // New serialization:
     //  remote: savePath (dir) -> Model.zip (file)
     //  local:  Model.zip (dir) -> Model.zip (file)
@@ -87,14 +96,26 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     //  remote: savePath (dir)
     //  local:  Model.zip (dir)
     val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
+    log.info(s"modelDir: $modelDir")
     val modelPath = Try {
       localFileSystem.open(new Path(zipDir, WorkflowFileReader.zipModel))
     }.map { inputStream =>
       try {
         ZipUtil.unpack(inputStream, new File(modelDir.toUri.getPath))
+
+        log.info(s"List of files in modelDir : $modelDir")
+        val filesIter = localFileSystem.listFiles(modelDir, false)
+        while ( filesIter.hasNext() ) {
+          val file = filesIter.next()
+          log.info(s"$file")
+        }
+
         modelDir.toString
       } finally inputStream.close()
     }.getOrElse(zipDir.toString)
+
+
+    log.info(s"modelPath: $modelPath")
 
     val model = Try(
       WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
@@ -268,6 +289,8 @@ private object WorkflowFileReader {
   val rawModel = "rawModel"
   val zipModel = "Model.zip"
   def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
+  val confWithDefaultCodec = new Configuration(false)
+  val codecFactory = new CompressionCodecFactory(confWithDefaultCodec)
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     Try {
