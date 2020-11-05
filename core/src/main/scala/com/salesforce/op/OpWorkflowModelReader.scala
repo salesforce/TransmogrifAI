@@ -268,6 +268,8 @@ private object WorkflowFileReader {
   val rawModel = "rawModel"
   val zipModel = "Model.zip"
   def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
+  val confWithDefaultCodec = new Configuration(false)
+  val codecFactory = new CompressionCodecFactory(confWithDefaultCodec)
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
     Try {
@@ -290,11 +292,10 @@ private object WorkflowFileReader {
   }
 
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
-    val codecFactory = new CompressionCodecFactory(conf)
-    val codec = Option(codecFactory.getCodec(path))
     val in = FileSystem.getLocal(conf).open(path)
     try {
-      val read = codec.map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
+      val read = Option(codecFactory.getCodec(path))
+        .map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
         .getOrElse(IOUtils.toString(in, "UTF-8"))
       read
     } finally {
