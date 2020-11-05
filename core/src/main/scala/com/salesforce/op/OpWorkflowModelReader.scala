@@ -313,11 +313,10 @@ private object WorkflowFileReader {
   }
 
   private def readAsString(path: Path)(implicit conf: Configuration): String = {
-    val codecFactory = new CompressionCodecFactory(conf)
-    val codec = Option(codecFactory.getCodec(path))
     val in = FileSystem.getLocal(conf).open(path)
     try {
-      val read = codec.map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
+      val read = Option(codecFactory.getCodec(path))
+        .map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
         .getOrElse(IOUtils.toString(in, "UTF-8"))
       read
     } finally {
