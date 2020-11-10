@@ -248,7 +248,11 @@ object OpWorkflowModelWriter {
   }
 
   def listFiles(fileSystem: FileSystem, path: Path): Unit = {
-    1
+    val filesIter = fileSystem.listFiles(path, true)
+    while ( filesIter.hasNext() ) {
+      val file = filesIter.next()
+      log.info(s"$file")
+    }
   }
 
   /**
