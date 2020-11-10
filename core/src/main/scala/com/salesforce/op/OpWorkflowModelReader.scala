@@ -71,6 +71,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       val file = filesIter.next()
       log.info(s"$file")
     }
+    log.info("\n\n")
   }
 
   /**

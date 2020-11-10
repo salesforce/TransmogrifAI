@@ -237,14 +237,12 @@ object OpWorkflowModelWriter {
     listFiles(localFileSystem, localPath)
     log.info(s"List of files in raw: $raw")
     listFiles(localFileSystem, raw)
-    log.info(s"List of files in compressed: $compressed")
-    listFiles(localFileSystem, compressed)
+    log.info(s"compressed: $compressed")
 
     // Remote paths
     log.info(s"List of files in path: $path")
     listFiles(destinationFileSystem, new Path(path))
-    log.info(s"List of files in finalPath: $finalPath")
-    listFiles(destinationFileSystem, finalPath)
+    log.info(s"finalPath: $finalPath")
   }
 
   def listFiles(fileSystem: FileSystem, path: Path): Unit = {
@@ -253,6 +251,7 @@ object OpWorkflowModelWriter {
       val file = filesIter.next()
       log.info(s"$file")
     }
+    log.info("\n\n")
   }
 
   /**
