@@ -65,6 +65,14 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
+  def listFiles(fileSystem: FileSystem, path: Path): Unit = {
+    val filesIter = fileSystem.listFiles(path, true)
+    while ( filesIter.hasNext() ) {
+      val file = filesIter.next()
+      log.info(s"$file")
+    }
+  }
+
   /**
    * Load a previously trained workflow model from path
    *
@@ -83,12 +91,6 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
     remoteFileSystem.copyToLocalFile(savePath, zipDir)
 
-    log.info(s"path: $path")
-    log.info(s"modelStagingDir: $modelStagingDir")
-    log.info(s"localPath: $localPath")
-    log.info(s"savePath: $savePath")
-    log.info(s"zipDir: $zipDir")
-
     // New serialization:
     //  remote: savePath (dir) -> Model.zip (file)
     //  local:  Model.zip (dir) -> Model.zip (file)
@@ -96,26 +98,27 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     //  remote: savePath (dir)
     //  local:  Model.zip (dir)
     val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
-    log.info(s"modelDir: $modelDir")
     val modelPath = Try {
       localFileSystem.open(new Path(zipDir, WorkflowFileReader.zipModel))
     }.map { inputStream =>
       try {
         ZipUtil.unpack(inputStream, new File(modelDir.toUri.getPath))
-
-        log.info(s"List of files in modelDir : $modelDir")
-        val filesIter = localFileSystem.listFiles(modelDir, false)
-        while ( filesIter.hasNext() ) {
-          val file = filesIter.next()
-          log.info(s"$file")
-        }
-
         modelDir.toString
       } finally inputStream.close()
     }.getOrElse(zipDir.toString)
 
+    // Remote paths
+    log.info(s"List of files in path: $savePath")
+    listFiles(remoteFileSystem, savePath)
 
-    log.info(s"modelPath: $modelPath")
+    // Local paths
+    log.info(s"modelStagingDir: $modelStagingDir")
+    log.info(s"List of files in localPath: $localPath")
+    listFiles(localFileSystem, localPath)
+    log.info(s"List of files in zipDir: $zipDir")
+    listFiles(localFileSystem, zipDir)
+    log.info(s"List of files in modelPath: $modelPath")
+    listFiles(localFileSystem, new Path(modelPath))
 
     val model = Try(
       WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
