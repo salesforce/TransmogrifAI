@@ -92,6 +92,13 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
     val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
     remoteFileSystem.copyToLocalFile(savePath, zipDir)
 
+    // Remote paths
+    log.info(s"List of files in remote path: $savePath")
+    listFiles(remoteFileSystem, savePath)
+
+    log.info(s"List of files in localPath: $localPath")
+    listFiles(localFileSystem, localPath)
+
     // New serialization:
     //  remote: savePath (dir) -> Model.zip (file)
     //  local:  Model.zip (dir) -> Model.zip (file)
@@ -108,16 +115,6 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
       } finally inputStream.close()
     }.getOrElse(zipDir.toString)
 
-    // Remote paths
-    log.info(s"List of files in path: $savePath")
-    listFiles(remoteFileSystem, savePath)
-
-    // Local paths
-    log.info(s"modelStagingDir: $modelStagingDir")
-    log.info(s"List of files in localPath: $localPath")
-    listFiles(localFileSystem, localPath)
-    log.info(s"List of files in zipDir: $zipDir")
-    listFiles(localFileSystem, zipDir)
     log.info(s"List of files in modelPath: $modelPath")
     listFiles(localFileSystem, new Path(modelPath))
 

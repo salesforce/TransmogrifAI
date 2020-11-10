@@ -224,25 +224,22 @@ object OpWorkflowModelWriter {
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
     writer.save(raw.toString)
+    log.info(s"List of files in raw: $raw")
+    listFiles(localFileSystem, raw)
+
     val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
     ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
+    log.info(s"compressed: $compressed")
 
     val finalPath = new Path(path, WorkflowFileReader.zipModel)
     val destinationFileSystem = finalPath.getFileSystem(conf)
+    log.info(s"finalPath: $finalPath")
     destinationFileSystem.moveFromLocalFile(compressed, finalPath)
-
-    // Local paths
-    log.info(s"modelStagingDir: $modelStagingDir")
-    log.info(s"List of files in localPath: $localPath")
-    listFiles(localFileSystem, localPath)
-    log.info(s"List of files in raw: $raw")
-    listFiles(localFileSystem, raw)
-    log.info(s"compressed: $compressed")
 
     // Remote paths
     log.info(s"List of files in path: $path")
     listFiles(destinationFileSystem, new Path(path))
-    log.info(s"finalPath: $finalPath")
+
   }
 
   def listFiles(fileSystem: FileSystem, path: Path): Unit = {
