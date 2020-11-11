@@ -224,3 +224,11 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   }
 
 }
+
+private object WorkflowFileReader {
+  val rawModel = "rawModel"
+  val zipModel = "Model.zip"
+
+  def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
+}
+

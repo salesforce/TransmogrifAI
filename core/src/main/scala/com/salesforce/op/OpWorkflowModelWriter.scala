@@ -30,18 +30,23 @@
 
 package com.salesforce.op
 
+import java.io.File
+
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats}
+import org.slf4j.LoggerFactory
+import org.zeroturnaround.zip.ZipUtil
 
 /**
  * Writes the [[OpWorkflowModel]] to json format.
@@ -189,6 +194,7 @@ private[op] object OpWorkflowModelReadWriteShared {
  * Writes the OpWorkflowModel into a specified path
  */
 object OpWorkflowModelWriter {
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Save [[OpWorkflowModel]] to path
@@ -197,10 +203,46 @@ object OpWorkflowModelWriter {
    * @param path      path to save the model and its stages
    * @param overwrite should overwrite the destination
    */
-  def save(model: OpWorkflowModel, path: String, overwrite: Boolean = true): Unit = {
+  def save(
+    model: OpWorkflowModel,
+    path: String,
+    overwrite: Boolean = true,
+    modelStagingDir: String = WorkflowFileReader.modelStagingDir
+  ): Unit = {
+    val localPath = new Path(modelStagingDir)
+    val conf = new Configuration()
+    val localFileSystem = FileSystem.getLocal(conf)
+    if (overwrite) localFileSystem.delete(localPath, true)
+    val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
+
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(path)
+    writer.save(raw.toString)
+    log.info(s"List of files in raw: $raw")
+    listFiles(localFileSystem, raw)
+
+    val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
+    ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
+    log.info(s"compressed: $compressed")
+
+    val finalPath = new Path(path, WorkflowFileReader.zipModel)
+    val destinationFileSystem = finalPath.getFileSystem(conf)
+    log.info(s"finalPath: $finalPath")
+    destinationFileSystem.moveFromLocalFile(compressed, finalPath)
+
+    // Remote paths
+    log.info(s"List of files in path: $path")
+    listFiles(destinationFileSystem, new Path(path))
+
+  }
+
+  def listFiles(fileSystem: FileSystem, path: Path): Unit = {
+    val filesIter = fileSystem.listFiles(path, true)
+    while ( filesIter.hasNext() ) {
+      val file = filesIter.next()
+      log.info(s"$file")
+    }
+    log.info("\n\n")
   }
 
   /**
