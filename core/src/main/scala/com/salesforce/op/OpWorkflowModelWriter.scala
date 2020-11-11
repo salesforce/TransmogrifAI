@@ -30,7 +30,7 @@
 
 package com.salesforce.op
 
-import java.io.File
+import java.io.{BufferedOutputStream, File}
 
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
@@ -222,7 +222,17 @@ object OpWorkflowModelWriter {
 
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(raw.toString)
+
+    // writer.save(raw.toString)
+    val modelJson = writer.toJsonString(path)
+    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(path)
+    log.info(s"modelJson: $modelJson")
+    val out = localFileSystem.create(new Path(jsonPath, "part-00000"))
+    val os = new BufferedOutputStream(out)
+    os.write(modelJson.getBytes("UTF-8"))
+    os.close()
+
+
     log.info(s"List of files in raw: $raw")
     listFiles(localFileSystem, raw)
 
