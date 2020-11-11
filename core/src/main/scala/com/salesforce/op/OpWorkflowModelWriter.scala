@@ -48,6 +48,8 @@ import org.json4s.{DefaultFormats, Formats}
 import org.slf4j.LoggerFactory
 import org.zeroturnaround.zip.ZipUtil
 
+import scala.util.Try
+
 /**
  * Writes the [[OpWorkflowModel]] to json format.
  * For now we will not serialize the parent of the model
@@ -239,7 +241,7 @@ object OpWorkflowModelWriter {
     listFiles(localFileSystem, raw)
 
     val compressed = new Path(localPath, WorkflowFileReader.zipModel)
-    ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
+    ZipUtil.pack(new File(raw.toUri.getPath), new File(compressed.toUri.getPath))
     log.info(s"compressed: $compressed")
 
     val finalPath = new Path(path, WorkflowFileReader.zipModel)
