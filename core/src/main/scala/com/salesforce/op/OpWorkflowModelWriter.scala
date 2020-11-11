@@ -76,7 +76,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
 
     val modelJson = toJsonString(raw.toString)
     val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(raw.toString)
-    val out = localFileSystem.create(new Path(jsonPath, "part-00000"), shouldOverwrite)
+    val out = localFileSystem.create(new Path(jsonPath), shouldOverwrite)
     val os = new BufferedOutputStream(out)
     os.write(modelJson.getBytes("UTF-8"))
     os.close()
