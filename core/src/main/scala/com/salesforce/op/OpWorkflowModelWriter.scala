@@ -35,11 +35,9 @@ import java.io.{BufferedOutputStream, File}
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
