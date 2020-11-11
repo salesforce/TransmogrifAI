@@ -61,10 +61,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   implicit val jsonFormats: Formats = DefaultFormats
 
   override protected def saveImpl(path: String): Unit = {
-    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
-      sc.parallelize(Seq(toJsonString(path)), 1)
-        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
-    }(this.sparkSession)
+    val modelJson = toJsonString(path)
+    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(path)
+    sc.parallelize(Seq(modelJson), 1).saveAsTextFile(jsonPath)
   }
 
   /**
