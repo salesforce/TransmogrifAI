@@ -30,7 +30,7 @@
 
 package com.salesforce.op
 
-import java.io.File
+import java.io.{BufferedOutputStream, File}
 
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
@@ -211,12 +211,19 @@ object OpWorkflowModelWriter {
     val conf = new Configuration()
     val localFileSystem = FileSystem.getLocal(conf)
     if (overwrite) localFileSystem.delete(localPath, true)
-    val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
+    val raw = new Path(localPath, WorkflowFileReader.rawModel)
 
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(raw.toString)
-    val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
+
+    val modelJson = writer.toJsonString(raw.toString)
+    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(raw.toString)
+    val out = localFileSystem.create(new Path(jsonPath, "part-00000"), overwrite)
+    val os = new BufferedOutputStream(out)
+    os.write(modelJson.getBytes("UTF-8"))
+    os.close()
+
+    val compressed = new Path(localPath, WorkflowFileReader.zipModel)
     ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
 
     val finalPath = new Path(path, WorkflowFileReader.zipModel)
