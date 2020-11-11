@@ -214,16 +214,18 @@ object OpWorkflowModelWriter {
     overwrite: Boolean = true,
     modelStagingDir: String = WorkflowFileReader.modelStagingDir
   ): Unit = {
-    val localPath = new Path(modelStagingDir)
     val conf = new Configuration()
     val localFileSystem = FileSystem.getLocal(conf)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     if (overwrite) localFileSystem.delete(localPath, true)
-    val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
+    val raw = new Path(localPath, WorkflowFileReader.rawModel)
 
     val w = new OpWorkflowModelWriter(model)
     val writer = if (overwrite) w.overwrite() else w
 
-    // writer.save(raw.toString)
+    writer.save(raw.toString)
+
+    /*
     val modelJson = writer.toJsonString(raw.toString)
     val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(raw.toString)
     log.info(s"modelJson: $modelJson")
@@ -231,12 +233,12 @@ object OpWorkflowModelWriter {
     val os = new BufferedOutputStream(out)
     os.write(modelJson.getBytes("UTF-8"))
     os.close()
-
+    */
 
     log.info(s"List of files in raw: $raw")
     listFiles(localFileSystem, raw)
 
-    val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
+    val compressed = new Path(localPath, WorkflowFileReader.zipModel)
     ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
     log.info(s"compressed: $compressed")
 
