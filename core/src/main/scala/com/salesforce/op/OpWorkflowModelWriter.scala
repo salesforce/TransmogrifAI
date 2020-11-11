@@ -224,8 +224,8 @@ object OpWorkflowModelWriter {
     val writer = if (overwrite) w.overwrite() else w
 
     // writer.save(raw.toString)
-    val modelJson = writer.toJsonString(path)
-    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(path)
+    val modelJson = writer.toJsonString(raw.toString)
+    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(raw.toString)
     log.info(s"modelJson: $modelJson")
     val out = localFileSystem.create(new Path(jsonPath, "part-00000"))
     val os = new BufferedOutputStream(out)
