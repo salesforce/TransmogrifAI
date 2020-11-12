@@ -45,8 +45,6 @@ import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats}
 import org.zeroturnaround.zip.ZipUtil
 
-import scala.util.{Failure, Success, Try}
-
 /**
  * Writes the [[OpWorkflowModel]] to json format.
  * For now we will not serialize the parent of the model
