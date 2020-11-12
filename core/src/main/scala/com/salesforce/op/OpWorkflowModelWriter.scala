@@ -219,7 +219,7 @@ object OpWorkflowModelWriter {
   ): Unit = {
     val conf = new Configuration()
     val localFileSystem = FileSystem.getLocal(conf)
-    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
+    val localPath = new Path(modelStagingDir)
     if (overwrite) localFileSystem.delete(localPath, true)
     val raw = new Path(localPath, WorkflowFileReader.rawModel)
 
