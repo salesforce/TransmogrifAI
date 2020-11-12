@@ -45,6 +45,8 @@ import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats}
 import org.zeroturnaround.zip.ZipUtil
 
+import scala.util.{Failure, Success, Try}
+
 /**
  * Writes the [[OpWorkflowModel]] to json format.
  * For now we will not serialize the parent of the model
@@ -76,10 +78,12 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
 
     val modelJson = toJsonString(raw.toString)
     val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(raw.toString)
-    val out = localFileSystem.create(new Path(jsonPath))
-    val os = new BufferedOutputStream(out)
-    os.write(modelJson.getBytes("UTF-8"))
-    os.close()
+    val os = new BufferedOutputStream(localFileSystem.create(new Path(jsonPath)))
+    try {
+      os.write(modelJson.getBytes("UTF-8"))
+    } finally {
+      os.close()
+    }
 
     val compressed = new Path(localPath, WorkflowFileReader.zipModel)
     ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
