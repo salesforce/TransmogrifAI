@@ -64,8 +64,10 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
 
   override protected def saveImpl(path: String): Unit = {
     JobGroupUtil.withJobGroup(OpStep.ModelIO) {
-      sc.parallelize(Seq(toJsonString(path)), 1)
-        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
+      val modelJson = toJsonString(path)
+      println(s"modelJson: $modelJson")
+      sc.parallelize(Seq(modelJson), 1)
+        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path))
     }(this.sparkSession)
   }
 
@@ -219,7 +221,7 @@ object OpWorkflowModelWriter {
   ): Unit = {
     val conf = new Configuration()
     val localFileSystem = FileSystem.getLocal(conf)
-    val localPath = new Path(modelStagingDir)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     if (overwrite) localFileSystem.delete(localPath, true)
     val raw = new Path(localPath, WorkflowFileReader.rawModel)
 
