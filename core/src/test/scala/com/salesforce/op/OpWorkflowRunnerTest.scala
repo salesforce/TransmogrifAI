@@ -232,7 +232,12 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest 
       dirFile.isDirectory shouldBe true
       // TODO: maybe do a thorough files inspection here
       val files = FileUtils.listFiles(dirFile, null, true)
-      files.asScala.map(_.toString).exists(_.contains("_SUCCESS")) shouldBe true
+      if (outFile.getAbsolutePath.endsWith("/model")) {
+        files.asScala.map(_.toString).exists(_.contains("op-model.json")) shouldBe true
+      }
+      else {
+        files.asScala.map(_.toString).exists(_.contains("_SUCCESS")) shouldBe true
+      }
       files.size > 1
     }
     res shouldBe a[R]
