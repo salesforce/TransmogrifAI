@@ -68,9 +68,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   }
 
   override protected def saveImpl(path: String): Unit = {
-    val localPath = new Path(modelStagingDir)
     val conf = new Configuration()
     val localFileSystem = FileSystem.getLocal(conf)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     localFileSystem.delete(localPath, true)
     val raw = new Path(localPath, WorkflowFileReader.rawModel)
 
@@ -84,7 +84,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
     }
 
     val compressed = new Path(localPath, WorkflowFileReader.zipModel)
-    ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
+    ZipUtil.pack(new File(raw.toUri.getPath), new File(compressed.toUri.getPath))
 
     val finalPath = new Path(path, WorkflowFileReader.zipModel)
     val destinationFileSystem = finalPath.getFileSystem(conf)
