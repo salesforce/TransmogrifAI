@@ -30,7 +30,8 @@
 
 package com.salesforce.op
 
-import java.io.{BufferedOutputStream, File}
+import java.io.File
+import java.nio.charset.StandardCharsets
 
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
@@ -74,11 +75,12 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
     localFileSystem.delete(localPath, true)
     val raw = new Path(localPath, WorkflowFileReader.rawModel)
 
-    val modelJson = toJsonString(raw.toString)
-    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(raw.toString)
-    val os = new BufferedOutputStream(localFileSystem.create(new Path(jsonPath)))
+    val rawPathStr = raw.toString
+    val modelJson = toJsonString(rawPathStr)
+    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(rawPathStr)
+    val os = localFileSystem.create(new Path(jsonPath))
     try {
-      os.write(modelJson.getBytes("UTF-8"))
+      os.write(modelJson.getBytes(StandardCharsets.UTF_8.toString))
     } finally {
       os.close()
     }
