@@ -31,15 +31,14 @@
 package com.salesforce.op
 
 import java.io.File
+import java.nio.charset.StandardCharsets
 
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import enumeratum._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
@@ -59,11 +58,39 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
 
   implicit val jsonFormats: Formats = DefaultFormats
 
+  protected var modelStagingDir: String = WorkflowFileReader.modelStagingDir
+
+  /**
+   * Set the local folder to copy and unpack stored model to for loading
+   */
+  def setModelStagingDir(localDir: String): this.type = {
+    modelStagingDir = localDir
+    this
+  }
+
   override protected def saveImpl(path: String): Unit = {
-    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
-      sc.parallelize(Seq(toJsonString(path)), 1)
-        .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
-    }(this.sparkSession)
+    val conf = new Configuration()
+    val localFileSystem = FileSystem.getLocal(conf)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
+    localFileSystem.delete(localPath, true)
+    val raw = new Path(localPath, WorkflowFileReader.rawModel)
+
+    val rawPathStr = raw.toString
+    val modelJson = toJsonString(rawPathStr)
+    val jsonPath = OpWorkflowModelReadWriteShared.jsonPath(rawPathStr)
+    val os = localFileSystem.create(new Path(jsonPath))
+    try {
+      os.write(modelJson.getBytes(StandardCharsets.UTF_8.toString))
+    } finally {
+      os.close()
+    }
+
+    val compressed = new Path(localPath, WorkflowFileReader.zipModel)
+    ZipUtil.pack(new File(raw.toUri.getPath), new File(compressed.toUri.getPath))
+
+    val finalPath = new Path(path, WorkflowFileReader.zipModel)
+    val destinationFileSystem = finalPath.getFileSystem(conf)
+    destinationFileSystem.moveFromLocalFile(compressed, finalPath)
   }
 
   /**
@@ -207,21 +234,9 @@ object OpWorkflowModelWriter {
     overwrite: Boolean = true,
     modelStagingDir: String = WorkflowFileReader.modelStagingDir
   ): Unit = {
-    val localPath = new Path(modelStagingDir)
-    val conf = new Configuration()
-    val localFileSystem = FileSystem.getLocal(conf)
-    if (overwrite) localFileSystem.delete(localPath, true)
-    val raw = new Path(modelStagingDir, WorkflowFileReader.rawModel)
-
-    val w = new OpWorkflowModelWriter(model)
+    val w = new OpWorkflowModelWriter(model).setModelStagingDir(modelStagingDir)
     val writer = if (overwrite) w.overwrite() else w
-    writer.save(raw.toString)
-    val compressed = new Path(modelStagingDir, WorkflowFileReader.zipModel)
-    ZipUtil.pack(new File(raw.toString), new File(compressed.toString))
-
-    val finalPath = new Path(path, WorkflowFileReader.zipModel)
-    val destinationFileSystem = finalPath.getFileSystem(conf)
-    destinationFileSystem.moveFromLocalFile(compressed, finalPath)
+    writer.save(path)
   }
 
   /**
