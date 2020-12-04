@@ -280,7 +280,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
 
       info("The ratio of feature strengths between important and other features should be similar to the ratio of" +
         "feature importance of Spark's RandomForest")
-      it("should have a ratio between the important and other features in both paradigms of less than 0.8") {
+      it("should have a ratio between the important and other features in both paradigms of less than 1.0") {
         val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
         val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
         val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
@@ -288,7 +288,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
         val featureImportanceRatio = math.abs(abcAvgRF / otherAvgRF)
         val paradigmDiff = math.abs(avgRecordInsightRatio - featureImportanceRatio)
         val paradigmRatio = paradigmDiff * 2 / (avgRecordInsightRatio + featureImportanceRatio)
-        paradigmRatio should be < 0.8
+        paradigmRatio should be < 1.0
       }
     }
 

@@ -38,7 +38,6 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
-
 @RunWith(classOf[JUnitRunner])
 class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext {
 
@@ -48,7 +47,6 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
   val defaultThresholds = (0 to 100).map(_ / 100.0).toArray
   val defaultTopNs = Array(1, 3)
   val defaultTopKs = Array(5, 10, 20, 50, 100)
-
 
   val (dsMulti, labelRawMulti, predictionMulti) =
     TestFeatureBuilder[RealNN, Prediction](Seq.fill(numRows.toInt)(
@@ -162,9 +160,9 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val probVectors = vectors.map(v => {
       val expArray = v.value.toArray.map(math.exp)
       val denom = expArray.sum
-      expArray.map(x => x/denom).toOPVector
+      expArray.map(x => x / denom).toOPVector
     })
-    val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
+    val predictions = vectors.zip(probVectors).map { case (raw, prob) =>
       Prediction(prediction = prob.v.argmax.toDouble, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
     }
 
@@ -182,18 +180,18 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
 
     // The accuracy at threshold zero should be the same as what Spark calculates (error = 1 - accuracy)
-    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/numRows
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0) / numRows
     accuracyAtZero + metricsMulti.Error shouldBe 1.0
 
     // Each row should correspond to either a correct, incorrect, or no prediction
     metricsMulti.ThresholdMetrics.correctCounts(1)
       .zip(metricsMulti.ThresholdMetrics.incorrectCounts(1))
-      .zip(metricsMulti.ThresholdMetrics.noPredictionCounts(1)).foreach{
+      .zip(metricsMulti.ThresholdMetrics.noPredictionCounts(1)).foreach {
       case ((c, i), n) => c + i + n shouldBe numRows
     }
 
     // The no prediction count should always be 0 when the threshold is 0
-    metricsMulti.ThresholdMetrics.noPredictionCounts.foreach{
+    metricsMulti.ThresholdMetrics.noPredictionCounts.foreach {
       case (_, v) => v.head shouldBe 0L
     }
 
@@ -204,16 +202,16 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     metricsMulti.TopKMetrics.Error(4) shouldBe metricsMulti.Error
 
     // Metrics should improve or be equal as topK increases
-    (metricsMulti.TopKMetrics.Precision, metricsMulti.TopKMetrics.Precision.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.Precision, metricsMulti.TopKMetrics.Precision.drop(1)).zipped.foreach {
       case (a, b) => a should be <= b
     }
-    (metricsMulti.TopKMetrics.Recall, metricsMulti.TopKMetrics.Recall.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.Recall, metricsMulti.TopKMetrics.Recall.drop(1)).zipped.foreach {
       case (a, b) => a should be <= b
     }
-    (metricsMulti.TopKMetrics.F1, metricsMulti.TopKMetrics.F1.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.F1, metricsMulti.TopKMetrics.F1.drop(1)).zipped.foreach {
       case (a, b) => a should be <= b
     }
-    (metricsMulti.TopKMetrics.Error, metricsMulti.TopKMetrics.Error.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.Error, metricsMulti.TopKMetrics.Error.drop(1)).zipped.foreach {
       case (a, b) => a should be >= b
     }
   }
@@ -224,7 +222,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     // Try and make the score one large number for a random class, and equal & small probabilities for all other ones
     val truePredIndex = math.floor(math.random * numClasses).toInt
-    val vectors = Seq.fill[OPVector](numRows.toInt){
+    val vectors = Seq.fill[OPVector](numRows.toInt) {
       val truePredIndex = math.floor(math.random * numClasses).toInt
       val myVector = Array.fill(numClasses)(1e-10)
       myVector.update(truePredIndex, 4.0)
@@ -234,9 +232,9 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val probVectors = vectors.map(v => {
       val expArray = v.value.toArray.map(math.exp)
       val denom = expArray.sum
-      expArray.map(x => x/denom).toOPVector
+      expArray.map(x => x / denom).toOPVector
     })
-    val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
+    val predictions = vectors.zip(probVectors).map { case (raw, prob) =>
       Prediction(prediction = prob.v.argmax, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
     }
     val labels = predictions.map(x => if (math.random < correctProb) x.prediction.toRealNN else RealNN(1.0))
@@ -254,18 +252,18 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
 
     // The accuracy at threshold zero should be the same as what Spark calculates (error = 1 - accuracy)
-    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/numRows
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0) / numRows
     accuracyAtZero + metricsMulti.Error shouldBe 1.0
 
     // Each row should correspond to either a correct, incorrect, or no prediction
     metricsMulti.ThresholdMetrics.correctCounts(1)
       .zip(metricsMulti.ThresholdMetrics.incorrectCounts(1))
-      .zip(metricsMulti.ThresholdMetrics.noPredictionCounts(1)).foreach{
+      .zip(metricsMulti.ThresholdMetrics.noPredictionCounts(1)).foreach {
       case ((c, i), n) => c + i + n shouldBe numRows
     }
 
     // The no prediction count should always be 0 when the threshold is 0
-    metricsMulti.ThresholdMetrics.noPredictionCounts.foreach{
+    metricsMulti.ThresholdMetrics.noPredictionCounts.foreach {
       case (_, v) => v.head shouldBe 0L
     }
 
@@ -276,16 +274,16 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     metricsMulti.TopKMetrics.Error(5) shouldBe metricsMulti.Error
 
     // Metrics should improve or be equal as topK increases
-    (metricsMulti.TopKMetrics.Precision, metricsMulti.TopKMetrics.Precision.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.Precision, metricsMulti.TopKMetrics.Precision.drop(1)).zipped.foreach {
       case (a, b) => a should be <= b
     }
-    (metricsMulti.TopKMetrics.Recall, metricsMulti.TopKMetrics.Recall.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.Recall, metricsMulti.TopKMetrics.Recall.drop(1)).zipped.foreach {
       case (a, b) => a should be <= b
     }
-    (metricsMulti.TopKMetrics.F1, metricsMulti.TopKMetrics.F1.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.F1, metricsMulti.TopKMetrics.F1.drop(1)).zipped.foreach {
       case (a, b) => a should be <= b
     }
-    (metricsMulti.TopKMetrics.Error, metricsMulti.TopKMetrics.Error.drop(1)).zipped.foreach{
+    (metricsMulti.TopKMetrics.Error, metricsMulti.TopKMetrics.Error.drop(1)).zipped.foreach {
       case (a, b) => a should be >= b
     }
   }
@@ -299,9 +297,9 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val probVectors = vectors.map(v => {
       val expArray = v.value.toArray.map(math.exp)
       val denom = expArray.sum
-      expArray.map(x => x/denom).toOPVector
+      expArray.map(x => x / denom).toOPVector
     })
-    val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
+    val predictions = vectors.zip(probVectors).map { case (raw, prob) =>
       Prediction(prediction = math.floor(math.random * numClasses),
         rawPrediction = raw.v.toArray, probability = prob.v.toArray)
     }
@@ -317,7 +315,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       .setTopNs(topNs)
     val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
 
-    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/numRows
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0) / numRows
     assert(accuracyAtZero + metricsMulti.Error == 1.0)
   }
 
@@ -342,4 +340,130 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       setTopKs(Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)))
   }
 
+  it should "find the right confidence bin via search" in {
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+    val testThreshold = (1 to 9).map(_ / 10.0)
+
+    // test for when the target value is outside of range of the array
+    evaluatorMulti.SearchHelper.findThreshold(testThreshold, 0.99) shouldEqual 0.9
+    evaluatorMulti.SearchHelper.findThreshold(testThreshold, 0.05) shouldEqual 0.0
+    // test for when the target value equals to an element in the array
+    testThreshold.foreach( element => {
+      evaluatorMulti.SearchHelper.findThreshold(testThreshold, element) shouldEqual element
+    })
+    // test for when the target value is within the range of the array, but not one of its elements
+    testThreshold.foreach( element => {
+      evaluatorMulti.SearchHelper.findThreshold(testThreshold, element + 0.05) shouldEqual element
+    })
+  }
+
+  it should "calculate confusion matrix counts correctly given a RDD" in {
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+
+    val testLabels = Array(1.0, 2.0, 3.0, 4.0)
+    var labelPredCount = testLabels.map(label => {
+      testLabels.map(pred => ((label, pred, 0.5), (label + pred).toLong ))
+    }).flatten
+    var expectedCmValues = Seq(
+      2L, 3L, 4L, 5L,
+      3L, 4L, 5L, 6L,
+      4L, 5L, 6L, 7L,
+      5L, 6L, 7L, 8L)
+
+    // test that the returned Confusion Matrix has correct counts
+    evaluatorMulti.constructConfusionMatrix(sc.parallelize(labelPredCount), testLabels) shouldEqual expectedCmValues
+
+    // test that the returned Confusion Matrix fills in the zeros
+    labelPredCount = testLabels.map(l => ((l, l, 0.5), 1L))
+    expectedCmValues = Seq(
+      1L, 0L, 0L, 0L,
+      0L, 1L, 0L, 0L,
+      0L, 0L, 1L, 0L,
+      0L, 0L, 0L, 1L)
+
+    evaluatorMulti.constructConfusionMatrix(sc.parallelize(labelPredCount), testLabels) shouldEqual expectedCmValues
+  }
+
+  it should "calculate confusion matrices by threshold correctly" in {
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+    val testConfMatrixNumClasses = 2
+    evaluatorMulti.setConfMatrixNumClasses(testConfMatrixNumClasses)
+
+    val testThresholds = Array(0.4, 0.7)
+    evaluatorMulti.setConfMatrixThresholds(testThresholds)
+
+    // create a test 2D array where 1st dimension is the label and 2nd dimension is the prediction,
+    // and the # of (label, prediction) equals to the value of the label
+    // _| 1  2  3
+    // 1| 1L 1L 1L
+    // 2| 2L 2L 2L
+    // 3| 3L 3L 3L
+    val testLabels = Array(1.0, 2.0, 3.0)
+    val labelAndPrediction = testLabels.flatMap(label => {
+      testLabels.flatMap(pred => Seq.fill(label.toInt)((label, pred)))
+    })
+
+    val data = Array(0.5, 0.8).flatMap(topProb => {
+      labelAndPrediction.map {
+        case (label, prediction) => (label, prediction, Array(topProb, 0.99-topProb, 0.01))
+      }})
+    val outputMetrics = evaluatorMulti.calculateConfMatrixMetricsByThreshold(sc.parallelize(data))
+
+    outputMetrics.confMatrixClassIndices shouldEqual Array(3.0, 2.0)
+    outputMetrics.confMatrixNumClasses shouldEqual testConfMatrixNumClasses
+    outputMetrics.confMatrixThresholds shouldEqual testThresholds
+    outputMetrics.confMatrices.length shouldEqual testThresholds.length
+    // topK confusion matrix for p >= 0.4
+    outputMetrics.confMatrices(0) shouldEqual
+    Seq(
+      6L, 6L,
+      4L, 4L)
+    // topK confusion matrix for p >= 0.7
+    outputMetrics.confMatrices(1).toArray shouldEqual
+    Seq(
+      3L, 3L,
+      2L, 2L)
+  }
+
+  it should "calculate mis-classifications correctly" in {
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+
+    val testMinSupport = 2
+    evaluatorMulti.setConfMatrixMinSupport(testMinSupport)
+
+    // create a test 2D array with the count of each label & prediction combination as:
+    // row is label and column is prediction
+    // _| 1  2  3
+    // 1| 2L 3L 4L
+    // 2| 3L 4L 5L
+    // 3| 4L 5L 6L
+    val testLabels = List(1.0, 2.0, 3.0)
+    val labelAndPrediction = testLabels.flatMap(label => {
+      testLabels.flatMap(pred => Seq.fill(label.toInt + pred.toInt)((label, pred)))
+    })
+
+    val outputMetrics = evaluatorMulti.calculateMisClassificationMetrics(sc.parallelize(labelAndPrediction))
+
+    outputMetrics.ConfMatrixMinSupport shouldEqual testMinSupport
+    outputMetrics.MisClassificationsByLabel shouldEqual
+      Seq(
+        MisClassificationsPerCategory(category = 3.0, totalCount = 15L, correctCount = 6L,
+          misClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
+        MisClassificationsPerCategory(category = 2.0, totalCount = 12L, correctCount = 4L,
+          misClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
+        MisClassificationsPerCategory(category = 1.0, totalCount = 9L, correctCount = 2L,
+          misClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
+      )
+
+      outputMetrics.MisClassificationsByPrediction shouldEqual
+        Seq(
+          MisClassificationsPerCategory(category = 3.0, totalCount = 15L, correctCount = 6L,
+            misClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
+          MisClassificationsPerCategory(category = 2.0, totalCount = 12L, correctCount = 4L,
+            misClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
+          MisClassificationsPerCategory(category = 1.0, totalCount = 9L, correctCount = 2L,
+            misClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
+        )
+  }
 }
+
