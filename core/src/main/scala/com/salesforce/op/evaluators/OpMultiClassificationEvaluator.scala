@@ -37,7 +37,7 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.Tuple2Semigroup
 import com.salesforce.op.utils.spark.RichEvaluator._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
-import org.apache.spark.ml.linalg. {Vector, DenseVector}
+import org.apache.spark.ml.linalg.{Vector, DenseVector}
 import org.apache.spark.ml.param.{DoubleArrayParam, IntArrayParam, IntParam, ParamValidators}
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.rdd.RDD
@@ -45,8 +45,6 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
-
-import scala.collection.immutable.HashSet
 import scala.collection.Searching._
 
 
@@ -122,9 +120,9 @@ private[op] class OpMultiClassificationEvaluator
     parent = this,
     name = "confMatrixThresholds",
     doc = "sequence of threshold values used for confusion matrix metrics",
-    isValid = _.forall(x => x >= 0.0 && x <= 1.0)
+    isValid = _.forall(x => x >= 0.0 && x < 1.0)
   )
-  setDefault(confMatrixThresholds, (0 to 10).map(_ / 10.0).toArray)
+  setDefault(confMatrixThresholds, (0 to 9).map(_ / 10.0).toArray)
   def setConfMatrixThresholds(v: Array[Double]): this.type = set(confMatrixThresholds, v)
 
   override def evaluateAll(data: Dataset[_]): MultiClassificationMetrics = {
@@ -193,8 +191,8 @@ private[op] class OpMultiClassificationEvaluator
 /**
  * function to construct the confusion matrix for the top n most occurring labels
  * @param labelPredictionCtRDD RDD of ((label, prediction, confidence), count)
- * @param cmClasses the top n most occurring classes, sorted by counts descending
- * @return an org.apache.spark.mllib.linalg.Matrix class, representing the confusion matrix
+ * @param cmClasses the top n most occurring classes, sorted by counts in descending order
+ * @return an array of counts
  */
   def constructConfusionMatrix(
     labelPredictionCtRDD: RDD[((Double, Double, Double), Long)],
@@ -202,16 +200,14 @@ private[op] class OpMultiClassificationEvaluator
 
     val confusionMatrixMap = labelPredictionCtRDD.map {
       case ((label, prediction, _), count) => ((label, prediction), count)
-    }.reduceByKey(_ + _)
-      .map {
-        case ((label, prediction), count) => (label, prediction) -> count
-      }.collectAsMap()
+    }.reduceByKey(_ + _).collectAsMap()
 
-    cmClasses.map(label => {
-      cmClasses.map(prediction => {
-        confusionMatrixMap.get((label, prediction)).getOrElse(0L)
-      })
-    }).flatten
+    for {
+      label <- cmClasses
+      prediction <- cmClasses
+    } yield {
+      confusionMatrixMap.getOrElse((label, prediction), 0L)
+    }
   }
 
   object SearchHelper extends Serializable{
@@ -232,7 +228,7 @@ private[op] class OpMultiClassificationEvaluator
  * function to calculate confusion matrix for TopK most occurring labels by confidence threshold
  *
  * @param data RDD of (label, prediction, prediction probability vector)
- * @return sequence of Matrix that corresponds to the confMatrixThresholds
+ * @return a MulticlassConfMatrixMetricsByThreshold object
 */
 
   def calculateConfMatrixMetricsByThreshold(
@@ -240,10 +236,11 @@ private[op] class OpMultiClassificationEvaluator
 
     val labelCountsRDD = data.map { case (label, _, _) => (label, 1L) }.reduceByKey(_ + _)
     val cmClasses = labelCountsRDD.sortBy(-_._2).map(_._1).take($(confMatrixNumClasses)).toSeq
-    val cmClassesSet = new HashSet() ++ cmClasses
+    val cmClassesSet = cmClasses.toSet
 
-    val dataTopNLabels = data.filter { case (label, _, _) => cmClassesSet.contains(label) }
-      .filter { case (_, prediction, _) => cmClassesSet contains prediction }
+    val dataTopNLabels = data.filter { case (label, prediction, _) =>
+      cmClassesSet.contains(label) && cmClassesSet.contains(prediction)
+    }
 
     val sortedThresholds = $(confMatrixThresholds).sorted.toIndexedSeq
 
@@ -293,8 +290,8 @@ private[op] class OpMultiClassificationEvaluator
           .take($(confMatrixMinSupport)).toMap
 
         val labelCount = predictionCountsIter.map(_._2).reduce(_ + _)
-        val correctCount = predictionCountsIter.filter {case (pred, _) => pred == label }
-          .map(_._2)
+        val correctCount = predictionCountsIter
+          .collect { case (pred, count) if pred == label => count }
           .reduceOption(_ + _).getOrElse(0L)
 
         MisClassificationsPerCategory(
@@ -304,8 +301,7 @@ private[op] class OpMultiClassificationEvaluator
           misClassifications = misClassificationCtMap
         )
       }
-    }.collect()
-     .sortBy(-_.totalCount).toSeq
+    }.sortBy(-_.totalCount).collect()
 
     val misClassificationsByPrediction = labelPredictionCountRDD.map {
       case ((label, prediction), count) => (prediction, (label, count))
@@ -317,9 +313,9 @@ private[op] class OpMultiClassificationEvaluator
           .take($(confMatrixMinSupport)).toMap
 
         val predictionCount = labelCountsIter.map(_._2).reduce(_ + _)
-        val correctCount = labelCountsIter.filter {case (label, _) => label == prediction }
-            .map(_._2)
-            .reduceOption(_ + _).getOrElse(0L)
+        val correctCount = labelCountsIter
+          .collect { case (label, count) if label == prediction => count }
+          .reduceOption(_ + _).getOrElse(0L)
 
         MisClassificationsPerCategory(
           category = prediction,
@@ -328,8 +324,7 @@ private[op] class OpMultiClassificationEvaluator
           misClassifications = sortedMisclassificationCt
         )
       }
-    }.collect()
-      .sortBy(-_.totalCount).toSeq
+    }.sortBy(-_.totalCount).collect()
 
     MisClassificationMetrics(
       ConfMatrixMinSupport = $(confMatrixMinSupport),

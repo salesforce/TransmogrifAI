@@ -361,9 +361,13 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val evaluatorMulti = new OpMultiClassificationEvaluator()
 
     val testLabels = Array(1.0, 2.0, 3.0, 4.0)
-    var labelPredCount = testLabels.map(label => {
-      testLabels.map(pred => ((label, pred, 0.5), (label + pred).toLong ))
-    }).flatten
+    var labelPredCount = for {
+      label <- testLabels
+      prediction <- testLabels
+    } yield {
+      ((label, prediction, 0.5), (label + prediction).toLong)
+    }
+
     var expectedCmValues = Seq(
       2L, 3L, 4L, 5L,
       3L, 4L, 5L, 6L,
