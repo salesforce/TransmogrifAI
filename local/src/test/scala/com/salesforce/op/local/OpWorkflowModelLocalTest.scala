@@ -123,7 +123,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     }
     log.info(s"Scored ${expectedScores.length * numOfRuns} records in ${elapsed}ms")
     log.info(s"Average time per record: ${elapsed.toDouble / (expectedScores.length * numOfRuns)}ms")
-    elapsed should be <= 50000L
+    elapsed should be <= 35000L
   }
 
   it should "produce scores without Spark for all feature types" in {
