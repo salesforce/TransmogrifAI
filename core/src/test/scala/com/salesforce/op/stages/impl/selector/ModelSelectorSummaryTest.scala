@@ -99,8 +99,8 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
         TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty),
         ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold(1, Seq(1.0), Seq(0.0, 0.5), Seq.empty),
         MisClassificationMetrics = MisClassificationMetrics(1, Seq.empty,
-          Seq(MisClassificationsPerCategory(totalCount = 5L, correctCount = 3L, category = 1.0,
-            misClassifications = Map(1.0 -> 2L))))),
+          Seq(MisClassificationsPerCategory(TotalCount = 5L, CorrectCount = 3L, Category = 1.0,
+            MisClassifications = Map(1.0 -> 2L))))),
       holdoutEvaluation = None
     )
 

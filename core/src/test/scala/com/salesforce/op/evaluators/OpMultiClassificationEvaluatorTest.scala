@@ -413,17 +413,17 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       }})
     val outputMetrics = evaluatorMulti.calculateConfMatrixMetricsByThreshold(sc.parallelize(data))
 
-    outputMetrics.confMatrixClassIndices shouldEqual Array(3.0, 2.0)
-    outputMetrics.confMatrixNumClasses shouldEqual testConfMatrixNumClasses
-    outputMetrics.confMatrixThresholds shouldEqual testThresholds
-    outputMetrics.confMatrices.length shouldEqual testThresholds.length
+    outputMetrics.ConfMatrixClassIndices shouldEqual Array(3.0, 2.0)
+    outputMetrics.ConfMatrixNumClasses shouldEqual testConfMatrixNumClasses
+    outputMetrics.ConfMatrixThresholds shouldEqual testThresholds
+    outputMetrics.ConfMatrices.length shouldEqual testThresholds.length
     // topK confusion matrix for p >= 0.4
-    outputMetrics.confMatrices(0) shouldEqual
+    outputMetrics.ConfMatrices(0) shouldEqual
     Seq(
       6L, 6L,
       4L, 4L)
     // topK confusion matrix for p >= 0.7
-    outputMetrics.confMatrices(1).toArray shouldEqual
+    outputMetrics.ConfMatrices(1).toArray shouldEqual
     Seq(
       3L, 3L,
       2L, 2L)
@@ -451,22 +451,22 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     outputMetrics.ConfMatrixMinSupport shouldEqual testMinSupport
     outputMetrics.MisClassificationsByLabel shouldEqual
       Seq(
-        MisClassificationsPerCategory(category = 3.0, totalCount = 15L, correctCount = 6L,
-          misClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
-        MisClassificationsPerCategory(category = 2.0, totalCount = 12L, correctCount = 4L,
-          misClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
-        MisClassificationsPerCategory(category = 1.0, totalCount = 9L, correctCount = 2L,
-          misClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
+        MisClassificationsPerCategory(Category = 3.0, TotalCount = 15L, CorrectCount = 6L,
+          MisClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
+        MisClassificationsPerCategory(Category = 2.0, TotalCount = 12L, CorrectCount = 4L,
+          MisClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
+        MisClassificationsPerCategory(Category = 1.0, TotalCount = 9L, CorrectCount = 2L,
+          MisClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
       )
 
       outputMetrics.MisClassificationsByPrediction shouldEqual
         Seq(
-          MisClassificationsPerCategory(category = 3.0, totalCount = 15L, correctCount = 6L,
-            misClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
-          MisClassificationsPerCategory(category = 2.0, totalCount = 12L, correctCount = 4L,
-            misClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
-          MisClassificationsPerCategory(category = 1.0, totalCount = 9L, correctCount = 2L,
-            misClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
+          MisClassificationsPerCategory(Category = 3.0, TotalCount = 15L, CorrectCount = 6L,
+            MisClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
+          MisClassificationsPerCategory(Category = 2.0, TotalCount = 12L, CorrectCount = 4L,
+            MisClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
+          MisClassificationsPerCategory(Category = 1.0, TotalCount = 9L, CorrectCount = 2L,
+            MisClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
         )
   }
 }

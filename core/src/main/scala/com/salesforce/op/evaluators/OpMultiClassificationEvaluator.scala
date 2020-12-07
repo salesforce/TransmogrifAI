@@ -210,11 +210,20 @@ private[op] class OpMultiClassificationEvaluator
     }
   }
 
-  object SearchHelper extends Serializable{
+  private[evaluators] object SearchHelper extends Serializable{
 
+    /**
+     * function to search the confidence threshold corresponding to a probability score
+     *
+     * @param arr a sorted array of confidence thresholds
+     * @param element the probability score to be searched
+     * @return the confidence threshold corresponding of the element. It equals to the element if there is an exact
+     *         match. Otherwise it's the element right before the insertion point.
+     */
     def findThreshold(arr: IndexedSeq[Double], element: Double): Double = {
+      require(!arr.isEmpty, "Array of confidence thresholds can't be empty!")
       if (element > arr.last) arr.last
-      else if (element < arr(0)) 0.0
+      else if (element < arr.head) 0.0
       else {
         val insertionPoint = new SearchImpl(arr).search(element).insertionPoint
         val insertionPointValue = arr(insertionPoint)
@@ -228,9 +237,8 @@ private[op] class OpMultiClassificationEvaluator
  * function to calculate confusion matrix for TopK most occurring labels by confidence threshold
  *
  * @param data RDD of (label, prediction, prediction probability vector)
- * @return a MulticlassConfMatrixMetricsByThreshold object
+ * @return a MulticlassConfMatrixMetricsByThreshold instance
 */
-
   def calculateConfMatrixMetricsByThreshold(
     data: RDD[(Double, Double, Array[Double])]): MulticlassConfMatrixMetricsByThreshold = {
 
@@ -251,7 +259,7 @@ private[op] class OpMultiClassificationEvaluator
       }
     }.reduceByKey(_ + _)
 
-    labelPredictionConfidenceCountRDD.cache()
+    labelPredictionConfidenceCountRDD.persist()
 
     val cmByThreshold = sortedThresholds.map( threshold => {
       val filteredRDD = labelPredictionConfidenceCountRDD.filter {
@@ -260,11 +268,13 @@ private[op] class OpMultiClassificationEvaluator
       constructConfusionMatrix(filteredRDD, cmClasses)
     })
 
+    labelPredictionConfidenceCountRDD.unpersist()
+
     MulticlassConfMatrixMetricsByThreshold(
-      confMatrixNumClasses = $(confMatrixNumClasses),
-      confMatrixClassIndices = cmClasses,
-      confMatrixThresholds = $(confMatrixThresholds),
-      confMatrices = cmByThreshold
+      ConfMatrixNumClasses = $(confMatrixNumClasses),
+      ConfMatrixClassIndices = cmClasses,
+      ConfMatrixThresholds = $(confMatrixThresholds),
+      ConfMatrices = cmByThreshold
     )
   }
 
@@ -272,7 +282,7 @@ private[op] class OpMultiClassificationEvaluator
  * function to calculate the mostly frequently mis-classified classes for each label/prediction category
  *
  * @param data RDD of (label, prediction)
- * @return a MisClassificationMetrics class
+ * @return a MisClassificationMetrics instance
  */
   def calculateMisClassificationMetrics(data: RDD[(Double, Double)]): MisClassificationMetrics = {
 
@@ -281,10 +291,10 @@ private[op] class OpMultiClassificationEvaluator
       .reduceByKey(_ + _)
 
     val misClassificationsByLabel = labelPredictionCountRDD.map {
-      case ((label, prediction), count) => (label, (prediction, count))
-    }.groupByKey()
+      case ((label, prediction), count) => (label, Seq((prediction, count)))
+    }.reduceByKey(_ ++ _)
       .map { case (label, predictionCountsIter) => {
-        val misClassificationCtMap = predictionCountsIter.toSeq
+        val misClassificationCtMap = predictionCountsIter
           .filter { case (pred, _) => pred != label }
           .sortBy(-_._2)
           .take($(confMatrixMinSupport)).toMap
@@ -295,19 +305,19 @@ private[op] class OpMultiClassificationEvaluator
           .reduceOption(_ + _).getOrElse(0L)
 
         MisClassificationsPerCategory(
-          category = label,
-          totalCount = labelCount,
-          correctCount = correctCount,
-          misClassifications = misClassificationCtMap
+          Category = label,
+          TotalCount = labelCount,
+          CorrectCount = correctCount,
+          MisClassifications = misClassificationCtMap
         )
       }
-    }.sortBy(-_.totalCount).collect()
+    }.sortBy(-_.TotalCount).collect()
 
     val misClassificationsByPrediction = labelPredictionCountRDD.map {
-      case ((label, prediction), count) => (prediction, (label, count))
-    }.groupByKey()
+      case ((label, prediction), count) => (prediction, Seq((label, count)))
+    }.reduceByKey(_ ++ _)
       .map { case (prediction, labelCountsIter) => {
-        val sortedMisclassificationCt = labelCountsIter.toSeq
+        val sortedMisclassificationCt = labelCountsIter
           .filter { case (label, _) => label != prediction }
           .sortBy(-_._2)
           .take($(confMatrixMinSupport)).toMap
@@ -318,13 +328,13 @@ private[op] class OpMultiClassificationEvaluator
           .reduceOption(_ + _).getOrElse(0L)
 
         MisClassificationsPerCategory(
-          category = prediction,
-          totalCount = predictionCount,
-          correctCount = correctCount,
-          misClassifications = sortedMisclassificationCt
+          Category = prediction,
+          TotalCount = predictionCount,
+          CorrectCount = correctCount,
+          MisClassifications = sortedMisclassificationCt
         )
       }
-    }.sortBy(-_.totalCount).collect()
+    }.sortBy(-_.TotalCount).collect()
 
     MisClassificationMetrics(
       ConfMatrixMinSupport = $(confMatrixMinSupport),
@@ -547,14 +557,14 @@ case class MultiClassificationMetricsTopK
  * @param confMatrixNumClasses value of the top n most occurring classes in the dataset
  * @param confMatrixClassIndices label index of the top n most occuring classes
  * @param confMatrixThresholds a sequence of thresholds
- * @param confMatrices a Matrix object that stores the confusion matrix for each threshold in confMatrixThresholds
+ * @param confMatrices a sequence of counts that stores the confusion matrix for each threshold in confMatrixThresholds
  */
 case class MulticlassConfMatrixMetricsByThreshold
 (
-  confMatrixNumClasses: Int,
-  confMatrixClassIndices: Seq[Double],
-  confMatrixThresholds: Seq[Double],
-  confMatrices: Seq[Seq[Long]]
+  ConfMatrixNumClasses: Int,
+  ConfMatrixClassIndices: Seq[Double],
+  ConfMatrixThresholds: Seq[Double],
+  ConfMatrices: Seq[Seq[Long]]
 ) extends EvaluationMetrics
 
 /**
@@ -580,11 +590,11 @@ case class MisClassificationMetrics
  */
 case class MisClassificationsPerCategory
 (
-  category: Double,
-  totalCount: Long,
-  correctCount: Long,
+  Category: Double,
+  TotalCount: Long,
+  CorrectCount: Long,
   @JsonDeserialize(keyAs = classOf[java.lang.Double])
-  misClassifications: Map[Double, Long]
+  MisClassifications: Map[Double, Long]
 )
 
 /**
