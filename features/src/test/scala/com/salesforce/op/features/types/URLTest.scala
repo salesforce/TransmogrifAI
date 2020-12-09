@@ -78,7 +78,7 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
       "ftp://my.red.book.com/amorcito.mio" -> "my.red.book.com",
       "http://secret.gov?Cla=%E9%99%B9%E4%8A%93&Cha=%E3&Eve=%EC%91%90%E8%87%B1" -> "secret.gov",
       "ftp://nukes.mil?Lea=%E2%BC%84%EB%91%A3&Mur=%E2%83%BD%E1%92%83" -> "nukes.mil",
-      "http://specialchars.漢字.com/＠" -> "specialchars.%E6%BC%A2%E5%AD%97.com"
+      "http://specialchars.＠.com/" -> "specialchars.%EF%BC%A0.com"
     )
 
     URL(None).domain shouldBe None
