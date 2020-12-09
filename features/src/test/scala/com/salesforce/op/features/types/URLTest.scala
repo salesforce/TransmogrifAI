@@ -81,7 +81,7 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
       "http://specialchars.＠.com/" -> "specialchars.%EF%BC%A0.com"
     )
 
-    URL(None).domain shouldBe None
+    URL(None).domain() shouldBe None
 
     forAll(samples) {
       case (sample, expected) =>
@@ -98,7 +98,7 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
       "ftp://my.red.book.com/amorcito.mio" -> "ftp"
     )
 
-    URL(None).protocol shouldBe None
+    URL(None).protocol() shouldBe None
 
     forAll(samples) {
       case (sample, expected) =>

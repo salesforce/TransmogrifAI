@@ -184,13 +184,15 @@ class URL(value: Option[String]) extends Text(value){
    *
    * @param escaped true if URI character sequence is in escaped form. false otherwise.
    */
-  def domain(escaped: Boolean = false): Option[String] = value map (s => new java.net.URL(new URI(s, escaped).toString).getHost)
+  def domain(escaped: Boolean = false): Option[String] = value map
+    (s => new java.net.URL(new URI(s, escaped).toString).getHost)
   /**
    * Extracts url protocol, i.e. http, https, ftp etc.
    *
    * @param escaped true if URI character sequence is in escaped form. false otherwise.
    */
-  def protocol(escaped: Boolean = false): Option[String] = value map (s => new java.net.URL(new URI(s, escaped).toString).getProtocol)
+  def protocol(escaped: Boolean = false): Option[String] = value map
+    (s => new java.net.URL(new URI(s, escaped).toString).getProtocol)
 }
 object URL {
   def apply(value: Option[String]): URL = new URL(value)
