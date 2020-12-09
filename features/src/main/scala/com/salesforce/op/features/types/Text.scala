@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 
 import com.twitter.chill.Base64.{InputStream => Base64InputStream}
+import org.apache.commons.httpclient.URI
 import org.apache.commons.io.input.CharSequenceInputStream
 import org.apache.commons.validator.routines.UrlValidator
 
@@ -181,11 +182,11 @@ class URL(value: Option[String]) extends Text(value){
   /**
    * Extracts url domain, i.e. 'salesforce.com', 'data.com' etc.
    */
-  def domain: Option[String] = value map (new java.net.URL(_).getHost)
+  def domain: Option[String] = value map (s => new java.net.URL(new URI(s, false).toString).getHost)
   /**
    * Extracts url protocol, i.e. http, https, ftp etc.
    */
-  def protocol: Option[String] = value map (new java.net.URL(_).getProtocol)
+  def protocol: Option[String] = value map (s => new java.net.URL(new URI(s, false).toString).getProtocol)
 }
 object URL {
   def apply(value: Option[String]): URL = new URL(value)
