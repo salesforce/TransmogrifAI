@@ -181,12 +181,16 @@ class URL(value: Option[String]) extends Text(value){
   def isValid(protocols: Array[String]): Boolean = value.exists(new UrlValidator(protocols).isValid)
   /**
    * Extracts url domain, i.e. 'salesforce.com', 'data.com' etc.
+   *
+   * @param escaped true if URI character sequence is in escaped form. false otherwise.
    */
-  def domain: Option[String] = value map (s => new java.net.URL(new URI(s, false).toString).getHost)
+  def domain(escaped: Boolean = false): Option[String] = value map (s => new java.net.URL(new URI(s, escaped).toString).getHost)
   /**
    * Extracts url protocol, i.e. http, https, ftp etc.
+   *
+   * @param escaped true if URI character sequence is in escaped form. false otherwise.
    */
-  def protocol: Option[String] = value map (s => new java.net.URL(new URI(s, false).toString).getProtocol)
+  def protocol(escaped: Boolean = false): Option[String] = value map (s => new java.net.URL(new URI(s, escaped).toString).getProtocol)
 }
 object URL {
   def apply(value: Option[String]): URL = new URL(value)

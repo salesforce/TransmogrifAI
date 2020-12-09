@@ -840,15 +840,15 @@ object RichTextFeatureLambdas {
   }
 
   class URLDomainToPickList extends Function1[URL, PickList] with Serializable {
-    def apply(v: URL): PickList = if (v.isValid) v.domain.toPickList else PickList.empty
+    def apply(v: URL): PickList = if (v.isValid) v.domain().toPickList else PickList.empty
   }
 
   class URLDomainToText extends Function1[URL, Text] with Serializable {
-    def apply(v: URL): Text = v.domain.toText
+    def apply(v: URL): Text = v.domain().toText
   }
 
   class URLProtocolToText extends Function1[URL, Text] with Serializable {
-    def apply(v: URL): Text = v.protocol.toText
+    def apply(v: URL): Text = v.protocol().toText
   }
 
   class URLIsValid extends Function1[URL, Boolean] with Serializable {

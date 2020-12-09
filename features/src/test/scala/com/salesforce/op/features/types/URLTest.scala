@@ -86,7 +86,7 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
     forAll(samples) {
       case (sample, expected) =>
         val url = URL(sample)
-        val domain = url.domain
+        val domain = url.domain()
         domain shouldBe Some(expected)
     }
   }
@@ -103,7 +103,7 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
     forAll(samples) {
       case (sample, expected) =>
         val url = URL(sample)
-        val domain = url.protocol
+        val domain = url.protocol()
         domain shouldBe Some(expected)
     }
   }

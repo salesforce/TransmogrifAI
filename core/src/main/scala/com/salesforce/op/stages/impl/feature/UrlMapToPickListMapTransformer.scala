@@ -38,7 +38,7 @@ class UrlMapToPickListMapTransformer(uid: String = UID[UrlMapToPickListMapTransf
   extends UnaryTransformer[URLMap, PickListMap](operationName = "urlMapToPickListMap", uid = uid) {
 
   override def transformFn: URLMap => PickListMap = _.value
-    .mapValues(v => if (v.toURL.isValid) v.toURL.domain else None)
+    .mapValues(v => if (v.toURL.isValid) v.toURL.domain() else None)
     .collect { case (k, Some(v)) => k -> v }.toPickListMap
 
 }
