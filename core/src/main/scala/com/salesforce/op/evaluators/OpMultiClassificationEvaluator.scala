@@ -188,8 +188,6 @@ private[op] class OpMultiClassificationEvaluator
     }
   }
 
-  case class LabelPredictionConfidenceCt(Label: Double, Prediction: Double, Confidence: Double, count: Long)
-
 /**
  * function to construct the confusion matrix for the top n most occurring labels
  * @param labelPredictionCtRDD RDD of ((label, prediction, confidence), count)
@@ -583,7 +581,7 @@ case class MisClassificationMetrics
 )
 
 /**
- * Case class that stores the most frequently mis-classified classes for each label/prediction category
+ * container to store the most frequently mis-classified classes for each label/prediction category
  *
  * @param category a category which a record's label or prediction equals to
  * @param totalCount total # of records in that category
