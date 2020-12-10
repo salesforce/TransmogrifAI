@@ -102,7 +102,7 @@ private[op] class OpMultiClassificationEvaluator
     doc = "# of the top most frequent classes used for confusion matrix metrics",
     isValid = ParamValidators.inRange(1, 30, lowerInclusive = true, upperInclusive = true)
   )
-  setDefault(confMatrixNumClasses, 10)
+  setDefault(confMatrixNumClasses, 15)
 
   def setConfMatrixNumClasses(v: Int): this.type = set(confMatrixNumClasses, v)
 
@@ -122,7 +122,7 @@ private[op] class OpMultiClassificationEvaluator
     doc = "sequence of threshold values used for confusion matrix metrics",
     isValid = _.forall(x => x >= 0.0 && x < 1.0)
   )
-  setDefault(confMatrixThresholds, (0 to 9).map(_ / 10.0).toArray)
+  setDefault(confMatrixThresholds, Array(0.0, 0.2, 0.4, 0.6, 0.8))
   def setConfMatrixThresholds(v: Array[Double]): this.type = set(confMatrixThresholds, v)
 
   override def evaluateAll(data: Dataset[_]): MultiClassificationMetrics = {
@@ -187,6 +187,8 @@ private[op] class OpMultiClassificationEvaluator
       metrics
     }
   }
+
+  case class LabelPredictionConfidenceCt(Label: Double, Prediction: Double, Confidence: Double, count: Long)
 
 /**
  * function to construct the confusion matrix for the top n most occurring labels
@@ -383,7 +385,6 @@ private[op] class OpMultiClassificationEvaluator
     )
   }
 
-
   /**
    * Function that calculates a set of threshold metrics for different topN values given an RDD of scores & labels,
    * a list of topN values to consider, and a list of thresholds to use.
@@ -562,7 +563,9 @@ case class MultiClassificationMetricsTopK
 case class MulticlassConfMatrixMetricsByThreshold
 (
   ConfMatrixNumClasses: Int,
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   ConfMatrixClassIndices: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   ConfMatrixThresholds: Seq[Double],
   ConfMatrices: Seq[Seq[Long]]
 ) extends EvaluationMetrics
@@ -595,6 +598,13 @@ case class MisClassificationsPerCategory
   CorrectCount: Long,
   @JsonDeserialize(keyAs = classOf[java.lang.Double])
   MisClassifications: Map[Double, Long]
+)
+
+case class labelPredictionConfidence
+(
+  Label: Double,
+  Prediction: Double,
+  Confidence: Double
 )
 
 /**
