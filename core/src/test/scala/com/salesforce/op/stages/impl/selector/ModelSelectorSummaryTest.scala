@@ -96,7 +96,11 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
         ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
           correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
           noPredictionCounts = Map(3 -> Seq(300L))),
-        TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty)),
+        TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty),
+        ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold(1, Seq(1.0), Seq(0.0, 0.5), Seq.empty),
+        MisClassificationMetrics = MisClassificationMetrics(1, Seq.empty,
+          Seq(MisClassificationsPerCategory(TotalCount = 5L, CorrectCount = 3L, Category = 1.0,
+            MisClassifications = Map(1.0 -> 2L))))),
       holdoutEvaluation = None
     )
 
@@ -121,7 +125,13 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
       ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
         correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
         noPredictionCounts = Map(3 -> Seq(300L))),
-      TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty))
+      TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty),
+      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold( 2, Seq(0.1), Seq(0.1),
+        Seq.empty),
+      MisClassificationMetrics = MisClassificationMetrics(1,
+         Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Map(1.0 -> 3L))),
+         Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Map(1.0 -> 3L))))
+    )
 
     val evalMetricsJson = evalMetrics.toJson()
     val roundTripEvalMetrics = ModelSelectorSummary.evalMetFromJson(
