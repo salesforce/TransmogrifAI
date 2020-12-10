@@ -598,13 +598,6 @@ case class MisClassificationsPerCategory
   MisClassifications: Map[Double, Long]
 )
 
-case class labelPredictionConfidence
-(
-  Label: Double,
-  Prediction: Double,
-  Confidence: Double
-)
-
 /**
  * Threshold-based metrics for multiclass classification
  *
