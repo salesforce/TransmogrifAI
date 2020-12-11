@@ -48,7 +48,8 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
     Some("ftp://.codomain"),
     Some("https://.codomain"),
     Some("//domain.nambia"),
-    Some("http://\u00ff\u0080\u007f\u0000.com") // scalastyle:off
+    Some("http://\u00ff\u0080\u007f\u0000.com"), // scalastyle:off
+    Some("http://specialchars.＠.com")
   )
 
   val goodOnes = Table("good ones",
@@ -77,16 +78,15 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
       "http://nothingthere.com?Chr=%E5%85&Raj=%E7%B5%AE%A1&Hir=%8F%E0%B4%A3" -> "nothingthere.com",
       "ftp://my.red.book.com/amorcito.mio" -> "my.red.book.com",
       "http://secret.gov?Cla=%E9%99%B9%E4%8A%93&Cha=%E3&Eve=%EC%91%90%E8%87%B1" -> "secret.gov",
-      "ftp://nukes.mil?Lea=%E2%BC%84%EB%91%A3&Mur=%E2%83%BD%E1%92%83" -> "nukes.mil",
-      "http://specialchars.＠.com/" -> "specialchars.%EF%BC%A0.com"
+      "ftp://nukes.mil?Lea=%E2%BC%84%EB%91%A3&Mur=%E2%83%BD%E1%92%83" -> "nukes.mil"
     )
 
-    URL(None).domain() shouldBe None
+    URL(None).domain shouldBe None
 
     forAll(samples) {
       case (sample, expected) =>
         val url = URL(sample)
-        val domain = url.domain()
+        val domain = url.domain
         domain shouldBe Some(expected)
     }
   }
@@ -98,12 +98,12 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
       "ftp://my.red.book.com/amorcito.mio" -> "ftp"
     )
 
-    URL(None).protocol() shouldBe None
+    URL(None).protocol shouldBe None
 
     forAll(samples) {
       case (sample, expected) =>
         val url = URL(sample)
-        val domain = url.protocol()
+        val domain = url.protocol
         domain shouldBe Some(expected)
     }
   }

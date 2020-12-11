@@ -39,6 +39,8 @@ import org.apache.commons.httpclient.URI
 import org.apache.commons.io.input.CharSequenceInputStream
 import org.apache.commons.validator.routines.UrlValidator
 
+import scala.util.Try
+
 /**
  * Text value representation
  *
@@ -172,7 +174,7 @@ class URL(value: Option[String]) extends Text(value){
    * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
    * Default valid protocols are: http, https, ftp.
    */
-  def isValid: Boolean = value.exists(UrlValidator.getInstance().isValid)
+  def isValid: Boolean = value.exists(v => UrlValidator.getInstance().isValid(v) && Try(new java.net.URL(v)).isSuccess)
   /**
    * Verifies if the url is of correct form of "Uniform Resource Identifiers (URI): Generic Syntax"
    * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
@@ -181,18 +183,12 @@ class URL(value: Option[String]) extends Text(value){
   def isValid(protocols: Array[String]): Boolean = value.exists(new UrlValidator(protocols).isValid)
   /**
    * Extracts url domain, i.e. 'salesforce.com', 'data.com' etc.
-   *
-   * @param escaped true if URI character sequence is in escaped form. false otherwise.
    */
-  def domain(escaped: Boolean = false): Option[String] = value map
-    (s => new java.net.URL(new URI(s, escaped).toString).getHost)
+  def domain(): Option[String] = value map (new java.net.URL(_).getHost)
   /**
    * Extracts url protocol, i.e. http, https, ftp etc.
-   *
-   * @param escaped true if URI character sequence is in escaped form. false otherwise.
    */
-  def protocol(escaped: Boolean = false): Option[String] = value map
-    (s => new java.net.URL(new URI(s, escaped).toString).getProtocol)
+  def protocol(): Option[String] = value map (new java.net.URL(_).getProtocol)
 }
 object URL {
   def apply(value: Option[String]): URL = new URL(value)
