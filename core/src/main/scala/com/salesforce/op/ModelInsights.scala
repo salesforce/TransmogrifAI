@@ -401,7 +401,9 @@ case object ModelInsights {
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
       classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
       classOf[BinaryClassificationBinMetrics], classOf[MulticlassThresholdMetrics],
-      classOf[BinaryThresholdMetrics], classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
+      classOf[BinaryThresholdMetrics], classOf[MultiClassificationMetrics], classOf[RegressionMetrics],
+      classOf[MultiClassificationMetricsTopK],
+      classOf[MulticlassConfMatrixMetricsByThreshold], classOf[MisClassificationMetrics]
     ))
     val evalMetricsSerializer = new CustomSerializer[EvalMetric](_ =>
       ( { case JString(s) => EvalMetric.withNameInsensitive(s) },
