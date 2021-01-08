@@ -38,6 +38,8 @@ import com.twitter.chill.Base64.{InputStream => Base64InputStream}
 import org.apache.commons.io.input.CharSequenceInputStream
 import org.apache.commons.validator.routines.UrlValidator
 
+import scala.util.Try
+
 /**
  * Text value representation
  *
@@ -171,7 +173,7 @@ class URL(value: Option[String]) extends Text(value){
    * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
    * Default valid protocols are: http, https, ftp.
    */
-  def isValid: Boolean = value.exists(UrlValidator.getInstance().isValid)
+  def isValid: Boolean = value.exists(v => UrlValidator.getInstance().isValid(v) && Try(new java.net.URL(v)).isSuccess)
   /**
    * Verifies if the url is of correct form of "Uniform Resource Identifiers (URI): Generic Syntax"
    * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
