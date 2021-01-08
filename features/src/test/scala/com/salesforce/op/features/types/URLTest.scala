@@ -48,7 +48,8 @@ class URLTest extends PropSpec with PropertyChecks with TestCommon {
     Some("ftp://.codomain"),
     Some("https://.codomain"),
     Some("//domain.nambia"),
-    Some("http://\u00ff\u0080\u007f\u0000.com") // scalastyle:off
+    Some("http://\u00ff\u0080\u007f\u0000.com"), // scalastyle:off
+    Some("http://specialchars.＠.com")
   )
 
   val goodOnes = Table("good ones",
