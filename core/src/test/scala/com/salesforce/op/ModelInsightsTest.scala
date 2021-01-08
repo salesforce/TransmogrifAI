@@ -40,8 +40,8 @@ import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorSummary, ProblemType, SelectedCombinerModel, SelectedModel, SelectedModelCombiner, ValidationType}
-import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutter, DataSplitter}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorSummary, ProblemType, SelectedCombinerModel, SelectedModel, SelectedModelCombiner, ValidationType}
+import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
