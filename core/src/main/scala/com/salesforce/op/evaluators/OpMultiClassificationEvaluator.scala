@@ -278,6 +278,34 @@ private[op] class OpMultiClassificationEvaluator
     )
   }
 
+  /**
+   * function to convert a sequence of ClassCount to a MisClassificationsPerCategory instance
+   *
+   * @param allClassCtSeq sequence of ClassCount containing labels or predictions and their counts for each category
+   * @param category index of a labelled or predicted class
+   * @return a MisClassifcationPerCategory instance
+   */
+  private def getMisclassificationsPerCategory(
+    category: Double, allClassCtSeq: Seq[ClassCount]): MisClassificationsPerCategory = {
+
+    val misClassificationCtMap = allClassCtSeq
+      .filter(_.ClassIndex != category)
+      .sortBy(-_.Count)
+      .take($(confMatrixMinSupport))
+
+    val labelCount = allClassCtSeq.map(_.Count).reduce(_ + _)
+    val correctCount = allClassCtSeq.filter(_.ClassIndex == category)
+      .map(_.Count)
+      .reduceOption(_ + _).getOrElse(0L)
+
+    MisClassificationsPerCategory(
+      Category = category,
+      TotalCount = labelCount,
+      CorrectCount = correctCount,
+      MisClassifications = misClassificationCtMap
+    )
+  }
+
 /**
  * function to calculate the mostly frequently mis-classified classes for each label/prediction category
  *
@@ -291,49 +319,15 @@ private[op] class OpMultiClassificationEvaluator
       .reduceByKey(_ + _)
 
     val misClassificationsByLabel = labelPredictionCountRDD.map {
-      case ((label, prediction), count) => (label, Seq((prediction, count)))
+      case ((label, prediction), count) => (label, Seq(ClassCount(prediction, count)))
     }.reduceByKey(_ ++ _)
-      .map { case (label, predictionCountsIter) => {
-        val misClassificationCtMap = predictionCountsIter
-          .filter { case (pred, _) => pred != label }
-          .sortBy(-_._2)
-          .take($(confMatrixMinSupport)).toMap
-
-        val labelCount = predictionCountsIter.map(_._2).reduce(_ + _)
-        val correctCount = predictionCountsIter
-          .collect { case (pred, count) if pred == label => count }
-          .reduceOption(_ + _).getOrElse(0L)
-
-        MisClassificationsPerCategory(
-          Category = label,
-          TotalCount = labelCount,
-          CorrectCount = correctCount,
-          MisClassifications = misClassificationCtMap
-        )
-      }
-    }.sortBy(-_.TotalCount).collect()
+      .map { case (label, predictionCountsSeq) => getMisclassificationsPerCategory(label, predictionCountsSeq)}
+      .sortBy(-_.TotalCount).collect()
 
     val misClassificationsByPrediction = labelPredictionCountRDD.map {
-      case ((label, prediction), count) => (prediction, Seq((label, count)))
+      case ((label, prediction), count) => (prediction, Seq(ClassCount(label, count)))
     }.reduceByKey(_ ++ _)
-      .map { case (prediction, labelCountsIter) => {
-        val sortedMisclassificationCt = labelCountsIter
-          .filter { case (label, _) => label != prediction }
-          .sortBy(-_._2)
-          .take($(confMatrixMinSupport)).toMap
-
-        val predictionCount = labelCountsIter.map(_._2).reduce(_ + _)
-        val correctCount = labelCountsIter
-          .collect { case (label, count) if label == prediction => count }
-          .reduceOption(_ + _).getOrElse(0L)
-
-        MisClassificationsPerCategory(
-          Category = prediction,
-          TotalCount = predictionCount,
-          CorrectCount = correctCount,
-          MisClassifications = sortedMisclassificationCt
-        )
-      }
+      .map { case (prediction, labelCountsSeq) => getMisclassificationsPerCategory(prediction, labelCountsSeq)
     }.sortBy(-_.TotalCount).collect()
 
     MisClassificationMetrics(
@@ -541,10 +535,15 @@ case class MultiClassificationMetrics
  */
 case class MultiClassificationMetricsTopK
 (
+  @JsonDeserialize(contentAs = classOf[java.lang.Integer])
   topKs: Seq[Int],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   Precision: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   Recall: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   F1: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   Error: Seq[Double]
 ) extends EvaluationMetrics
 
@@ -594,8 +593,19 @@ case class MisClassificationsPerCategory
   Category: Double,
   TotalCount: Long,
   CorrectCount: Long,
-  @JsonDeserialize(keyAs = classOf[java.lang.Double])
-  MisClassifications: Map[Double, Long]
+  MisClassifications: Seq[ClassCount]
+)
+
+/**
+ * container to store the count of a class
+ *
+ * @param ClassIndex
+ * @param Count
+ */
+case class ClassCount
+(
+  ClassIndex: Double,
+  Count: Long
 )
 
 /**

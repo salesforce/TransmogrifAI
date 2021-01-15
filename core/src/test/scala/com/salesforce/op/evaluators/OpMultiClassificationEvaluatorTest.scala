@@ -398,10 +398,10 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     // create a test 2D array where 1st dimension is the label and 2nd dimension is the prediction,
     // and the # of (label, prediction) equals to the value of the label
-    // _| 1  2  3
-    // 1| 1L 1L 1L
-    // 2| 2L 2L 2L
-    // 3| 3L 3L 3L
+    // ___| 1.0  2.0  3.0
+    // 1.0| 1L   1L   1L
+    // 2.0| 2L   2L   2L
+    // 3.0| 3L   3L   3L
     val testLabels = Array(1.0, 2.0, 3.0)
     val labelAndPrediction = testLabels.flatMap(label => {
       testLabels.flatMap(pred => Seq.fill(label.toInt)((label, pred)))
@@ -437,10 +437,10 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     // create a test 2D array with the count of each label & prediction combination as:
     // row is label and column is prediction
-    // _| 1  2  3
-    // 1| 2L 3L 4L
-    // 2| 3L 4L 5L
-    // 3| 4L 5L 6L
+    // ___| 1.0  2.0  3.0
+    // 1.0| 2L   3L   4L
+    // 2.0| 3L   4L   5L
+    // 3.0| 4L   5L   6L
     val testLabels = List(1.0, 2.0, 3.0)
     val labelAndPrediction = testLabels.flatMap(label => {
       testLabels.flatMap(pred => Seq.fill(label.toInt + pred.toInt)((label, pred)))
@@ -452,21 +452,21 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     outputMetrics.MisClassificationsByLabel shouldEqual
       Seq(
         MisClassificationsPerCategory(Category = 3.0, TotalCount = 15L, CorrectCount = 6L,
-          MisClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
+          MisClassifications = Seq(ClassCount(2.0, 5L), ClassCount(1.0, 4L))),
         MisClassificationsPerCategory(Category = 2.0, TotalCount = 12L, CorrectCount = 4L,
-          MisClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
+          MisClassifications = Seq(ClassCount(3.0, 5L), ClassCount(1.0, 3L))),
         MisClassificationsPerCategory(Category = 1.0, TotalCount = 9L, CorrectCount = 2L,
-          MisClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
+          MisClassifications = Seq(ClassCount(3.0, 4L), ClassCount(2.0, 3L)))
       )
 
       outputMetrics.MisClassificationsByPrediction shouldEqual
         Seq(
           MisClassificationsPerCategory(Category = 3.0, TotalCount = 15L, CorrectCount = 6L,
-            MisClassifications = Map(2.0 -> 5L, 1.0 -> 4L)),
+            MisClassifications = Seq(ClassCount(2.0, 5L), ClassCount(1.0, 4L))),
           MisClassificationsPerCategory(Category = 2.0, TotalCount = 12L, CorrectCount = 4L,
-            MisClassifications = Map(3.0 -> 5L, 1.0 -> 3L)),
+            MisClassifications = Seq(ClassCount(3.0, 5L), ClassCount(1.0, 3L))),
           MisClassificationsPerCategory(Category = 1.0, TotalCount = 9L, CorrectCount = 2L,
-            MisClassifications = Map(3.0 -> 4L, 2.0 -> 3L))
+            MisClassifications = Seq(ClassCount(3.0, 4L), ClassCount(2.0, 3L)))
         )
   }
 }
