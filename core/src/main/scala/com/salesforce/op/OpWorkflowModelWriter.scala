@@ -37,7 +37,6 @@ import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
 import enumeratum._
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
@@ -69,7 +68,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   }
 
   override protected def saveImpl(path: String): Unit = {
-    val conf = new Configuration()
+    val conf = this.sparkSession.sparkContext.hadoopConfiguration
     val localFileSystem = FileSystem.getLocal(conf)
     val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
     localFileSystem.delete(localPath, true)
