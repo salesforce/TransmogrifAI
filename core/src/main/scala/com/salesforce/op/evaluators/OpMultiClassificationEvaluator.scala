@@ -602,6 +602,7 @@ case class MisClassificationsPerCategory
 case class ConfusionMatrixPerThreshold
 (
   Threshold: Double,
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
   ConfusionMatrixCounts: Seq[Long]
 )
 
