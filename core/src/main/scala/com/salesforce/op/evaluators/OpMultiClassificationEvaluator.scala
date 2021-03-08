@@ -265,7 +265,10 @@ private[op] class OpMultiClassificationEvaluator
       val filteredRDD = labelPredictionConfidenceCountRDD.filter {
         case ((_, _, confidence), _) => confidence >= threshold
       }
-      constructConfusionMatrix(filteredRDD, cmClasses)
+      ConfusionMatrixPerThreshold(
+        Threshold = threshold,
+        ConfusionMatrixCounts = constructConfusionMatrix(filteredRDD, cmClasses)
+      )
     })
 
     labelPredictionConfidenceCountRDD.unpersist()
@@ -564,7 +567,7 @@ case class MulticlassConfMatrixMetricsByThreshold
   ConfMatrixClassIndices: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   ConfMatrixThresholds: Seq[Double],
-  ConfMatrices: Seq[Seq[Long]]
+  ConfMatrices: Seq[ConfusionMatrixPerThreshold]
 ) extends EvaluationMetrics
 
 /**
@@ -594,6 +597,13 @@ case class MisClassificationsPerCategory
   TotalCount: Long,
   CorrectCount: Long,
   MisClassifications: Seq[ClassCount]
+)
+
+case class ConfusionMatrixPerThreshold
+(
+  Threshold: Double,
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  ConfusionMatrixCounts: Seq[Long]
 )
 
 /**
