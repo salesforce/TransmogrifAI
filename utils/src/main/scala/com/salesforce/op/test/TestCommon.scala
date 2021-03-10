@@ -52,11 +52,27 @@ trait TestCommon extends Matchers with Assertions {
   protected def resourceDir: String = "src/test/resources"
 
   /**
+   * Get logging level for all loggers
+   */
+  def getLoggingLevels: Seq[Level] = {
+    val loggers = Logger.getRootLogger :: LogManager.getCurrentLoggers.asScala.toList
+    loggers.collect { case l: Logger => l.getLevel }
+  }
+
+  /**
    * Set logging level for
    */
   def loggingLevel(level: Level): Unit = {
     val loggers = Logger.getRootLogger :: LogManager.getCurrentLoggers.asScala.toList
     loggers.collect { case l: Logger => l }.foreach(_.setLevel(level))
+  }
+
+  /**
+   * Set logging level individually
+   */
+  def loggingLevels(levels: Seq[Level]): Unit = {
+    val loggers = Logger.getRootLogger :: LogManager.getCurrentLoggers.asScala.toList
+    loggers.collect { case l: Logger => l } zip levels foreach { case (logger, level) => logger.setLevel(level) }
   }
 
   /**

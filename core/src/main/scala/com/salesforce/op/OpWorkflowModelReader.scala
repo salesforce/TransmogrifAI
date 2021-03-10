@@ -31,19 +31,22 @@
 package com.salesforce.op
 
 
-import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
-import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
+import java.io.File
+
 import com.salesforce.op.OpWorkflowModelReadWriteShared.DeprecatedFieldNames._
+import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
+import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.compress.CompressionCodecFactory
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
+import org.zeroturnaround.zip.ZipUtil
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -63,16 +66,46 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
    * Load a previously trained workflow model from path
    *
    * @param path to the trained workflow model
+   * @param modelStagingDir local folder to copy and unpack stored model to for loading
    * @return workflow model
    */
-  final def load(path: String): OpWorkflowModel = {
-    implicit val conf = new org.apache.hadoop.conf.Configuration()
-    Try(WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(path)))
-      .flatMap(loadJson(_, path = path)) match {
-      case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
-      case Success(wf) => wf
+  final def load(path: String, modelStagingDir: String = WorkflowFileReader.modelStagingDir): OpWorkflowModel = {
+    implicit val conf = new Configuration()
+    val localFileSystem = FileSystem.getLocal(conf)
+    val localPath = localFileSystem.makeQualified(new Path(modelStagingDir))
+    localFileSystem.delete(localPath, true)
 
+    val savePath = new Path(path)
+    val remoteFileSystem = savePath.getFileSystem(conf)
+    val zipDir = new Path(localPath, WorkflowFileReader.zipModel)
+    remoteFileSystem.copyToLocalFile(savePath, zipDir)
+
+    // New serialization:
+    //  remote: savePath (dir) -> Model.zip (file)
+    //  local:  Model.zip (dir) -> Model.zip (file)
+    // Old serialization:
+    //  remote: savePath (dir)
+    //  local:  Model.zip (dir)
+    val modelDir = new Path(localPath, WorkflowFileReader.rawModel)
+    val modelPath = Try {
+      localFileSystem.open(new Path(zipDir, WorkflowFileReader.zipModel))
+    }.map { inputStream =>
+      try {
+        ZipUtil.unpack(inputStream, new File(modelDir.toUri.getPath))
+        modelDir.toString
+      } finally inputStream.close()
+    }.getOrElse(zipDir.toString)
+
+    val model = Try(
+      WorkflowFileReader.loadFile(OpWorkflowModelReadWriteShared.jsonPath(modelPath))
+    ).flatMap(loadJson(_, path = modelPath)) match {
+      case Failure(error) =>
+        throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
+      case Success(wf) => wf
     }
+
+    localFileSystem.delete(localPath, true)
+    model
   }
 
   /**
@@ -232,26 +265,42 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow], val asSpark: Bo
 }
 
 private object WorkflowFileReader {
+  val rawModel = "rawModel"
+  val zipModel = "Model.zip"
+  def modelStagingDir: String = s"modelStagingDir/model-${System.currentTimeMillis}"
+  val confWithDefaultCodec = new Configuration(false)
+  val codecFactory = new CompressionCodecFactory(confWithDefaultCodec)
 
   def loadFile(pathString: String)(implicit conf: Configuration): String = {
-    val path = new Path(pathString)
-    val fs = path.getFileSystem(conf)
-    val allFiles = fs.listFiles(path, false)
-    var partPath: Option[Path] = None
-    while (allFiles.hasNext) {
-      val p = allFiles.next().getPath
-      if (p.getName.startsWith("part-00000")) {
-        partPath = Option(p)
-      }
+    Try {
+      readAsString( new Path(pathString, "part-00000.gz") )
+    } recoverWith { case suppressed1 =>
+      Try {
+        readAsString( new Path(pathString, "part-00000") )
+      } recoverWith { case suppressed2 => suppressed2.addSuppressed(suppressed1)
+          Try {
+            readAsString( new Path(pathString) )
+          } recoverWith {
+            case th => th.addSuppressed(suppressed2)
+              Failure(th)
+          }
+        }
+      } match {
+      case Failure(e) => throw new RuntimeException(s"Failed to load workflow because of $e", e)
+      case Success(v) => v
     }
-    val finalPath = partPath.getOrElse(path)
-    val codecFactory = new CompressionCodecFactory(conf)
-    val codec = Option(codecFactory.getCodec(finalPath))
-    val in = fs.open(finalPath)
-    val read = codec.map( c => Source.fromInputStream(c.createInputStream(in)).mkString )
-      .getOrElse( IOUtils.toString(in, "UTF-8") )
-    in.close()
-    read
+  }
+
+  private def readAsString(path: Path)(implicit conf: Configuration): String = {
+    val in = FileSystem.getLocal(conf).open(path)
+    try {
+      val read = Option(codecFactory.getCodec(path))
+        .map(c => Source.fromInputStream(c.createInputStream(in)).mkString)
+        .getOrElse(IOUtils.toString(in, "UTF-8"))
+      read
+    } finally {
+      in.close()
+    }
   }
 }
 

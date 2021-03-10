@@ -23,6 +23,9 @@ dependencies {
     // Scopt
     compile "com.github.scopt:scopt_%%:$scoptVersion"
 
+    // Zip util
+    compile 'org.zeroturnaround:zt-zip:1.14'
+
     // XGBoost
     compile ("ml.dmlc:xgboost4j-spark_%%:$xgboostVersion") { exclude group: 'com.esotericsoftware.kryo', module: 'kryo' }
     // Akka slfj4 logging (version matches XGBoost dependency)

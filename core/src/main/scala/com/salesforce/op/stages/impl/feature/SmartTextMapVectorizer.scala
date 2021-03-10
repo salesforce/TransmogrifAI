@@ -33,15 +33,17 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.stages.SensitiveFeatureMode._
+import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats, SensitiveFeatureMode}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Monoid
 import com.twitter.algebird.macros.caseclass
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import com.twitter.algebird.{Monoid, Semigroup}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -51,6 +53,8 @@ import scala.reflect.runtime.universe.TypeTag
  * plus occurrences of non top k values and a null indicator (if enabled).
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
+ *
+ * Detection and removal of names in the input columns can be enabled with the `sensitiveFeatureMode` param.
  *
  * @param uid uid for instance
  */
@@ -62,9 +66,10 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
-    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams {
+    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams
+    with NameDetectFun[Text] {
 
-  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
+  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = Encoders.kryo[Array[TextMapStats]]
 
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),
@@ -77,7 +82,10 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     hashSpaceStrategy = getHashSpaceStrategy
   )
 
-  private def makeVectorMetadata(args: SmartTextMapVectorizerModelArgs): OpVectorMetadata = {
+  private def makeVectorMetadata(
+    args: SmartTextMapVectorizerModelArgs,
+    aggNameDetectStats: Array[Map[String, NameDetectStats]]
+  ): OpVectorMetadata = {
     val categoricalColumns = if (args.categoricalFeatureInfo.flatten.nonEmpty) {
       val (mapFeatures, mapFeatureInfo) =
         inN.toSeq.zip(args.categoricalFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
@@ -126,7 +134,15 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     } else Array.empty[OpVectorColumnMetadata]
 
     val columns = categoricalColumns ++ allTextColumns
-    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
+
+    val nameDetectStatsMap: Map[(String, Option[String]), NameDetectStats] =
+      inN.toSeq.zip(aggNameDetectStats) flatMap {
+        case (tf, mapFromKeyToNameDetectStats) => mapFromKeyToNameDetectStats map {
+          case (key, nameDetectStats) => (tf.name, Some(key)) -> nameDetectStats }
+      } toMap
+    val sensitive = createSensitiveFeatureInformation(nameDetectStatsMap)
+
+    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }
 
   def makeSmartTextMapVectorizerModelArgs(aggregatedStats: Array[TextMapStats]): SmartTextMapVectorizerModelArgs = {
@@ -139,7 +155,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     val topKValue = $(topK)
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
-      textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
+      val featureInfoBeforeSensitive = textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
         // Estimate the coverage of the top K values
         val totalCount = textStats.valueCounts.values.sum // total count
         // Filter by minimum support
@@ -171,6 +187,15 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         } else Array.empty[String]
         SmartTextFeatureInfo(key = k, vectorizationMethod = vecMethod, topValues = topVals)
       }
+
+      if (shouldRemoveSensitive) textMapStats.nameDetectStats.toSeq.zip(featureInfoBeforeSensitive) map {
+        case ((k, nameDetectStats), previousFeatureInfo) =>
+        val treatAsName = computeTreatAsName(nameDetectStats)
+        SmartTextFeatureInfo(key = k,
+          vectorizationMethod = if (treatAsName) Ignore else previousFeatureInfo.vectorizationMethod,
+          topValues = previousFeatureInfo.topValues
+        )
+      } else featureInfoBeforeSensitive
     }
 
     logInfo("TextStats for features used in SmartTextMapVectorizer:")
@@ -202,16 +227,18 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanValues = $(cleanText)
     val shouldTokenize = $(textLengthType) == TextLengthType.Tokens.entryName
 
-    implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
+    implicit val textStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
+    val nameDetectMapFun = makeMapFunction(dataset.sparkSession)
+
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
       _.map(TextMapStats.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, shouldTokenize,
-        maxCard)).toArray
+        maxCard, getSensitiveFeatureMode, nameDetectMapFun)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
 
-    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs)
+    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, aggregatedStats.map(_.nameDetectStats))
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextMapVectorizerModel[T](args = smartTextMapVectorizerModelArgs, operationName = operationName, uid = uid)
@@ -230,12 +257,17 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
  *
  * @param keyValueCounts counts of feature values
  */
-private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) extends JsonLike
+private[op] case class TextMapStats
+(
+  keyValueCounts: Map[String, TextStats],
+  nameDetectStats: Map[String, NameDetectStats] = Map.empty[String, NameDetectStats]
+) extends JsonLike
 
 private[op] object TextMapStats extends CleanTextFun {
 
   def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
-    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
+    implicit val textStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCardinality)
+    implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
     caseclass.monoid[TextMapStats]
   }
 
@@ -255,12 +287,16 @@ private[op] object TextMapStats extends CleanTextFun {
     shouldCleanKeys: Boolean,
     shouldCleanValues: Boolean,
     shouldTokenize: Boolean,
-    maxCardinality: Int
+    maxCardinality: Int,
+    sensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.Off,
+    nameDetectMapFun: Text#Value => NameDetectStats = f => NameDetectStats.empty
   )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
     val keyValueCounts = textMap.map { case (k, v) => cleanTextFn(k, shouldCleanKeys) ->
       TextStats.textStatsFromString(v, shouldCleanValues, shouldTokenize, maxCardinality)
     }
-    TextMapStats(keyValueCounts)
+    val nameDetectStats = if (sensitiveFeatureMode == Off) Map.empty[String, NameDetectStats]
+    else textMap.map{ case (k, v) => cleanTextFn(k, shouldCleanKeys) -> nameDetectMapFun(Text(v).value) }
+    TextMapStats(keyValueCounts, nameDetectStats)
   }
 
 }

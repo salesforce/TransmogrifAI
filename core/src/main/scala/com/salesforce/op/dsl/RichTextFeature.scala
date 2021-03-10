@@ -34,6 +34,7 @@ import com.salesforce.op.dsl.RichTextFeatureLambdas._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature._
+import com.salesforce.op.utils.stages.SensitiveFeatureMode
 import com.salesforce.op.utils.text._
 
 import scala.reflect.runtime.universe.TypeTag
@@ -241,6 +242,7 @@ trait RichTextFeature {
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      sensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.Off,
       textLengthType: TextLengthType = SmartTextVectorizer.LengthType,
       minLengthStdDev: Double = SmartTextVectorizer.MinTextLengthStdDev,
       stripHtml: Boolean = TextTokenizer.StripHtml,
@@ -268,6 +270,7 @@ trait RichTextFeature {
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
+        .setSensitiveFeatureMode(sensitiveFeatureMode)
         .setTextLengthType(textLengthType)
         .setMinLengthStdDev(minLengthStdDev)
         .getOutput()

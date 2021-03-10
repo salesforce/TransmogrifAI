@@ -160,7 +160,8 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
             s"isResponse = ${f.isResponse}, " +
             s"originStage = ${f.originStage.uid}, " +
             s"parents = ${f.parents.map(_.uid).mkString("[", ",", "]")}, " +
-            s"distributions = ${f.distributions.map(_.toString).mkString("[", ",", "]")})"
+            s"distributions = ${f.distributions.map(_.toString).mkString("[", ",", "]")}, " +
+            s"metadata = ${f.metadata})"
       }
     }
     "pretty parent stages" should {

@@ -324,7 +324,7 @@ private[op] trait MapHashingFun extends HashingFun {
   ): Array[OpVectorColumnMetadata] = {
     val numHashes = params.numFeatures
     val numFeatures = hashKeys.map(_.length).sum
-    val hashColumns =
+    val hashColumns = if (hashFeatures.nonEmpty) {
       if (isSharedHashSpace(params, Some(numFeatures))) {
         (0 until numHashes).map { i =>
           OpVectorColumnMetadata(
@@ -343,6 +343,7 @@ private[op] trait MapHashingFun extends HashingFun {
           i <- 0 until numHashes
         } yield f.toColumnMetaData().copy(grouping = Option(key))
       }.toArray
+    } else Array.empty[OpVectorColumnMetadata]
 
     // All columns get null tracking or text length tracking, whether their contents are hashed or ignored
     val allTextKeys = hashKeys.zip(ignoreKeys).map{ case(h, i) => h ++ i }

@@ -1,3 +1,4 @@
 dependencies {
     compile project(':features')
+    testCompile project(':testkit')
 }

@@ -33,6 +33,7 @@ package com.salesforce.op.features
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages.{OPStage, OpPipelineStage}
+import org.apache.spark.sql.types.Metadata
 
 import scala.reflect.runtime.universe.WeakTypeTag
 
@@ -41,13 +42,15 @@ import scala.reflect.runtime.universe.WeakTypeTag
  *
  * Note: can only be created using [[FeatureBuilder]].
  *
- * @param name        name of feature, represents the name of the column in the dataframe.
- * @param isResponse  whether or not this feature is a response feature, ie dependent variable
- * @param originStage reference to OpPipelineStage responsible for generating the feature.
- * @param parents     references to the features that are transformed by the originStage that produces this feature
- * @param uid         unique identifier of the feature instance
- * @param wtt         feature's value type tag
- * @tparam O feature value type
+ * @param name          name of feature, represents the name of the column in the dataframe.
+ * @param isResponse    whether or not this feature is a response feature, ie dependent variable
+ * @param originStage   reference to OpPipelineStage responsible for generating the feature.
+ * @param parents       references to the features that are transformed by the originStage that produces this feature
+ * @param uid           unique identifier of the feature instance
+ * @param distributions distributions associated with raw feature from raw feature filter
+ * @param metadata      metadata to attach to feature in dataframe
+ * @param wtt           feature's value type tag
+ * @tparam O            feature value type
  */
 case class Feature[O <: FeatureType] private[op]
 (
@@ -56,7 +59,8 @@ case class Feature[O <: FeatureType] private[op]
   originStage: OpPipelineStage[O],
   parents: Seq[OPFeature],
   uid: String,
-  distributions: Seq[FeatureDistributionLike] = Seq.empty
+  distributions: Seq[FeatureDistributionLike] = Seq.empty,
+  metadata: Option[Metadata] = None
 )(implicit val wtt: WeakTypeTag[O]) extends FeatureLike[O] {
 
   def this(
@@ -70,7 +74,8 @@ case class Feature[O <: FeatureType] private[op]
     originStage = originStage,
     parents = parents,
     uid = FeatureUID(originStage.uid),
-    distributions = Seq.empty
+    distributions = Seq.empty,
+    metadata = None
   )(wtt)
 
   /**
@@ -92,7 +97,7 @@ case class Feature[O <: FeatureType] private[op]
       val newParents = f.parents.map(p => copy[T](p.asInstanceOf[FeatureLike[T]]))
       Feature[T](
         name = f.name, isResponse = f.isResponse, originStage = stage, parents = newParents, uid = f.uid,
-        distributions = f.distributions
+        distributions = f.distributions, metadata = f.metadata
       )(f.wtt)
     }
 
@@ -107,6 +112,14 @@ case class Feature[O <: FeatureType] private[op]
    */
   override private[op] def withDistributions(distributions: Seq[FeatureDistributionLike]) =
     this.copy(distributions = distributions)
+
+  /**
+   * Adds metadata to feature so can override metadata on created feature
+   *
+   * @param metadataIn dataframe metadata to include in the output column
+   * @return A feature with the metadata associated
+   */
+  override def withMetadata(metadataIn: Metadata): FeatureLike[O] = this.copy(metadata = Option(metadataIn))
 }
 
 /**

@@ -31,7 +31,9 @@
 package com.salesforce.op.features
 
 import com.salesforce.op._
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.test.{PassengerFeaturesTest, TestCommon}
+import org.apache.spark.ml.attribute.NominalAttribute
 import org.json4s.MappingException
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -43,7 +45,10 @@ class FeatureJsonHelperTest extends FlatSpec with PassengerFeaturesTest with Tes
 
   trait DifferentParents {
     val feature = height + weight
-    val stages = Map(feature.originStage.uid -> feature.originStage)
+    val stages = Map(
+      feature.originStage.uid -> feature.originStage,
+      height.originStage.uid -> height.originStage
+    )
     val features = Map(height.uid -> height, weight.uid -> weight)
   }
 
@@ -91,6 +96,27 @@ class FeatureJsonHelperTest extends FlatSpec with PassengerFeaturesTest with Tes
     val res = FeatureJsonHelper.fromJsonString(feature.toJson(), stages, features = Map.empty)
     res.isFailure shouldBe true
     res.failed.get shouldBe a[RuntimeException]
+  }
+
+  it should "serialize and deserialize all information" in new DifferentParents {
+    val dist = Seq(new FeatureDistribution(name = "dt", key = None, count = 1, nulls = 0,
+    distribution = Array(0.5), summaryInfo = Array(1.0)))
+    val meta = NominalAttribute.defaultAttr
+      .withName("test")
+      .withValues(Array("false", "true", "UnseenLabel"))
+      .toMetadata()
+    val withData = height.copy(distributions = dist, metadata = Option(meta))
+    val jsonIn = withData.toJson()
+    val parsedFeature = FeatureJsonHelper.fromJsonString(jsonIn, stages, features)
+    val res = parsedFeature.get
+    res shouldBe a[Feature[_]]
+    res.name shouldBe withData.name
+    res.isResponse shouldBe withData.isResponse
+    res.originStage shouldBe withData.originStage
+    res.metadata shouldBe withData.metadata
+    // res.distributions shouldBe withData.distributions
+    res.uid shouldBe withData.uid
+    res.wtt.tpe =:= withData.wtt.tpe shouldBe true
   }
 
 

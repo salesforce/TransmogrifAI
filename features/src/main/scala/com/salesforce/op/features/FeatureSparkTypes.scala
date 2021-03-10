@@ -40,6 +40,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.column
 import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.sql.{Column, Encoder, Row, TypedColumn}
+import com.salesforce.op.utils.spark.RichMetadata._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe._
@@ -566,7 +567,8 @@ case object FeatureSparkTypes {
    * @return struct field
    */
   def toStructField(f: OPFeature, metadata: Metadata = Metadata.empty): StructField = {
-    StructField(name = f.name, dataType = sparkTypeOf(f.wtt), nullable = true, metadata = metadata)
+    val thisMetadata = f.metadata.map(_.deepMerge(metadata)).getOrElse(metadata)
+    StructField(name = f.name, dataType = sparkTypeOf(f.wtt), nullable = true, metadata = thisMetadata)
   }
 
   /**

@@ -40,7 +40,7 @@ import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.selector.{SelectedCombinerModel, SelectedModel, SelectedModelCombiner}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorSummary, ProblemType, SelectedCombinerModel, SelectedModel, SelectedModelCombiner, ValidationType}
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
@@ -407,6 +407,61 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     pretty should include("Top Contributions")
   }
 
+  it should "correctly serialize and deserialize from json with MulticlassificationMetrics" in {
+    val trainMetrics = MultiClassificationMetrics(
+      Precision = 0.1,
+      Recall = 0.2,
+      F1 = 0.3,
+      Error = 0.4,
+      ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
+        correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
+        noPredictionCounts = Map(3 -> Seq(300L))),
+      TopKMetrics = MultiClassificationMetricsTopK(Seq(1), Seq(0.1), Seq(0.1), Seq(0.1), Seq(0.1)),
+      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold( 2, Seq(0.1), Seq(0.1), Seq(Seq(1L))),
+      MisClassificationMetrics = MisClassificationMetrics(1, Seq.empty,
+        Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Seq(ClassCount(1.0, 3L)))))
+    )
+
+    val holdoutMetrics = MultiClassificationMetrics(
+      Precision = 0.1,
+      Recall = 0.2,
+      F1 = 0.3,
+      Error = 0.4,
+      ThresholdMetrics = MulticlassThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
+        correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
+        noPredictionCounts = Map(3 -> Seq(300L))),
+      TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty),
+      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold(2, Seq(0.1), Seq(0.1), Seq.empty),
+      MisClassificationMetrics = MisClassificationMetrics(1, Seq.empty,
+        Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Seq.empty)))
+    )
+
+    val summary = ModelSelectorSummary(
+      validationType = ValidationType.TrainValidationSplit,
+      validationParameters = Map.empty,
+      dataPrepParameters = Map.empty,
+      dataPrepResults = None,
+      evaluationMetric = MultiClassEvalMetrics.Error,
+      problemType = ProblemType.MultiClassification,
+      bestModelUID = "test1",
+      bestModelName = "test2",
+      bestModelType = "test3",
+      validationResults = Seq.empty,
+      trainEvaluation = trainMetrics,
+      holdoutEvaluation = Some(holdoutMetrics)
+    )
+
+    val insights = workflowModel.modelInsights(pred).copy(selectedModelInfo = Some(summary))
+    ModelInsights.fromJson(insights.toJson()) match {
+      case Failure(e) => fail(e)
+      case Success(deser) =>
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
+          case (o, i) =>
+            o.trainEvaluation shouldEqual i.trainEvaluation
+            o.holdoutEvaluation shouldEqual i.holdoutEvaluation
+        }
+    }
+  }
 
   it should "correctly serialize and deserialize from json when raw feature filter is not used" in {
     val insights = workflowModel.modelInsights(pred)

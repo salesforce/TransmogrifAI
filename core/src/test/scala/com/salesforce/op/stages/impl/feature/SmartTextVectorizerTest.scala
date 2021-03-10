@@ -34,11 +34,12 @@ import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.stages.impl.feature.TextVectorizationMethod.{Hash, Pivot}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
+import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -61,7 +62,7 @@ class SmartTextVectorizerTest
       (Text.empty, Text.empty)
     )
   )
-  val estimator = new SmartTextVectorizer()
+  val estimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
@@ -286,7 +287,7 @@ class SmartTextVectorizerTest
       .setTrackTextLen(true).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
-    assertVectorLength(transformed, output, TransmogrifierDefaults.TopK + 2, Pivot)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.TopK + 2, TextVectorizationMethod.Pivot)
   }
   it should "treat the edge case of coverage being near 1" in {
     val maxCard = 100
@@ -294,7 +295,8 @@ class SmartTextVectorizerTest
       .setTrackTextLen(true).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
-    assertVectorLength(transformed, output, TransmogrifierDefaults.DefaultNumOfFeatures + 2, Hash)
+    assertVectorLength(transformed, output, TransmogrifierDefaults.DefaultNumOfFeatures + 2,
+      TextVectorizationMethod.Hash)
   }
 
   it should "detect one categorical with high cardinality using the coverage" in {
@@ -308,7 +310,7 @@ class SmartTextVectorizerTest
       .setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
-    assertVectorLength(transformed, output, topK + 2, Pivot)
+    assertVectorLength(transformed, output, topK + 2, TextVectorizationMethod.Pivot)
   }
 
   it should "not pivot using the coverage because of a high minimum support" in {
@@ -324,7 +326,7 @@ class SmartTextVectorizerTest
       .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
-    assertVectorLength(transformed, output, numHashes + 2, Hash)
+    assertVectorLength(transformed, output, numHashes + 2, TextVectorizationMethod.Hash)
   }
 
   it should "still pivot using the coverage despite a high minimum support" in {
@@ -340,7 +342,7 @@ class SmartTextVectorizerTest
       .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
-    assertVectorLength(transformed, output, 3, Pivot)
+    assertVectorLength(transformed, output, 3, TextVectorizationMethod.Pivot)
   }
 
   it should "not pivot using the coverage because top K is too high" in {
@@ -355,7 +357,7 @@ class SmartTextVectorizerTest
       .setTrackTextLen(true).setCleanText(false).setInput(rawCatCountry)
     val output = vectorizer.getOutput()
     val transformed = new OpWorkflow().setResultFeatures(output).transform(countryDF)
-    assertVectorLength(transformed, output, numHashes + 2, Hash)
+    assertVectorLength(transformed, output, numHashes + 2, TextVectorizationMethod.Hash)
   }
 
   it should "still transform country into text, despite the coverage" in {
@@ -369,7 +371,7 @@ class SmartTextVectorizerTest
       .setMaxCardinality(maxCard).setTopK(topK).setMinSupport(1).setCoveragePct(0.5).setCleanText(false)
       .setTrackTextLen(true).setNumFeatures(numHashes).setInput(rawCountry).getOutput()
     val transformed = new OpWorkflow().setResultFeatures(coverageHashed).transform(rawDF)
-    assertVectorLength(transformed, coverageHashed, numHashes + 2, Hash)
+    assertVectorLength(transformed, coverageHashed, numHashes + 2, TextVectorizationMethod.Hash)
   }
 
   it should "fail with an error" in {
@@ -654,8 +656,9 @@ class SmartTextVectorizerTest
     val metaColumns = OpVectorMetadata(df.schema(output.name)).columns
     metaColumns.length shouldBe expectedLength
     textVectorizationMethod match {
-      case Pivot => assert(metaColumns(expectedLength - 2).indicatorValue.contains(OpVectorColumnMetadata.OtherString))
-      case Hash => assert(metaColumns(expectedLength - 2).descriptorValue
+      case TextVectorizationMethod.Pivot => assert(metaColumns(expectedLength - 2).indicatorValue
+        .contains(OpVectorColumnMetadata.OtherString))
+      case TextVectorizationMethod.Hash => assert(metaColumns(expectedLength - 2).descriptorValue
         .contains(OpVectorColumnMetadata.TextLenString))
       case other => throw new Error(s"Only Pivoting or Hashing possible, got ${other} instead")
     }
@@ -722,4 +725,209 @@ class SmartTextVectorizerTest
     tokensWithFlag should contain theSameElementsInOrderAs tokensWithAnalyzer
   }
 
+  val biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
+    .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+    .setTopK(2).setPrependFeatureName(false)
+    .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+    .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
+    .setInput(f1, f2)
+
+  lazy val (newInputData, newF1, newF2, newF3) = TestFeatureBuilder("text1", "text2", "name",
+    Seq[(Text, Text, Text)](
+      ("hello world".toText, "Hello world!".toText, "Michael".toText),
+      ("hello world".toText, "What's up".toText, "Michelle".toText),
+      ("good evening".toText, "How are you doing, my friend?".toText, "Roxanne".toText),
+      (Text.empty, "Not bad, my friend.".toText, "Ross".toText),
+      (Text.empty, Text.empty, Text.empty)
+    )
+  )
+
+  private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
+    NameDetectUtils.DefaultNameDictionary.toList
+  )
+
+  Spec[SmartTextVectorizer[Text]] should "detect a single name feature" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    model.args.vectorizationMethods shouldBe Array(TextVectorizationMethod.Ignore)
+  }
+
+  it should "detect a single name feature and return empty vectors" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+
+    val smartVectorized = newEstimator.getOutput()
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized).transform(newInputData)
+    val result = transformed.collect(smartVectorized)
+
+    // The only entries in the output should be null indicators
+    result shouldBe Seq(
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(1.0))
+    ).map(_.toOPVector)
+    OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe 1
+  }
+
+  it should "detect a single name column among other non-name Text columns" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    model.args.vectorizationMethods shouldBe Array(TextVectorizationMethod.Pivot, TextVectorizationMethod.Hash,
+      TextVectorizationMethod.Ignore)
+  }
+
+  it should "not create information in the vector for a single name column among other non-name Text columns" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+    val withNamesVectorized = newEstimator.getOutput()
+
+    val oldEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer(uid = UID("newEstimator"))
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+      .setTopK(2).setPrependFeatureName(false)
+      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
+      .setInput(newF1, newF2)
+    val withoutNamesVectorized = oldEstimator.getOutput()
+
+    val transformed = new OpWorkflow()
+      .setResultFeatures(withNamesVectorized, withoutNamesVectorized).transform(newInputData)
+    val result = transformed.collect(withNamesVectorized, withoutNamesVectorized)
+
+    val (withNames, withoutNames) = result.unzip
+
+    // There should only be a single extra metadata entry for the null indicator of the (removed) name field
+    OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe
+      OpVectorMetadata("OutputVector", oldEstimator.getMetadata()).size + 1
+
+    // All of the entries in the vector
+    // (other than the last one corresponding to the null indicator for the removed name field)
+    // should be the same
+    // Note: Changing the order of vector information will fail this test
+    withNames.zip(withoutNames) foreach { case (withVector, withoutVector) =>
+      val withArray = withVector.value.toArray
+      val withoutArray = withoutVector.value.toArray :+ withArray.last
+      withArray shouldBe withoutArray
+    }
+  }
+
+  it should "not identify a single repeated name as Name" in {
+    val (newNewInputData, newNewF1, newNewF2) = TestFeatureBuilder("Repeated Name", "Random Names",
+      Seq.fill(200)("Michael").toText zip
+        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(200).toSeq
+    )
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newNewF1, newNewF2)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newNewInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    model.args.vectorizationMethods shouldBe Array(TextVectorizationMethod.Pivot, TextVectorizationMethod.Ignore)
+  }
+
+  it should "compute sensitive information in the metadata for one detected name column" in {
+    val prevLoggingLevels = getLoggingLevels
+    loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+    sensitive.get("name") match {
+      case Some(Seq(SensitiveNameInformation(
+        probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+      ))) =>
+        probName shouldBe 1.0
+        genderDetectResults.length shouldBe NameDetectUtils.GenderDetectStrategies.length
+        probMale shouldBe 0.5
+        probFemale shouldBe 0.5
+        probOther shouldBe 0.0
+        name shouldBe newF3.name
+        mapKey shouldBe None
+        actionTaken shouldBe true
+      case None => fail("Sensitive information not found in the metadata.")
+      case _ => fail("Wrong kind of sensitive information found in the metadata.")
+    }
+    loggingLevels(prevLoggingLevels) // Reset logging levels
+  }
+
+  it should "compute sensitive information in the metadata for multiple detected name columns" in {
+    val numFeatures = 5
+    val (ds, untypedFeatures) = TestFeatureBuilder(
+      1 to numFeatures map {_ =>
+        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.15).take(50).toSeq} : _*
+    )
+    val features = untypedFeatures.map(_.asInstanceOf[FeatureLike[Text]])
+    for {i <- 1 to numFeatures} {
+      val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(features.slice(0, i): _*)
+      val model: SmartTextVectorizerModel[Text] = newEstimator
+        .fit(ds)
+        .asInstanceOf[SmartTextVectorizerModel[Text]]
+
+      val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+      for {j <- 1 to i} {
+        sensitive.get(s"f$j") match {
+          case Some(Seq(SensitiveNameInformation(
+            probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+          ))) =>
+            probName should be > 0.0
+            probName should be <= 1.0
+            probMale should be <= 1.0
+            probFemale should be <= 1.0
+            probOther should be <= 1.0
+            (probMale + probFemale + probOther) - 1.0 should be < 0.01
+
+            genderDetectResults.length shouldBe 1 // because debugging is off
+            name shouldBe s"f$j"
+            mapKey shouldBe None
+            actionTaken shouldBe true
+          case None =>
+            fail("Sensitive information not found in the metadata.")
+          case Some(_) =>
+            fail("Wrong kind of sensitive information found in the metadata.")
+        }
+      }
+    }
+  }
+
+  it should "compute sensitive information in the metadata for all columns only when debugging is on" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+    newInputData.columns foreach { fname: String =>
+      if (fname == newF3.name) {
+        sensitive contains fname shouldBe true
+      } else {
+        sensitive contains fname shouldBe false
+      }
+    }
+
+    {
+      val prevLoggingLevels = getLoggingLevels
+      loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
+      val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+      val model: SmartTextVectorizerModel[Text] = newEstimator
+        .fit(newInputData)
+        .asInstanceOf[SmartTextVectorizerModel[Text]]
+      val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+      newInputData.columns foreach { fname: String =>
+        sensitive contains fname shouldBe true
+        sensitive get fname match {
+          case Some(Seq(SensitiveNameInformation(_, _, _, _, _, name, _, actionTaken))) =>
+            if (name == newF3.name) {
+              actionTaken shouldBe true
+            } else {
+              actionTaken shouldBe false
+            }
+          case None => fail("Sensitive information not found in the metadata.")
+          case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+        }
+      }
+      loggingLevels(prevLoggingLevels) // Reset logging levels
+    }
+  }
 }

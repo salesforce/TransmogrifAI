@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempDirectoryTest with TestCommon {
   val log = LoggerFactory.getLogger(this.getClass)
-  val numRecords = 100
+  val numRecords = 500
 
   // First set up the raw features
   val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.2).take(numRecords).toList
@@ -123,7 +123,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     }
     log.info(s"Scored ${expectedScores.length * numOfRuns} records in ${elapsed}ms")
     log.info(s"Average time per record: ${elapsed.toDouble / (expectedScores.length * numOfRuns)}ms")
-    elapsed should be <= 10000L
+    elapsed should be <= 35000L
   }
 
   it should "produce scores without Spark for all feature types" in {
@@ -184,7 +184,7 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
       val scoresFound = score(prediction.name).asInstanceOf[Map[String, Double]]
       val scoresExp = expected(prediction.name).asInstanceOf[Map[String, Double]]
       val keys = scoresExp.keySet.union(scoresFound.keySet)
-      keys.foreach( k => math.abs(scoresFound(k) - scoresExp(k)) < 0.01 shouldBe true )
+      keys.foreach(k => compareWithTol(scoresFound(k), scoresExp(k), 1e-1))
       score.filterNot(_._1 == prediction.name) shouldEqual expected.filterNot(_._1 == prediction.name)
     }
   }
