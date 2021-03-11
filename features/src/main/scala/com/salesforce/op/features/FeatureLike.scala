@@ -441,7 +441,8 @@ trait FeatureLike[O <: FeatureType] {
     var stack = List.empty[(Int, OPFeature)]
     stack = (0, this) :: stack
     while (stack.nonEmpty) {
-      val (indentLevel: Int, elem: OPFeature) :: stack = stack
+      val (indentLevel, elem) = stack.head
+      stack = stack.tail
       if (elem.originStage != null) {
         sb.append(s"${"|    " * indentLevel}+-- ${elem.originStage.operationName}\n")
         elem.parents.map(e => (indentLevel + 1, e)).reverse ++: stack
