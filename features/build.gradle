@@ -19,8 +19,9 @@ dependencies {
     compile "org.json4s:json4s-ext_%%:$json4sVersion"
 
     // MLeap serialization & runtime for Spark models
-    compile "ml.combust.mleap:mleap-spark_%%:$mleapVersion"
-    compile "ml.combust.mleap:mleap-runtime_%%:$mleapVersion"
-    compile "ml.combust.mleap:mleap-xgboost-spark_%%:$mleapVersion"
-    compile "ml.combust.mleap:mleap-xgboost-runtime_%%:$mleapVersion"
+    // TODO: upgrade 2.11 to %% when 0.17 is out
+    compile "ml.combust.mleap:mleap-spark_2.11:$mleapVersion"
+    compile "ml.combust.mleap:mleap-runtime_2.11:$mleapVersion"
+    compile "ml.combust.mleap:mleap-xgboost-spark_2.11:$mleapVersion"
+    compile "ml.combust.mleap:mleap-xgboost-runtime_2.11:$mleapVersion"
 }
