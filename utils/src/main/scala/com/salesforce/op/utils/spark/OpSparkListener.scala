@@ -30,9 +30,10 @@
 
 package com.salesforce.op.utils.spark
 
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.databind.SerializerProvider
+import com.fasterxml.jackson.core.{JsonGenerator, JsonParser}
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
+import com.fasterxml.jackson.databind.{DeserializationContext, SerializerProvider}
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.salesforce.op.utils.version.VersionInfo
@@ -161,7 +162,9 @@ trait MetricJsonLike extends JsonLike {
           gen.writeNumber(value.get)
         }
       },
-      null // not necessary
+      new StdDeserializer[Max[Long]](classOf[Max[Long]]) {
+        override def deserialize(p: JsonParser, ctxt: DeserializationContext): Max[Long] = Max(p.getLongValue)
+      }
     )))
   }
 }
