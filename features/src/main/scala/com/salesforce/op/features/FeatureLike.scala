@@ -438,13 +438,13 @@ trait FeatureLike[O <: FeatureType] {
    */
   final def prettyParentStages: String = {
     val sb = new StringBuilder
-    val stack = new scala.collection.mutable.Stack[(Int, OPFeature)]
-    stack.push((0, this))
+    var stack = List.empty[(Int, OPFeature)]
+    stack = (0, this) :: stack
     while (stack.nonEmpty) {
-      val (indentLevel, elem) = stack.pop()
+      val (indentLevel: Int, elem: OPFeature) :: stack = stack
       if (elem.originStage != null) {
         sb.append(s"${"|    " * indentLevel}+-- ${elem.originStage.operationName}\n")
-        elem.parents.foreach(e => stack.push((indentLevel + 1, e)))
+        elem.parents.map(e => (indentLevel + 1, e)).reverse ++: stack
       }
     }
     sb.mkString
