@@ -35,9 +35,9 @@ mainClassName = "please.set.main.class.in.build.gradle"
 
 ext {
     junitVersion = '4.12'
-    sparkVersion = '2.4.5'
+    sparkVersion = '3.1.1'
     scalatestVersion = '3.0.0'
-    transmogrifaiVersion ='0.7.0'
+    transmogrifaiVersion ='0.8.0'
     collectionsVersion = '3.2.2'
     scoveragePluginVersion = '1.3.1'
 }
