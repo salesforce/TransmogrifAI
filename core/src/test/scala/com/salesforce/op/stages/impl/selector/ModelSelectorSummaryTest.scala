@@ -139,10 +139,13 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
     )
 
     val evalMetricsJson = evalMetrics.toJson()
-    println(1)
     val roundTripEvalMetrics = ModelSelectorSummary.evalMetFromJson(
       classOf[MultiClassificationMetrics].getName, evalMetricsJson).get
     roundTripEvalMetrics shouldBe evalMetrics
+
+    val confMatrixMetrics = roundTripEvalMetrics.asInstanceOf[MultiClassificationMetrics].ConfusionMatrixMetrics
+    confMatrixMetrics.ConfMatrices(0).Threshold shouldEqual 0.1
+    confMatrixMetrics.ConfMatrices(0).ConfusionMatrixCounts shouldEqual Seq(1L)
 
     val corruptJson = evalMetricsJson.replace(":", "=")
     val thr = intercept[IllegalArgumentException](ModelSelectorSummary.evalMetFromJson(
