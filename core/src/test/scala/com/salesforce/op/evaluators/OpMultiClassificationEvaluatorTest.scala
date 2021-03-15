@@ -418,15 +418,17 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     outputMetrics.ConfMatrixThresholds shouldEqual testThresholds
     outputMetrics.ConfMatrices.length shouldEqual testThresholds.length
     // topK confusion matrix for p >= 0.4
-    outputMetrics.ConfMatrices(0) shouldEqual
+    outputMetrics.ConfMatrices(0).ConfusionMatrixCounts shouldEqual
     Seq(
       6L, 6L,
       4L, 4L)
+    outputMetrics.ConfMatrices(0).Threshold shouldEqual 0.4
     // topK confusion matrix for p >= 0.7
-    outputMetrics.ConfMatrices(1).toArray shouldEqual
+    outputMetrics.ConfMatrices(1).ConfusionMatrixCounts.toArray shouldEqual
     Seq(
       3L, 3L,
       2L, 2L)
+    outputMetrics.ConfMatrices(1).Threshold shouldEqual 0.7
   }
 
   it should "calculate mis-classifications correctly" in {
