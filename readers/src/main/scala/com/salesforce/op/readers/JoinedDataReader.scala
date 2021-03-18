@@ -346,6 +346,8 @@ private[op] class JoinedAggregateDataReader[T, U]
 }
 
 
+// TODO: UserDefinedAggregateFunction is now deprecated in favor of Aggregator,
+//  but that operates on Rows, not Columns. How would we redo this?
 /**
  * Aggregator base for dataframe to use in JoinedAggregateDataReader
  *
