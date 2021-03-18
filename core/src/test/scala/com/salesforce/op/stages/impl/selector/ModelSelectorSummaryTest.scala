@@ -97,7 +97,8 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
           correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
           noPredictionCounts = Map(3 -> Seq(300L))),
         TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty),
-        ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold(1, Seq(1.0), Seq(0.0, 0.5), Seq(Seq(1L))),
+        ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold(1, Seq(1.0),
+          Seq(0.0, 0.5), Seq(ConfusionMatrixPerThreshold(Threshold = 0.0, ConfusionMatrixCounts = Seq(1L)))),
         MisClassificationMetrics = MisClassificationMetrics(1, Seq.empty,
           Seq(MisClassificationsPerCategory(TotalCount = 5L, CorrectCount = 3L, Category = 1.0,
             MisClassifications = Seq(ClassCount(1.0, 2L)))))),
@@ -130,17 +131,21 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
         correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
         noPredictionCounts = Map(3 -> Seq(300L))),
       TopKMetrics = MultiClassificationMetricsTopK(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty),
-      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold( 2, Seq(0.1), Seq(0.1), Seq(Seq(1L))),
+      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold( 2, Seq(0.1), Seq(0.1),
+        Seq(ConfusionMatrixPerThreshold(Threshold = 0.1, ConfusionMatrixCounts = Seq(1L)))),
       MisClassificationMetrics = MisClassificationMetrics(1,
          Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Seq(ClassCount(1.0, 3L)))),
          Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Seq(ClassCount(1.0, 3L)))))
     )
 
     val evalMetricsJson = evalMetrics.toJson()
-    println(1)
     val roundTripEvalMetrics = ModelSelectorSummary.evalMetFromJson(
       classOf[MultiClassificationMetrics].getName, evalMetricsJson).get
     roundTripEvalMetrics shouldBe evalMetrics
+
+    val confMatrixMetrics = roundTripEvalMetrics.asInstanceOf[MultiClassificationMetrics].ConfusionMatrixMetrics
+    confMatrixMetrics.ConfMatrices(0).Threshold shouldEqual 0.1
+    confMatrixMetrics.ConfMatrices(0).ConfusionMatrixCounts shouldEqual Seq(1L)
 
     val corruptJson = evalMetricsJson.replace(":", "=")
     val thr = intercept[IllegalArgumentException](ModelSelectorSummary.evalMetFromJson(

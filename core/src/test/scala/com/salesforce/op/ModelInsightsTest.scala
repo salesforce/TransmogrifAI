@@ -417,7 +417,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
         noPredictionCounts = Map(3 -> Seq(300L))),
       TopKMetrics = MultiClassificationMetricsTopK(Seq(1), Seq(0.1), Seq(0.1), Seq(0.1), Seq(0.1)),
-      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold( 2, Seq(0.1), Seq(0.1), Seq(Seq(1L))),
+      ConfusionMatrixMetrics = MulticlassConfMatrixMetricsByThreshold( 2, Seq(0.1),
+        Seq(0.1), Seq(ConfusionMatrixPerThreshold(Threshold = 0.1, ConfusionMatrixCounts = Seq(1L)))),
       MisClassificationMetrics = MisClassificationMetrics(1, Seq.empty,
         Seq(MisClassificationsPerCategory(0.0, 5L, 5L, Seq(ClassCount(1.0, 3L)))))
     )
