@@ -64,16 +64,10 @@ trait DataReader[T] extends Reader[T] with ReaderKey[T] {
   def readPath: Option[String]
 
   /**
-   * All the reader's sub readers (used in joins)
-   * @return sub readers
-   */
-  final def subReaders: Seq[DataReader[_]] = Seq(this)
-
-  /**
    * Function which reads raw data from specified location to use in Dataframe creation, i.e. [[generateDataFrame]] fun.
    * This function returns either RDD or Dataset of the type specified by this reader.
    * It can be overwritten to carry out any special logic required for the reader
-   * (ie filters or joins needed to produce the specified reader type).
+   * (ie filters needed to produce the specified reader type).
    *
    * @param params parameters used to carry out specialized logic in reader (passed in from workflow)
    * @param spark  spark instance to do the reading and conversion from RDD to Dataframe
