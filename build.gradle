@@ -149,6 +149,7 @@ configure(allProjs) {
                 "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
         ]
     }
+    compileScala.scalaCompileOptions.additionalParameters += ["-opt:l:inline", "-opt-inline-from:**"]
     [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
 
     jar {
