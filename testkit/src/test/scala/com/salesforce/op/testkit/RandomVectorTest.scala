@@ -128,7 +128,7 @@ class RandomVectorTest extends FlatSpec with TestCommon {
 
     sut reset 42
     val vectors = sut limit numTries map (v => v.value)
-    val actualSum = (Vectors.zeros(4) /: vectors)(plus)
+    val actualSum = vectors.foldLeft(Vectors.zeros(4))(plus)
 
     val diff = minus(actualSum, expected)
 
