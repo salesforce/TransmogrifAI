@@ -148,7 +148,9 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
         new RealisticEvaluationFixture {
 
           it("should handle the edge case where the data set is empty") {
-            val bins = Array(Double.NegativeInfinity) ++ (-1.0 to 1.0 by 0.1) ++ Array(Double.PositiveInfinity)
+            val bins = Array(Double.NegativeInfinity) ++
+              Range.BigDecimal(-1.0, 1.0, 0.1).map(_.doubleValue) ++
+              Array(Double.PositiveInfinity)
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(spark.emptyDataset[EvalRow])
@@ -162,7 +164,9 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
           }
 
           it("should return the bins as set") {
-            val bins = Array(Double.NegativeInfinity) ++ (-1.0 to 1.0 by 0.1) ++ Array(Double.PositiveInfinity)
+            val bins = Array(Double.NegativeInfinity) ++
+              Range.BigDecimal(-1.0, 1.0, 0.1).map(_.doubleValue) ++
+              Array(Double.PositiveInfinity)
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(dataset)
@@ -170,7 +174,9 @@ class OpRegressionEvaluatorTest extends FunSpec with AppendedClues with TestSpar
           }
 
           it("should result in N-1 counts for N bins") {
-            val bins = Array(Double.NegativeInfinity) ++ (-1.0 to 1.0 by 0.1) ++ Array(Double.PositiveInfinity)
+            val bins = Array(Double.NegativeInfinity) ++
+              Range.BigDecimal(-1.0, 1.0, 0.1).map(_.doubleValue) ++
+              Array(Double.PositiveInfinity)
             val metrics = newEvaluator()
               .setPercentageErrorHistogramBins(bins)
               .evaluateAll(dataset)
