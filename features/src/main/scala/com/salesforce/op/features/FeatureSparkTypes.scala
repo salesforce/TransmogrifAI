@@ -36,8 +36,8 @@ import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataType._
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.{column, udf}
+import org.apache.spark.sql.expressions._
+import org.apache.spark.sql.functions.column
 import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.sql.{Column, Encoder, Row, TypedColumn}
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -263,7 +263,11 @@ case object FeatureSparkTypes {
    */
   def udf1[I <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: I => O
-  ): UserDefinedFunction = udf(transform1[I, O](f))
+  ): UserDefinedFunction = {
+    val outputType = FeatureSparkTypes.sparkTypeOf[O]
+    val func = transform1[I, O](f)
+    SparkUDFFactory.create(func, outputType)
+  }
 
   /**
    * Creates a transform function suitable for Spark types with given function I => O
@@ -295,7 +299,11 @@ case object FeatureSparkTypes {
    */
   def udf2[I1 <: FeatureType : TypeTag, I2 <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: (I1, I2) => O
-  ): UserDefinedFunction = udf(transform2[I1, I2, O](f))
+  ): UserDefinedFunction = {
+    val outputType = FeatureSparkTypes.sparkTypeOf[O]
+    val func = transform2[I1, I2, O](f)
+    SparkUDFFactory.create(func, outputType)
+  }
 
   /**
    * Creates a transform function suitable for Spark types with given function (I1, I2) => O
@@ -332,7 +340,11 @@ case object FeatureSparkTypes {
   def udf3[I1 <: FeatureType : TypeTag, I2 <: FeatureType : TypeTag, I3 <: FeatureType : TypeTag,
   O <: FeatureType : TypeTag](
     f: (I1, I2, I3) => O
-  ): UserDefinedFunction = udf(transform3[I1, I2, I3, O](f))
+  ): UserDefinedFunction = {
+    val outputType = FeatureSparkTypes.sparkTypeOf[O]
+    val func = transform3[I1, I2, I3, O](f)
+    SparkUDFFactory.create(func, outputType)
+  }
 
   /**
    * Creates a transform function suitable for Spark types with given function (I1, I2, I3) => O
@@ -374,7 +386,11 @@ case object FeatureSparkTypes {
   def udf4[I1 <: FeatureType : TypeTag, I2 <: FeatureType : TypeTag, I3 <: FeatureType : TypeTag,
   I4 <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: (I1, I2, I3, I4) => O
-  ): UserDefinedFunction = udf(transform4[I1, I2, I3, I4, O](f))
+  ): UserDefinedFunction = {
+    val outputType = FeatureSparkTypes.sparkTypeOf[O]
+    val func = transform4[I1, I2, I3, I4, O](f)
+    SparkUDFFactory.create(func, outputType)
+  }
 
   /**
    * Creates a transform function suitable for Spark types with given function (I1, I2, I3, I4) => O
@@ -416,9 +432,10 @@ case object FeatureSparkTypes {
   def udfN[I <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: Seq[I] => O
   ): UserDefinedFunction = {
+    val outputType = FeatureSparkTypes.sparkTypeOf[O]
     // Converters MUST be defined outside the result function since they involve reflection calls
     val convert = FeatureTypeSparkConverter[I]()
-    udf((r: Row) => {
+    val func = (r: Row) => {
       val arr = new ArrayBuffer[I](r.length)
       var i = 0
       while (i < r.length) {
@@ -426,7 +443,8 @@ case object FeatureSparkTypes {
         i += 1
       }
       FeatureTypeSparkConverter.toSpark(f(arr))
-    })
+    }
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
@@ -466,10 +484,11 @@ case object FeatureSparkTypes {
   (
     f: (I1, Seq[I2]) => O
   ): UserDefinedFunction = {
+    val outputType = FeatureSparkTypes.sparkTypeOf[O]
     // Converters MUST be defined outside the result function since they involve reflection calls
     val convertI1 = FeatureTypeSparkConverter[I1]()
     val convertI2 = FeatureTypeSparkConverter[I2]()
-    udf((r: Row) => {
+    val func = (r: Row) => {
       val arr = new ArrayBuffer[I2](r.length - 1)
       val i1: I1 = convertI1.fromSpark(r.get(0))
       var i = 1
@@ -478,7 +497,8 @@ case object FeatureSparkTypes {
         i += 1
       }
       FeatureTypeSparkConverter.toSpark(f(i1, arr))
-    })
+    }
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
