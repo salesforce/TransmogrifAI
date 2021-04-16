@@ -445,7 +445,7 @@ trait FeatureLike[O <: FeatureType] {
       stack = stack.tail
       if (elem.originStage != null) {
         sb.append(s"${"|    " * indentLevel}+-- ${elem.originStage.operationName}\n")
-        elem.parents.map(e => (indentLevel + 1, e)).reverse ++: stack
+        stack = elem.parents.map(e => (indentLevel + 1, e)).reverse ++: stack
       }
     }
     sb.mkString
