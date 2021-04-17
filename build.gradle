@@ -68,7 +68,7 @@ configure(allProjs) {
         jodaTimeVersion = '2.9.4'
         jodaConvertVersion = '1.8.1'
         algebirdVersion = '0.13.4'
-        jacksonVersion = '2.10.0'
+        jacksonVersion = '2.12.2'
         luceneVersion = '7.3.0'
         enumeratumVersion = '1.4.18'
         scoptVersion = '3.5.0'
