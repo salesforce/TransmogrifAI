@@ -7,6 +7,9 @@ machine-config: &machine-config
     TERM: dumb
     GRADLE_OPTS: -Xmx256m
 
+orbs:
+  codecov: codecov/codecov@4.6.0
+
 shared-steps:
   open-jdk: &open-jdk
     run:
@@ -84,9 +87,8 @@ jobs:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-      - run:
-          name: Report scoverage resuts to Codecov
-          command: bash <(curl -s https://codecov.io/bash)
+      - codecov/upload:
+          upload_name: Report scoverage resuts to Codecov
 
 workflows:
   version: 2
