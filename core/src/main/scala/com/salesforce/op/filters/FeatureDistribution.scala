@@ -180,8 +180,8 @@ case class FeatureDistribution
     case _ => false
   }
 
-  override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution,
-    summaryInfo, moments, cardEstimate, `type`)
+  override def hashCode(): Int = Objects.hashCode((name, key, count, nulls, distribution.deep,
+    summaryInfo.deep, moments, cardEstimate, `type`))
 }
 
 object FeatureDistribution {

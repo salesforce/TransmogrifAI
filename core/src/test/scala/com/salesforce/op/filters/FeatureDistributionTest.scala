@@ -192,7 +192,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
     fd1.hashCode() shouldBe fd1.hashCode()
     fd1.hashCode() shouldBe fd1.copy(summaryInfo = fd1.summaryInfo).hashCode()
-    fd1.hashCode() should not be fd1.copy(summaryInfo = Array.empty).hashCode()
+    fd1.hashCode() shouldBe fd1.copy(summaryInfo = Array.empty).hashCode()
     fd1.hashCode() should not be fd2.hashCode()
   }
 
