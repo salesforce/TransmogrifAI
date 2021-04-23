@@ -86,7 +86,7 @@ jobs:
           path: ~/junit/
       - run:
           name: Report scoverage resuts to Codecov
-          command: bash <(curl -s https://codecov.io/bash)
+          command: bash codecov.sh
 
 workflows:
   version: 2
