@@ -31,7 +31,6 @@
 package com.salesforce.op.filters
 
 import java.util.Objects
-
 import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
@@ -192,13 +191,16 @@ object FeatureDistribution {
     override def plus(l: FeatureDistribution, r: FeatureDistribution): FeatureDistribution = l.reduce(r)
   }
 
-  val FeatureDistributionSerializer = FieldSerializer[FeatureDistribution](
+  val serializers = List(
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType),
+    new MomentsSerializer
+  )
+
+  val fieldSerializer = FieldSerializer[FeatureDistribution](
     FieldSerializer.ignore("cardEstimate")
   )
 
-  implicit val formats: Formats = DefaultFormats +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
-    FeatureDistributionSerializer
+  implicit val formats: Formats = DefaultFormats + fieldSerializer ++ serializers
 
   /**
    * Feature distributions to json
