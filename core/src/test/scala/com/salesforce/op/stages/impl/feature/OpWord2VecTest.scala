@@ -55,8 +55,8 @@ class OpWord2VecTest extends FlatSpec with TestSparkContext {
   lazy val (testData, _) = TestFeatureBuilder(data.tail)
 
   lazy val expected = data.tail.zip(Seq(
-    Vectors.dense(-0.029884086549282075, -0.055613189935684204, 0.04186216294765473).toOPVector,
-    Vectors.dense(-0.0026281912411962234, -0.016138136386871338, 0.010740748473576136).toOPVector,
+    Vectors.dense(-0.024136673845350745, -0.009191020298749209, -0.026630465127527717).toOPVector,
+    Vectors.dense(-0.001795683189162186, -0.006721755755799157, 0.0017270694619842936).toOPVector,
     Vectors.dense(0.0, 0.0, 0.0).toOPVector
   )).toArray
 
@@ -64,7 +64,9 @@ class OpWord2VecTest extends FlatSpec with TestSparkContext {
     val f1Vec = new OpWord2Vec().setInput(f1).setMinCount(0).setVectorSize(3).setSeed(1234567890L)
     val output = f1Vec.getOutput()
     val testTransformedData = f1Vec.fit(inputData).transform(testData)
-    testTransformedData.orderBy(f1.name).collect(f1, output) shouldBe expected
+    val result = testTransformedData.orderBy(f1.name).collect(f1, output)
+    result.foreach(println(_))
+    result shouldBe expected
   }
 
   it should "convert array of strings into a vector (shortcut version)" in {
