@@ -71,7 +71,7 @@ trait TestSparkContext extends TempDirectoryTest with TestCommon {
     try {
       deleteRecursively(new File(checkpointDir))
       SparkSession.clearActiveSession()
-      spark.stop()
+      spark.catalog.clearCache()
     } finally {
       super[TempDirectoryTest].afterAll()
     }
