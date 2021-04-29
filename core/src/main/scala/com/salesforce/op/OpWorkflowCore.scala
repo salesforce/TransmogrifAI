@@ -149,7 +149,7 @@ private[op] trait OpWorkflowCore {
       def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[T], Dataset[T]] = Right(ds)
     }
     reader = Option(newReader)
-    checkUnmatchedFeatures()
+    // checkUnmatchedFeatures()
     this
   }
 
