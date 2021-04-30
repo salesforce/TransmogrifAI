@@ -252,18 +252,18 @@ private[op] trait OpWorkflowCore {
    * Determine if any of the raw features do not have a matching reader
    */
   protected def checkUnmatchedFeatures(): Unit = {
-    if (rawFeatures.nonEmpty && reader.nonEmpty) {
-      val readerInputTypes = reader.get.subReaders.map(_.fullTypeName).toSet
-      val unmatchedFeatures = rawFeatures.filterNot(f =>
-        readerInputTypes
-          .contains(f.originStage.asInstanceOf[FeatureGeneratorStage[_, _ <: FeatureType]].tti.tpe.toString)
-      )
-      require(
-        unmatchedFeatures.isEmpty,
-        s"No matching data readers for ${unmatchedFeatures.length} input features:" +
-          s" ${unmatchedFeatures.mkString(",")}. Readers had types: ${readerInputTypes.mkString(",")}"
-      )
-    }
+//    if (rawFeatures.nonEmpty && reader.nonEmpty) {
+//      val readerInputTypes = reader.get.subReaders.map(_.fullTypeName).toSet
+//      val unmatchedFeatures = rawFeatures.filterNot(f =>
+//        readerInputTypes
+//          .contains(f.originStage.asInstanceOf[FeatureGeneratorStage[_, _ <: FeatureType]].tti.tpe.toString)
+//      )
+//      require(
+//        unmatchedFeatures.isEmpty,
+//        s"No matching data readers for ${unmatchedFeatures.length} input features:" +
+//          s" ${unmatchedFeatures.mkString(",")}. Readers had types: ${readerInputTypes.mkString(",")}"
+//      )
+//    }
   }
 
   /**
