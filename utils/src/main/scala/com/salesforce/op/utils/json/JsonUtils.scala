@@ -134,6 +134,7 @@ object JsonUtils {
       .configure(JsonParser.Feature.ALLOW_COMMENTS, true)
       .configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true)
       .configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
+      .registerModule(DefaultScalaModule)
   }
 
   private def yamlMapper(serdes: Seq[SerDes[_]]): ObjectMapper = configureMapper(serdes) {
