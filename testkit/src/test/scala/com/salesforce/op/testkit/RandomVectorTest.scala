@@ -80,10 +80,10 @@ class RandomVectorTest extends FlatSpec with TestCommon {
     }
 
     check(sut, predicate = _ => true, expected = List(
-      List(2.2996685228637697, 4.020626621218229),
-      List(7.0239295306677665, 4.64383918464643),
-      List(2.2776269335796417, 2.506848417731993),
-      List(-0.746412841570697, 3.813613151074187)
+      List(7.148909873560239, 2.591123571033081),
+      List(6.58988088726891, 2.497262752245047),
+      List(1.6728855749023959, 3.162502507068895),
+      List(3.196454645177923, 2.8954408970124463)
     ) )
   }
   it should "Give ones and zeroes with given probability" in {
