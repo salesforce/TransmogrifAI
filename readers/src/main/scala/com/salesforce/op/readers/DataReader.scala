@@ -178,16 +178,16 @@ trait DataReader[T] extends Reader[T] with ReaderKey[T] {
         spark.createDataFrame(d, schema)
       case Right(ds) =>
         val inputSchema = ds.schema.fields
-         if (schema.forall(fn => inputSchema.exists( // check if features to be extracted already exist in dataframe
-           fi => fn.name == fi.name && fn.dataType == fi.dataType && fn.nullable == fi.nullable)
-         )) {
-           val names = schema.fields.map(_.name).toSeq
-           ds.select(names.head, names.tail: _*)
-         } else {
-           implicit val rowEnc = RowEncoder(schema)
-           val df = ds.flatMap(record => generateRow(key(record), record, rawFeatures, schema))
-           spark.createDataFrame(df.rdd, schema) // because the spark row encoder does not preserve metadata
-         }
+        if (schema.forall(fn => inputSchema.exists( // check if features to be extracted already exist in dataframe
+          fi => fn.name == fi.name && fn.dataType == fi.dataType && fn.nullable == fi.nullable)
+        )) {
+          val names = schema.fields.map(_.name).toSeq
+          ds.select(names.head, names.tail: _*)
+        } else {
+          implicit val rowEnc = RowEncoder(schema)
+          val df = ds.flatMap(record => generateRow(key(record), record, rawFeatures, schema))
+          spark.createDataFrame(df.rdd, schema) // because the spark row encoder does not preserve metadata
+        }
     }
   }
 
