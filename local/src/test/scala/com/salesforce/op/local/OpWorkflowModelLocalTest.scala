@@ -161,8 +161,14 @@ class OpWorkflowModelLocalTest extends FlatSpec with TestSparkContext with TempD
     val rawData = ds.withColumn(KeyFieldName, col(id)).sort(KeyFieldName).collect().map(_.toMap)
     val scores = rawData.map(scoreFn)
     scores.length shouldBe expectedScores.length
-    for {((score, expected), i) <- scores.zip(expectedScores).zipWithIndex} withClue(s"Record index $i: ") {
-      score shouldBe expected
+    for {
+      ((score, expected), i) <- scores.zip(expectedScores).zipWithIndex
+      ((_, scoreMap), (_, expectedMap)) <- score.zip(expected)
+      ((_, scoreValue), (_, expectedValue)) <- scoreMap.asInstanceOf[Map[String, Double]]
+        .zip(expectedMap.asInstanceOf[Map[String, Double]])
+    } withClue(s"Record index $i: ") {
+      // There is a small loss of numerical precision since upgrading to Spark 3.11/scala 2.12
+      scoreValue shouldBe expectedValue +- 1e-15
     }
   }
 
