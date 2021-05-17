@@ -58,9 +58,7 @@ class DropIndicesByTransformer
     case _ =>
   }
 
-  @transient private lazy val gottenInputSchema = getInputSchema()
-
-  @transient private lazy val vectorMetadata = OpVectorMetadata(gottenInputSchema(in1.name))
+  @transient private lazy val vectorMetadata = OpVectorMetadata(getInputSchema()(in1.name))
   @transient private lazy val columnMetadataToKeep = vectorMetadata.columns.collect { case cm if !matchFn(cm) => cm }
   @transient private lazy val indicesToKeep = columnMetadataToKeep.map(_.index)
 
