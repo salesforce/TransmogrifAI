@@ -72,11 +72,11 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   it should "write params map" in {
     val params = extractParams(stageJson).extract[Map[String, Any]]
     if (hasOutputName) {
-      params should have size 4
-      params.keys shouldBe Set("inputFeatures", "outputMetadata", "inputSchema", "outputFeatureName")
+      params should have size 5
+      params.keys shouldBe Set("inputFeatures", "columnMetadata", "outputMetadata", "inputSchema", "outputFeatureName")
     } else {
-      params should have size 3
-      params.keys shouldBe Set("inputFeatures", "outputMetadata", "inputSchema")
+      params should have size 4
+      params.keys shouldBe Set("inputFeatures", "columnMetadata", "outputMetadata", "inputSchema")
     }
   }
   it should "write outputMetadata" in {

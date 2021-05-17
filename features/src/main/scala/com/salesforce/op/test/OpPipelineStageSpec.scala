@@ -156,7 +156,8 @@ trait OpPipelineStageAsserts extends AppendedClues {
         case (sf, ef) =>
           sf.name shouldBe ef.name
           sf.dataType shouldBe ef.dataType
-          sf.metadata.deepEquals(ef.metadata) shouldBe true
+          // Should not rely on InputSchema anymore to pass around metadata
+          // sf.metadata.deepEquals(ef.metadata) shouldBe true
           sf.nullable shouldBe ef.nullable
       }
     }

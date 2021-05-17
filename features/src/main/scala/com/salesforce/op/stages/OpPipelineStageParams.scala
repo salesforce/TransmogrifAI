@@ -32,6 +32,7 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.features._
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.ColumnMetadata._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.{Metadata, StructType}
 
@@ -171,6 +172,19 @@ trait OpPipelineStageParams extends InputParams {
    */
   protected def onGetMetadata(): Unit = {}
 
+  final private[op] val columnMetadata = new ColumnMetadataParam(
+    parent = this, name = OpPipelineStageParamsNames.ColumnMetadata,
+    doc = "the column metadata from the input dataframe"
+  )
+
+  setDefault(columnMetadata, ColumnMetadata.empty)
+
+  final private[op] def setColumnMetadata(value: Metadata): this.type = {
+    set(columnMetadata, value)
+  }
+
+  final def getColumnMetadata(): Metadata = $(columnMetadata)
+
   /**
    * Note this should be removed as a param and changed to a var if move stage reader and writer into op
    * and out of ml. Is currently a param to prevent having the setter method be public.
@@ -186,14 +200,16 @@ trait OpPipelineStageParams extends InputParams {
     val featureNames = getInputFeatures().map(_.name)
     val specificSchema = StructType(featureNames.map(s(_)))
     set(inputSchema, specificSchema)
+    setColumnMetadata(ColumnMetadata.fromSchema(specificSchema))
   }
 
-  final def getInputSchema(): StructType = $(inputSchema)
+  final def getInputSchema(): StructType = $(inputSchema).insertColumnMetadata($(columnMetadata))
 
 }
 
 object OpPipelineStageParamsNames {
   val OutputMetadata: String = "outputMetadata"
+  val ColumnMetadata: String = "columnMetadata"
   val InputSchema: String = "inputSchema"
   val InputFeatures: String = "inputFeatures"
 }

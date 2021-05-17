@@ -99,6 +99,7 @@ abstract class BinaryEstimator[I1 <: FeatureType, I2 <: FeatureType, O <: Featur
   override def fit(dataset: Dataset[_]): BinaryModel[I1, I2, O] = {
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
+
     val df = dataset.select(in1.name, in2.name)
     val ds = df.map(r =>
       (convertI1.fromSpark(r.get(0)).value,
