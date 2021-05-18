@@ -66,5 +66,4 @@ object Lambdas {
     def apply(x: Real, y: Real, t: Text, z: Real): Real =
       (for {yv <- y.value; xv <- x.value; tv <- t.value; zv <- z.value} yield xv * yv + zv * tv.length).toReal
   }
-
 }

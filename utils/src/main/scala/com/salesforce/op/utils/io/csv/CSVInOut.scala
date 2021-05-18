@@ -88,9 +88,9 @@ case class CSVOptions
 ) {
 
   /**
-   * Create a Map matching [[org.apache.spark.sql.execution.datasources.csv.CSVOptions]] structure
+   * Create a Map matching [[org.apache.spark.sql.catalyst.csv.CSVOptions]] structure
    *
-   * @return Map matching [[org.apache.spark.sql.execution.datasources.csv.CSVOptions]] structure
+   * @return Map matching [[org.apache.spark.sql.catalyst.csv.CSVOptions]] structure
    */
   def toSparkCSVOptionsMap: Map[String, String] = Map(
     "sep" -> separator,

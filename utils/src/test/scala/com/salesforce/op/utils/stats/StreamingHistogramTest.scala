@@ -30,8 +30,9 @@
 
 package com.salesforce.op.utils.stats
 
-import breeze.stats.{meanAndVariance, MeanAndVariance}
 import breeze.stats.distributions._
+import breeze.stats.meanAndVariance
+import breeze.stats.meanAndVariance.MeanAndVariance
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.stats.RichStreamingHistogram._
 import com.salesforce.op.utils.stats.StreamingHistogram.StreamingHistogramBuilder

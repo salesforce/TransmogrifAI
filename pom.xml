@@ -16,7 +16,7 @@
 
     <groupId>com.salesforce.transmogrifai</groupId>
     <artifactId>TransmogrifAI</artifactId>
-    <version>0.7.0</version>
+    <version>0.8.0</version>
     <name>TransmogrifAI</name>
     <description>AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning</description>
     <url>https://github.com/salesforce/TransmogrifAI</url>
@@ -48,7 +48,7 @@
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
-            <version>2.11.12</version>
+            <version>2.12.13</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -101,7 +101,7 @@
         </dependency>
         <dependency>
             <groupId>com.github.scopt</groupId>
-            <artifactId>scopt_2.11</artifactId>
+            <artifactId>scopt_2.12</artifactId>
             <version>3.5.0</version>
             <scope>compile</scope>
         </dependency>
@@ -139,13 +139,13 @@
         </dependency>
         <dependency>
             <groupId>org.scala-graph</groupId>
-            <artifactId>graph-core_2.11</artifactId>
+            <artifactId>graph-core_2.12</artifactId>
             <version>1.12.5</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.lihaoyi</groupId>
-            <artifactId>sourcecode_2.11</artifactId>
+            <artifactId>sourcecode_2.12</artifactId>
             <version>0.1.3</version>
             <scope>compile</scope>
         </dependency>
@@ -163,7 +163,7 @@
         </dependency>
         <dependency>
             <groupId>org.json4s</groupId>
-            <artifactId>json4s-ext_2.11</artifactId>
+            <artifactId>json4s-ext_2.12</artifactId>
             <version>3.5.3</version>
             <scope>compile</scope>
         </dependency>
@@ -181,13 +181,13 @@
         </dependency>
         <dependency>
             <groupId>com.twitter</groupId>
-            <artifactId>algebird-core_2.11</artifactId>
+            <artifactId>algebird-core_2.12</artifactId>
             <version>0.13.4</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.twitter</groupId>
-            <artifactId>chill-avro_2.11</artifactId>
+            <artifactId>chill-avro_2.12</artifactId>
             <version>0.9.3</version>
             <scope>compile</scope>
             <exclusions>
@@ -199,7 +199,7 @@
         </dependency>
         <dependency>
             <groupId>com.twitter</groupId>
-            <artifactId>chill-algebird_2.11</artifactId>
+            <artifactId>chill-algebird_2.12</artifactId>
             <version>0.9.3</version>
             <scope>compile</scope>
         </dependency>
@@ -211,7 +211,7 @@
         </dependency>
         <dependency>
             <groupId>com.beachape</groupId>
-            <artifactId>enumeratum_2.11</artifactId>
+            <artifactId>enumeratum_2.12</artifactId>
             <version>1.4.12</version>
             <scope>compile</scope>
         </dependency>
@@ -229,7 +229,7 @@
         </dependency>
         <dependency>
             <groupId>com.geirsson</groupId>
-            <artifactId>scalafmt-core_2.11</artifactId>
+            <artifactId>scalafmt-core_2.12</artifactId>
             <version>1.5.1</version>
             <scope>compile</scope>
         </dependency>
@@ -241,8 +241,8 @@
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_2.11</artifactId>
-            <version>2.4.5</version>
+            <artifactId>spark-sql_2.12</artifactId>
+            <version>3.1.1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -259,14 +259,14 @@
         </dependency>
         <dependency>
             <groupId>ml.combust.mleap</groupId>
-            <artifactId>mleap-spark_2.11</artifactId>
-            <version>0.14.0</version>
+            <artifactId>mleap-spark_2.12</artifactId>
+            <version>0.17.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>ml.combust.mleap</groupId>
-            <artifactId>mleap-runtime_2.11</artifactId>
-            <version>0.14.0</version>
+            <artifactId>mleap-runtime_2.12</artifactId>
+            <version>0.17.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

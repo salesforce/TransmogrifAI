@@ -35,6 +35,7 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.stages.ColumnMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
@@ -56,7 +57,7 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val inputData = data.withColumn(v.name, col(v.name).as(v.name, meta))
     val stage =
       new DropIndicesByTransformer(new DropIndicesByTransformerTest.MatchFn)
-        .setInput(v).setInputSchema(inputData.schema)
+        .setInput(v).setInputSchema(inputData.schema.insertColumnMetadata(v.name -> meta))
     inputData -> stage
   }
 

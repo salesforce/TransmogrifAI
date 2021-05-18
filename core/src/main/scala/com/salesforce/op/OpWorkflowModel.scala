@@ -94,7 +94,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
     JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       require(reader.nonEmpty, "Data reader must be set")
-      checkReadersAndFeatures()
+      checkFeatures()
       reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
     }
   }

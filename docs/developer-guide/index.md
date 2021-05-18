@@ -629,7 +629,7 @@ val workflow = new OpWorkflow()
    .setInputDataSet[Passenger](passengerDataSet) // passengerDataSet is a DataSet[Passenger] or RDD[Passenger]
 ```
 
-DataReaders are used to load and process data before entry into the workflow, for example aggregation of data or joining of multiple data sources can easily be performed using DataReaders as described in the [DataReaders](#datareaders) section below. If you have a dataset already loaded and simply wish to pass it into the Workflow the `setInputDataSet` and `setInputRdd` methods will create a simple DataReader for you to allow this.
+DataReaders are used to load and process data before entry into the workflow, for example aggregation of data can easily be performed using DataReaders as described in the [DataReaders](#datareaders) section below. If you have a dataset already loaded and simply wish to pass it into the Workflow the `setInputDataSet` and `setInputRdd` methods will create a simple DataReader for you to allow this.
 
 It is important to understand that up until this point nothing has happened. While all the Features, Stages (transformers + estimators), and data source have been defined, none of the actual data associated with the  features has been computed. Computation does not happen and Features are not materialized until the Workflow is fitted.
 
@@ -841,9 +841,9 @@ We provide utility functions to simplify working with Metadata in [RichMetadata]
  
 DataReaders define how data should be loaded into the workflow. They load and process raw data to produce the Dataframe used by the workflow. DataReaders are tied to a specific data source with the type of the raw loaded data (for example the AVRO schema or a case class describing the columns in a CSV).
 
-There are three types of DataReaders. [Simple DataReaders](#datareaders) just load the data and return a DataFrame with one row for each row of data read. [Aggregate DataReaders](#aggregate-data-readers) will group the data by the entity (the thing you are scoring) key and combine values (with or without time filters) based on the aggregation function associated with each feature definition. For example aggregate readers can be used to compute features like total spend from a list of transactions. [Conditional DataReaders](#conditional-data-readers) are like aggregate readers but they allow an dynamic time cuttoff for each row that depends on fullfilment of a user defined condition. For example conditional readers can be used to compute features like total spend before a user becomes a member. These readers can be combined to [join](../examples/Time-Series-Aggregates-and-Joins.html) multiple datasources.
+There are three types of DataReaders. [Simple DataReaders](#datareaders) just load the data and return a DataFrame with one row for each row of data read. [Aggregate DataReaders](#aggregate-data-readers) will group the data by the entity (the thing you are scoring) key and combine values (with or without time filters) based on the aggregation function associated with each feature definition. For example aggregate readers can be used to compute features like total spend from a list of transactions. [Conditional DataReaders](#conditional-data-readers) are like aggregate readers but they allow an dynamic time cuttoff for each row that depends on fullfilment of a user defined condition. For example conditional readers can be used to compute features like total spend before a user becomes a member.
 
-A constructor object provides shortcuts for defining most commonly used data readers. Defiing a data reader requires specifying the type of the data being read and the key for the data (the entity being scored).
+A constructor object provides shortcuts for defining most commonly used data readers. Defining a data reader requires specifying the type of the data being read and the key for the data (the entity being scored).
 
 
 ```scala
@@ -929,33 +929,6 @@ val dataReader = new ConditionalDataReader[Visit](
 ```
 
 Using this reader in a workflow will ensure that for every visitor, we extract features relative to the first time he did a search. The predictor features are aggregated from a 30 day window preceding the search, and the response features are aggregated from a 30 day window succeeding the search. Each individual feature can override this value and be aggregated based on the time span specified in the FeatureBuilder. 
-
-### Joined Data Readers
-
-Sometimes it is necessary to read data from multiple locations and combine it in order to create all the desired features. While you can always apply any data processing logic in the read method of your data reader, the preferred approach for joining data sources is to use a joined data reader:
-
-```scala
-val joinedDataReader = passengerDataReader.leftOuterJoin(shipInfoDataReader)
-```
-
-Joined data readers allow your raw FeatureBuilders to be defined with respect to the simpler base types rather than the complex joint types.
-
-Inner, left outer and full outer joins are supported. Joins will by default use the keys specified in the reader to join the data sources. However, it is possible to specifiy an [alternative key](https://github.com/salesforce/TransmogrifAI/blob/master/readers/src/main/scala/com/salesforce/op/readers/JoinedDataReader.scala#L209) to join on for one of the tables, e.g. if you need to aggregate on a key other than the key you need to join on. Joins are done after feature extraction for each of the datasources.
-
-Sometimes it is important to aggreagte feature information after the join has been performed, e.g. you aggreagte only after an event in the first table has occured. We call this secondary aggreagtion and the most common use cases are supported by joined reasers. If a second aggregation phase is required it can be added using the JoinedReader method: 
-
-```scala
- def withSecondaryAggregation(timeFilter: TimeBasedFilter): JoinedAggregateDataReader[T, U]
-```
-
-
- This will produce a reader that joins the data and then performs an aggregation after the join. The secondary aggregation will use the aggregators defined in the feature builders. The secondary aggreagtion will only occur on the right table unless the join keys are the primary key for both tables. 
-
- The results of a joined reader can be used for futher joins as desired:
-
-```scala
-  reader1.leftJoin(reader2).withSecondayAggreagtion(timeFilter).innerJoin(reader3)
-```
 
 ### Streaming Data Readers
 

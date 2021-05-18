@@ -53,6 +53,7 @@ trait TestSparkContext extends TempDirectoryTest with TestCommon {
       .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getName)
       .set("spark.kryo.registrator", classOf[OpKryoRegistrator].getName)
       .set("spark.ui.enabled", false.toString) // Disables Spark Application UI
+      .set("spark.sql.legacy.parquet.int96RebaseModeInRead", "LEGACY") // See SPARK-31404
     // .set("spark.kryo.registrationRequired", "true") // Enable to debug Kryo
     // .set("spark.kryo.unsafe", "true") // This might improve performance
   }
@@ -71,7 +72,7 @@ trait TestSparkContext extends TempDirectoryTest with TestCommon {
     try {
       deleteRecursively(new File(checkpointDir))
       SparkSession.clearActiveSession()
-      spark.stop()
+      spark.catalog.clearCache()
     } finally {
       super[TempDirectoryTest].afterAll()
     }

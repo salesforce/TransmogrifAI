@@ -116,9 +116,10 @@ private[op] class OpBinaryClassificationEvaluator
       val aUPR = sparkMLMetrics.areaUnderPR()
 
       val confusionMatrixByThreshold = sparkMLMetrics.confusionMatrixByThreshold().collect()
+      // Since we're not using sample weights, we simply cast the counts back to Longs.
       val (copiedTupPos, copiedTupNeg) = confusionMatrixByThreshold.map { case (_, confusionMatrix) =>
-          ((confusionMatrix.numTruePositives, confusionMatrix.numFalsePositives),
-            (confusionMatrix.numTrueNegatives, confusionMatrix.numFalseNegatives))
+          ((confusionMatrix.weightedTruePositives.toLong, confusionMatrix.weightedFalsePositives.toLong),
+            (confusionMatrix.weightedTrueNegatives.toLong, confusionMatrix.weightedFalseNegatives.toLong))
         }.unzip
       val (tpByThreshold, fpByThreshold) = copiedTupPos.unzip
       val (tnByThreshold, fnByThreshold) = copiedTupNeg.unzip

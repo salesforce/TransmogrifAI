@@ -128,7 +128,8 @@ Start by picking TransmogrifAI version to match your project dependencies from t
 
 | TransmogrifAI Version                                 | Spark Version | Scala Version | Java Version |
 |-------------------------------------------------------|:-------------:|:-------------:|:------------:|
-| 0.7.1 (unreleased, master), **0.7.0 (stable)**        |    **2.4**    |    **2.11**   |    **1.8**   |
+| 0.8.0 (unreleased, master)                            |      3.1      |      2.12     |      1.8     |
+| **0.7.1 (stable)**, 0.7.0                             |    **2.4**    |    **2.11**   |    **1.8**   |
 | 0.6.1, 0.6.0, 0.5.3, 0.5.2, 0.5.1, 0.5.0              |      2.3      |      2.11     |      1.8     |
 | 0.4.0, 0.3.4                                          |      2.2      |      2.11     |      1.8     |
 
@@ -140,10 +141,10 @@ repositories {
 }
 dependencies {
     // TransmogrifAI core dependency
-    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.11:0.7.0'
+    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.12:0.8.0'
 
     // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.7.0'
+    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.12:0.8.0'
 }
 ```
 
@@ -154,10 +155,10 @@ scalaVersion := "2.11.12"
 resolvers += Resolver.jcenterRepo
 
 // TransmogrifAI core dependency
-libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.7.0"
+libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.8.0"
 
 // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
-// libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.7.0"
+// libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.8.0"
 ```
 
 Then import TransmogrifAI into your code:

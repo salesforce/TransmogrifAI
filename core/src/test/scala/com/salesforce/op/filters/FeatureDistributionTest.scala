@@ -35,7 +35,7 @@ import com.salesforce.op.stages.impl.feature.TextStats
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.json.EnumEntrySerializer
-import com.twitter.algebird.Moments
+import com.twitter.algebird.{Moments, MomentsSerializer}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
@@ -192,7 +192,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
     fd1.hashCode() shouldBe fd1.hashCode()
     fd1.hashCode() shouldBe fd1.copy(summaryInfo = fd1.summaryInfo).hashCode()
-    fd1.hashCode() should not be fd1.copy(summaryInfo = Array.empty).hashCode()
+    fd1.hashCode() shouldBe fd1.copy(summaryInfo = Array.empty).hashCode()
     fd1.hashCode() should not be fd2.hashCode()
   }
 
@@ -255,8 +255,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     FeatureDistribution.toJson(featureDistributions) shouldNot include (cardEstimate)
 
     // deserialization from json with and without cardEstimate works
-    val jsonWithCardEstimate = Serialization.write(featureDistributions)(DefaultFormats +
-      EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType))
+    val jsonWithCardEstimate = Serialization.write(featureDistributions)(DefaultFormats ++
+      FeatureDistribution.serializers)
     jsonWithCardEstimate should fullyMatch regex Seq(cardEstimate).mkString(".*", ".*", ".*")
     jsonWithCardEstimate shouldNot fullyMatch regex Seq.fill(2)(cardEstimate).mkString(".*", ".*", ".*")
 

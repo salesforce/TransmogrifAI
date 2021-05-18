@@ -400,7 +400,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
 
   private def distance(xs: Array[Double], ys: Array[Double]): Double = {
     val xys = xs zip ys
-    math.sqrt((0.0 /: xys) { case (s, (x, y)) => s + (x - y) * (x - y) })
+    math.sqrt(xys.foldLeft(0.0) { case (s, (x, y)) => s + (x - y) * (x - y) })
   }
 
   private def prettyClose(xs: Array[Double], ys: Array[Double]) =

@@ -53,7 +53,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichStructType._
 ```
 
-## I don't need joins or aggregations in my data preparation why can't I just use Spark to load my data and pass it into a Workflow?
+## I don't need TransmogrifAI's aadvanced reader functionality in my data preparation why can't I just use Spark to load my data and pass it into a Workflow?
 You can! Simply use the `.setInputRDD(myRDD)` or `.setInputDataSet(myDataSet)` methods on Workflow to pass in your data.
 
 ## How do I examine intermediate data when trying to debug my ML workflow?

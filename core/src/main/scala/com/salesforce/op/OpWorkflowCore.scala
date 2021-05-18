@@ -122,7 +122,6 @@ private[op] trait OpWorkflowCore {
    */
   final def setReader(r: Reader[_]): this.type = {
     reader = Option(r)
-    checkUnmatchedFeatures()
     this
   }
 
@@ -149,7 +148,6 @@ private[op] trait OpWorkflowCore {
       def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[T], Dataset[T]] = Right(ds)
     }
     reader = Option(newReader)
-    checkUnmatchedFeatures()
     this
   }
 
@@ -166,7 +164,6 @@ private[op] trait OpWorkflowCore {
       def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[T], Dataset[T]] = Left(rdd)
     }
     reader = Option(newReader)
-    checkUnmatchedFeatures()
     this
   }
 
@@ -247,40 +244,11 @@ private[op] trait OpWorkflowCore {
    */
   final def getRawFeatureFilterResults(): RawFeatureFilterResults = rawFeatureFilterResults
 
-
   /**
-   * Determine if any of the raw features do not have a matching reader
+   * Check that features are set and that params match them
    */
-  protected def checkUnmatchedFeatures(): Unit = {
-    if (rawFeatures.nonEmpty && reader.nonEmpty) {
-      val readerInputTypes = reader.get.subReaders.map(_.fullTypeName).toSet
-      val unmatchedFeatures = rawFeatures.filterNot(f =>
-        readerInputTypes
-          .contains(f.originStage.asInstanceOf[FeatureGeneratorStage[_, _ <: FeatureType]].tti.tpe.toString)
-      )
-      require(
-        unmatchedFeatures.isEmpty,
-        s"No matching data readers for ${unmatchedFeatures.length} input features:" +
-          s" ${unmatchedFeatures.mkString(",")}. Readers had types: ${readerInputTypes.mkString(",")}"
-      )
-    }
-  }
-
-  /**
-   * Check that readers and features are set and that params match them
-   */
-  protected def checkReadersAndFeatures() = {
+  protected def checkFeatures() = {
     require(rawFeatures.nonEmpty, "Result features must be set")
-    checkUnmatchedFeatures()
-
-    val subReaderTypes = reader.get.subReaders.map(_.typeName).toSet
-    val unmatchedReaders = subReaderTypes.filterNot { t => parameters.readerParams.contains(t) }
-
-    if (unmatchedReaders.nonEmpty) {
-      log.info(
-        "Readers for types: {} do not have an override path in readerParams, so the default will be used",
-        unmatchedReaders.mkString(","))
-    }
   }
 
   /**

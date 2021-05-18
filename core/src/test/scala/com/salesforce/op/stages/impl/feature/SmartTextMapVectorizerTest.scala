@@ -42,7 +42,7 @@ import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
 import org.apache.log4j.Level
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Encoder}
 import org.junit.runner.RunWith
 import org.scalatest.Assertion
 import org.scalatest.junit.JUnitRunner
@@ -152,6 +152,17 @@ class SmartTextMapVectorizerTest
   ).map(_.toOPVector)
 
   import spark.sqlContext.implicits._
+
+  def computeCardinality(mapDF: DataFrame, rawMap: Feature[TextMap], key: String = "f0"): Int = {
+    mapDF
+      .select(rawMap)
+      .as[TextMap#Value]
+      .flatMap { x => Option(x) } // drop nulls
+      .flatMap(_.get(key)) // drop rows without `key`
+      .distinct()
+      .count()
+      .toInt
+  }
 
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
@@ -973,7 +984,7 @@ class SmartTextMapVectorizerTest
   it should "detect one categorical with high cardinality using the coverage" in {
     val maxCard = 100
     val topK = 10
-    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    val cardinality = computeCardinality(countryMapDF, rawCatCountryMap)
     cardinality should be > maxCard
     cardinality should be > topK
     val vectorizer = new SmartTextMapVectorizer()
@@ -989,7 +1000,7 @@ class SmartTextMapVectorizerTest
     val topK = 10
     val minSupport = 99999
     val numHashes = 5
-    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    val cardinality = computeCardinality(countryMapDF, rawCatCountryMap)
     cardinality should be > maxCard
     cardinality should be > topK
     val vectorizer = new SmartTextMapVectorizer()
@@ -1005,7 +1016,7 @@ class SmartTextMapVectorizerTest
     val topK = 10
     val minSupport = 100
     val numHashes = 5
-    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    val cardinality = computeCardinality(countryMapDF, rawCatCountryMap)
     cardinality should be > maxCard
     cardinality should be > topK
     val vectorizer = new SmartTextMapVectorizer()
@@ -1020,7 +1031,7 @@ class SmartTextMapVectorizerTest
     val maxCard = 100
     val topK = 1000000
     val numHashes = 5
-    val cardinality = countryMapDF.select(rawCatCountryMap).as[TextMap#Value].map(_("f0")).distinct().count().toInt
+    val cardinality = computeCardinality(countryMapDF, rawCatCountryMap)
     cardinality should be > maxCard
     cardinality should be <= topK
     val vectorizer = new SmartTextMapVectorizer()
@@ -1035,7 +1046,7 @@ class SmartTextMapVectorizerTest
     val maxCard = 100
     val topK = 10
     val numHashes = 5
-    val cardinality = rawDFSeparateMaps.select(rawTextMap1).as[TextMap#Value].map(_.get("f0")).distinct().count().toInt
+    val cardinality = computeCardinality(rawDFSeparateMaps, rawTextMap1)
     cardinality should be > maxCard
     cardinality should be > topK
     val coverageHashed = new SmartTextMapVectorizer()

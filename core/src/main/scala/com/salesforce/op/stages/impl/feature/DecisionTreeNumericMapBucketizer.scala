@@ -74,7 +74,7 @@ class DecisionTreeNumericMapBucketizer[N, I2 <: OPMap[N]]
     val shouldCleanValues = false
 
     // drop the empty map values & clean map keys if needed
-    val ds = dataset.filter(_._2.nonEmpty).map { case (label, map) =>
+    val ds = dataset.filter { x: (Option[Double], Map[String, N]) => x._2.nonEmpty }.map { case (label, map) =>
       label -> filterKeys[N](map, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
     }.persist()
 
@@ -91,7 +91,7 @@ class DecisionTreeNumericMapBucketizer[N, I2 <: OPMap[N]]
       // Compute splits for each collected key in parallel
       uniqueKeys.par.map { k =>
         val data: Dataset[(Double, Double)] =
-          ds.filter(_._2.contains(k))
+          ds.filter { x: (Option[Double], Map[String, N]) => x._2.contains(k) }
             .map { case (label, map) => label.get -> nev.toDouble(map(k)) }
         k -> computeSplits(data, featureName = s"${in2.name}[$k]")
       }.toArray

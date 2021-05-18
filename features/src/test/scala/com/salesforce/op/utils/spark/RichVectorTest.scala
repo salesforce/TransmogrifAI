@@ -72,7 +72,8 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
         )
       } {
         intercept[IllegalArgumentException](res()).getMessage should {
-          startWith("requirement failed: Vectors must") and include("same length")
+          (startWith("requirement failed: Vectors must") and include("same length")) or
+            (startWith("requirement failed:") and include("Vectors with non-matching sizes"))
         }
       }
     }
