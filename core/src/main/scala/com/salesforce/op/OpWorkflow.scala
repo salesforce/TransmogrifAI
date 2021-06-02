@@ -266,7 +266,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param in DataFrame
    * @return transformed DataFrame
    */
-  private[op] def transform(in: DataFrame, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+  def transform(in: DataFrame, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
     (implicit sc: SparkSession): DataFrame = {
     val transformers = fitStages(in, stages, persistEveryKStages).map(_.asInstanceOf[Transformer])
     FitStagesUtil.applySparkTransformations(in, transformers, persistEveryKStages)
