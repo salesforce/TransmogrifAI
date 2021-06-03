@@ -69,7 +69,7 @@ class DateMapToUnitCircleVectorizerTest extends OpEstimatorSpec[OPVector, Sequen
    */
   override val expectedResult: Seq[OPVector] = sampleDateTimes
     .map{ v =>
-      val rad = DateToUnitCircle.convertToRandians(Option(v.getMillis), TimePeriod.HourOfDay)
+      val rad = DateToUnitCircle.convertToRadians(Option(v.getMillis), TimePeriod.HourOfDay)
       (rad ++ rad).toOPVector
     }
 

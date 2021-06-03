@@ -83,7 +83,7 @@ class DateToUnitCircleTransformer[T <: Date]
 ) with DateToUnitCircleParams {
 
   override def transformFn: Seq[T] => OPVector = timestamp => {
-    val randians = timestamp.flatMap(ts => DateToUnitCircle.convertToRandians(ts.v, getTimePeriod)).toArray
+    val randians = timestamp.flatMap(ts => DateToUnitCircle.convertToRadians(ts.v, getTimePeriod)).toArray
     Vectors.dense(randians).toOPVector
   }
 
@@ -106,7 +106,7 @@ private[op] object DateToUnitCircle {
   def convertToBin(timestamp: Long, timePeriodDesired: TimePeriod): Double =
     getPeriodWithSize(timestamp, timePeriodDesired)._1
 
-  def convertToRandians(timestamp: Option[Long], timePeriodDesired: TimePeriod): Array[Double] =
+  def convertToRadians(timestamp: Option[Long], timePeriodDesired: TimePeriod): Array[Double] =
     timestamp.map { ts =>
       val (timePeriod, periodSize) = getPeriodWithSize(ts, timePeriodDesired)
       val radians = (2 * math.Pi * timePeriod) / periodSize
