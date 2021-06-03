@@ -101,17 +101,20 @@ class DateToUnitCircleTransformer[T <: Date]
 
 private[op] object DateToUnitCircle {
 
+  val defaultRadians: Array[Double] = Array(1.0, 0.0)
+
   def metadataValues(timePeriod: TimePeriod): Seq[String] = Seq(s"x_$timePeriod", s"y_$timePeriod")
 
   def convertToBin(timestamp: Long, timePeriodDesired: TimePeriod): Double =
     getPeriodWithSize(timestamp, timePeriodDesired)._1
 
-  def convertToRadians(timestamp: Option[Long], timePeriodDesired: TimePeriod): Array[Double] =
+  def convertToRadians(timestamp: Option[Long], timePeriodDesired: TimePeriod,
+                       nullRadians: Array[Double] = defaultRadians): Array[Double] =
     timestamp.map { ts =>
       val (timePeriod, periodSize) = getPeriodWithSize(ts, timePeriodDesired)
       val radians = (2 * math.Pi * timePeriod) / periodSize
       Array(math.cos(radians), math.sin(radians))
-    }.getOrElse(Array(0.0, 0.0))
+    }.getOrElse(nullRadians)
 
   private def getPeriodWithSize(timestamp: Long, timePeriod: TimePeriod): (Double, Int) = {
     val tpv = timePeriod.extractTimePeriodVal(timestamp)
