@@ -83,8 +83,8 @@ class DateToUnitCircleTransformer[T <: Date]
 ) with DateToUnitCircleParams {
 
   override def transformFn: Seq[T] => OPVector = timestamp => {
-    val randians = timestamp.flatMap(ts => DateToUnitCircle.convertToRadians(ts.v, getTimePeriod)).toArray
-    Vectors.dense(randians).toOPVector
+    val radians = timestamp.flatMap(ts => DateToUnitCircle.convertToRadians(ts.v, getTimePeriod)).toArray
+    Vectors.dense(radians).toOPVector
   }
 
   override def onGetMetadata(): Unit = {
