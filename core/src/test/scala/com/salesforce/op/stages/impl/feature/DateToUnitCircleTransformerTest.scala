@@ -125,7 +125,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val vector = vectorizer.getOutput()
     val actual = transformed.collect(vector)
     val expected = Array(
-      Array(0.0, 0.0),
+      Array(1.0, 0.0),
       Array(1.0, 0.0)
     ).map(Vectors.dense(_).toOPVector)
     all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
