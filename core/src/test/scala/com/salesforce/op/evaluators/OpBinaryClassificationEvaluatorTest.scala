@@ -283,6 +283,52 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     checkThresholdMetrics(metrics)
   }
 
+  /* TN/TN/FP/FN all reflect predicted value at default threshold of 0.5.
+  * Threshold metrics, like auPR and auROC, are calculated based on the score values,
+  * which are used as thresholds for curve calculation */
+  it should "produce auROC and auPR of 1 when all positive labels are scored higher than negative labels" in {
+    val doesNotMatter = 123.4
+    val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
+      Seq(
+        (RealNN(1.0), Prediction(
+          prediction = 0.0,
+          rawPrediction = Array(doesNotMatter),
+          probability = Array(doesNotMatter, 0.4))),
+        (RealNN(1.0), Prediction(
+          prediction = 0.0,
+          rawPrediction = Array(doesNotMatter),
+          probability = Array(doesNotMatter, 0.3))),
+        (RealNN(0.0), Prediction(
+          prediction = 0.0,
+          rawPrediction = Array(doesNotMatter),
+          probability = Array(doesNotMatter, 0.2))),
+        (RealNN(0.0), Prediction(
+          prediction = 0.0,
+          rawPrediction = Array(doesNotMatter),
+          probability = Array(doesNotMatter, 0.1)))
+      )
+    )
+    val labelSynth = rawLabelSynth.copy(isResponse = true)
+    val testEvaluatorSynth = new OpBinaryClassificationEvaluator()
+      .setLabelCol(labelSynth.name)
+      .setPredictionCol(predictionSynth.name)
+    val metrics = testEvaluatorSynth.evaluateAll(dsSynth)
+
+    metrics.AuROC shouldBe 1
+    metrics.AuPR shouldBe 1
+    metrics.TP shouldBe 0.0
+    metrics.TN shouldBe 2.0
+    metrics.FP shouldBe 0.0
+    metrics.FN shouldBe 2.0
+    metrics.ThresholdMetrics.recallByThreshold shouldBe Seq(0.5, 1.0, 1.0, 1.0)
+    metrics.ThresholdMetrics.falsePositiveRateByThreshold shouldBe Seq(0.0, 0.0, 0.5, 1.0)
+    metrics.ThresholdMetrics.truePositivesByThreshold shouldBe Seq( 1, 2, 2, 2 )
+    metrics.ThresholdMetrics.falsePositivesByThreshold shouldBe Seq( 0, 0, 1, 2 )
+    metrics.ThresholdMetrics.trueNegativesByThreshold shouldBe Seq( 2, 2, 1, 0 )
+    metrics.ThresholdMetrics.falseNegativesByThreshold shouldBe Seq( 1, 0, 0, 0 )
+
+  }
+
   private[op] def checkThresholdMetrics(metrics: BinaryClassificationMetrics): Unit = {
     val count = metrics.TP + metrics.FP + metrics.TN + metrics.FN
     val thresholdMetrics = metrics.ThresholdMetrics
@@ -357,7 +403,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     (tp, tn, fp, fn, precision, recall, f1)
 
   }
-
 
   // TODO: move this to OpWorkFlowTest
   //  it should "evaluate  a  workflow" in {
