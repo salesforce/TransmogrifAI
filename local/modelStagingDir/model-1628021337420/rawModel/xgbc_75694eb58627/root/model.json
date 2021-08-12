@@ -1,0 +1,14 @@
+{
+  "op": "xgboost.classifier",
+  "attributes": {
+    "num_classes": {
+      "int": 2
+    },
+    "num_features": {
+      "int": 17
+    },
+    "tree_limit": {
+
+    }
+  }
+}

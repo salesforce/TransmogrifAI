@@ -1,0 +1,19 @@
+{
+  "name": "logreg_42f69f73698a",
+  "shape": {
+    "inputs": [{
+      "port": "features",
+      "name": "age-gender-genderPL-height-stringMap-survived-weight_8-stagesApplied_OPVector_000000000223"
+    }],
+    "outputs": [{
+      "port": "raw_prediction",
+      "name": "rawPrediction"
+    }, {
+      "port": "probability",
+      "name": "probability"
+    }, {
+      "port": "prediction",
+      "name": "age-gender-genderPL-height-stringMap-survived-weight_9-stagesApplied_Prediction_000000000229"
+    }]
+  }
+}
