@@ -283,7 +283,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     checkThresholdMetrics(metrics)
   }
 
-  /* TN/TN/FP/FN all reflect predicted value at default threshold of 0.5.
+  /* TP/TN/FP/FN all reflect predicted value at default threshold of 0.5.
   * Threshold metrics, like auPR and auROC, are calculated based on the score values,
   * which are used as thresholds for curve calculation */
   it should "produce auROC and auPR of 1 when all positive labels are scored higher than negative labels" in {
@@ -326,7 +326,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metrics.ThresholdMetrics.falsePositivesByThreshold shouldBe Seq( 0, 0, 1, 2 )
     metrics.ThresholdMetrics.trueNegativesByThreshold shouldBe Seq( 2, 2, 1, 0 )
     metrics.ThresholdMetrics.falseNegativesByThreshold shouldBe Seq( 1, 0, 0, 0 )
-
   }
 
   private[op] def checkThresholdMetrics(metrics: BinaryClassificationMetrics): Unit = {
