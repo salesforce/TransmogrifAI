@@ -84,9 +84,6 @@ jobs:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-      - run:
-          name: Report scoverage resuts to Codecov
-          command: bash codecov.sh
 
 workflows:
   version: 2
