@@ -57,8 +57,17 @@ object Lambdas {
     def apply(x: Real, y: Real): Real = (for {yv <- y.value; xv <- x.value} yield xv * yv).toReal
   }
 
+  class FncBinaryInt extends Function2[Real, Integer, Real] with Serializable {
+    def apply(x: Real, y: Integer): Real = (for {yv <- y.value; xv <- x.value} yield xv * yv).toReal
+  }
+
   class FncTernary extends Function3[Real, Real, Real, Real] with Serializable {
     def apply(x: Real, y: Real, z: Real): Real =
+      (for {yv <- y.value; xv <- x.value; zv <- z.value} yield xv * yv + zv).toReal
+  }
+
+  class FncTernaryInt extends Function3[Real, Integer, Real, Real] with Serializable {
+    def apply(x: Real, y: Integer, z: Real): Real =
       (for {yv <- y.value; xv <- x.value; zv <- z.value} yield xv * yv + zv).toReal
   }
 
@@ -67,4 +76,8 @@ object Lambdas {
       (for {yv <- y.value; xv <- x.value; tv <- t.value; zv <- z.value} yield xv * yv + zv * tv.length).toReal
   }
 
+  class FncQuaternaryInt extends Function4[Real, Integer, Text, Real, Real] with Serializable {
+    def apply(x: Real, y: Integer, t: Text, z: Real): Real =
+      (for {yv <- y.value; xv <- x.value; tv <- t.value; zv <- z.value} yield xv * yv + zv * tv.length).toReal
+  }
 }

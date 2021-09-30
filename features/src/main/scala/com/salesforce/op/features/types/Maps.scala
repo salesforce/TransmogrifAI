@@ -145,6 +145,19 @@ object BinaryMap {
 }
 
 /**
+ * Map of integer values
+ *
+ * @param value map of integer values
+ */
+class IntegerMap(val value: Map[String, Int]) extends OPMap[Int] with NumericMap {
+  def toDoubleMap: Map[String, Double] = value.map(x => (x._1, x._2.toDouble))
+}
+object IntegerMap {
+  def apply(value: Map[String, Int]): IntegerMap = new IntegerMap(value)
+  def empty: IntegerMap = FeatureTypeDefaults.IntegerMap
+}
+
+/**
  * Map of integral values
  *
  * @param value map of integral values

@@ -35,7 +35,6 @@ import java.util.{Date => JDate}
 import com.salesforce.op.features.types._
 
 import scala.reflect.runtime.universe.WeakTypeTag
-import scala.util.Random
 
 /**
  * Generator of data as integral numbers
@@ -102,5 +101,3 @@ object RandomIntegral {
   private def incrementingStream(init: JDate, minStep: Long, maxStep: Long): RandomStream[Long] =
     RandomStream.incrementing(init.getTime, minStep, maxStep)
 }
-
-

@@ -50,6 +50,7 @@ abstract class SumNumeric[N: Semigroup, T <: OPNumeric[N]]
 }
 case object SumReal extends SumNumeric[Double, Real]
 case object SumCurrency extends SumNumeric[Double, Currency]
+case object SumInteger extends SumNumeric[Int, Integer]
 case object SumIntegral extends SumNumeric[Long, Integral]
 case object SumRealNN extends SumNumeric[Double, RealNN](zero = Some(0.0))
 
@@ -70,6 +71,7 @@ abstract class MinMaxNumeric[N, T <: OPNumeric[N]]
 case object MaxRealNN extends MinMaxNumeric[Double, RealNN](isMin = false, zero = Some(Double.NegativeInfinity))
 case object MaxReal extends MinMaxNumeric[Double, Real](isMin = false)
 case object MaxCurrency extends MinMaxNumeric[Double, Currency](isMin = false)
+case object MaxInteger extends MinMaxNumeric[Int, Integer](isMin = false)
 case object MaxIntegral extends MinMaxNumeric[Long, Integral](isMin = false)
 case object MaxDate extends MinMaxNumeric[Long, Date](isMin = false)
 case object MaxDateTime extends MinMaxNumeric[Long, DateTime](isMin = false)

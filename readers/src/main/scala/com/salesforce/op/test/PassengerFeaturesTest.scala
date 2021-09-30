@@ -30,7 +30,7 @@
 
 package com.salesforce.op.test
 
-import com.salesforce.op.aggregators.MaxReal
+import com.salesforce.op.aggregators.{MaxInteger, MaxReal}
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import org.joda.time.Duration
@@ -38,7 +38,7 @@ import PassengerFeaturesTest._
 
 
 trait PassengerFeaturesTest {
-  val age = FeatureBuilder.Real[Passenger].extract(new AgeExtract).aggregate(MaxReal).asPredictor
+  val age = FeatureBuilder.Integer[Passenger].extract(new AgeExtract).aggregate(MaxInteger).asPredictor
   val gender = FeatureBuilder.MultiPickList[Passenger].extract(new GenderAsMultiPickListExtract).asPredictor
   val genderPL = FeatureBuilder.PickList[Passenger].extract(new GenderAsPickListExtract).asPredictor
   val height = FeatureBuilder.RealNN[Passenger].extract(new HeightToRealNNExtract)
@@ -101,8 +101,8 @@ object PassengerFeaturesTest {
   class BooleanMapExtract extends Function1[Passenger, BinaryMap] with Serializable {
     def apply(p: Passenger): BinaryMap = p.getBooleanMap.toBinaryMap
   }
-  class AgeExtract extends Function1[Passenger, Real] with Serializable {
-    def apply(p: Passenger): Real = p.getAge.toReal
+  class AgeExtract extends Function1[Passenger, Integer] with Serializable {
+    def apply(p: Passenger): Integer = p.getAge.toInteger
   }
 
 }

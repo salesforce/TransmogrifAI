@@ -75,6 +75,7 @@ object RandomMap {
   implicit val cEmail = new Compatibility[Email, EmailMap]
   implicit val cGeolocation = new Compatibility[Geolocation, GeolocationMap]
   implicit val cID = new Compatibility[ID, IDMap]
+  implicit val cInteger = new Compatibility[Integer, IntegerMap]
   implicit val cIntegral = new Compatibility[Integral, IntegralMap]
   implicit val cMultiPickList = new Compatibility[MultiPickList, MultiPickListMap]
   implicit val cPhone = new Compatibility[Phone, PhoneMap]
@@ -141,6 +142,20 @@ object RandomMap {
     (implicit compatibilityOfBaseTypeAndMapType: Compatibility[T, M]):
   RandomMap[String, M] =
     mapsFromStream[String, M](textGenerator.stream, minSize, maxSize, sources = Some(textGenerator))
+
+  /**
+   * Produces random maps of integer
+   *
+   * @param valueGenerator - a generator of single (int) values
+   * @param minSize minimum size of the map; 0 if missing
+   * @param maxSize maximum size of the map; if missing, all maps are of the same size
+   * @tparam T the type of single-value data to be generated
+   * @tparam M the type of map
+   * @return a generator of maps of integrals; the keys by default have the form "k0", "k1", etc
+   */
+  def ofInt[T <: Integer, M <: OPMap[Int] : WeakTypeTag](valueGenerator: RandomInteger[T], minSize: Int, maxSize: Int)
+  (implicit compatibilityOfBaseTypeAndMapType: Compatibility[T, M]): RandomMap[Int, M] =
+    mapsOf[Int, M](valueGenerator.numbers.producer, minSize, maxSize, sources = Some(valueGenerator))
 
   /**
    * Produces random maps of integrals

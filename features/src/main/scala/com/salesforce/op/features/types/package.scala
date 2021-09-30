@@ -76,21 +76,25 @@ package object types extends FeatureTypeSparkConverters {
   implicit class JDoubleConversions(val v: java.lang.Double) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
     def toCurrency: Currency = new Currency(Option(v).map(_.toDouble))
+    def toInteger: Integer = new Integer(Option(v).map(_.toInt))
     def toPercent: Percent = new Percent(Option(v).map(_.toDouble))
   }
   implicit class JFloatConversions(val v: java.lang.Float) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
     def toCurrency: Currency = new Currency(Option(v).map(_.toDouble))
+    def toInteger: Integer = new Integer(Option(v).map(_.toInt))
     def toPercent: Percent = new Percent(Option(v).map(_.toDouble))
   }
   implicit class JIntegerConversions(val v: java.lang.Integer) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
+    def toInteger: Integer = new Integer(Option(v).map(_.toInt))
     def toIntegral: Integral = new Integral(Option(v).map(_.toLong))
     def toDate: Date = new Date(Option(v).map(_.toLong))
     def toDateTime: DateTime = new DateTime(Option(v).map(_.toLong))
   }
   implicit class JLongConversions(val v: java.lang.Long) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
+    def toInteger: Integer = new Integer(Option(v).map(_.toInt))
     def toIntegral: Integral = new Integral(Option(v).map(_.toLong))
     def toDate: Date = new Date(Option(v).map(_.toLong))
     def toDateTime: DateTime = new DateTime(Option(v).map(_.toLong))
@@ -114,6 +118,7 @@ package object types extends FeatureTypeSparkConverters {
   }
   implicit class OptIntConversions(val v: Option[Int]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
+    def toInteger: Integer = new Integer(v)
     def toIntegral: Integral = new Integral(v.map(_.toLong))
     def toDate: Date = new Date(v.map(_.toLong))
     def toDateTime: DateTime = new DateTime(v.map(_.toLong))
@@ -271,6 +276,7 @@ package object types extends FeatureTypeSparkConverters {
   }
 
   implicit def intMapToRealMap(m: IntegralMap#Value): RealMap#Value = m.map { case (k, v) => k -> v.toDouble }
+  implicit def integerMapToRealMap(m: IntegerMap#Value): RealMap#Value = m.map { case (k, v) => k -> v.toDouble }
   implicit def booleanToRealMap(m: BinaryMap#Value): RealMap#Value = m.map { case (k, b) => k -> (if (b) 1.0 else 0.0) }
 
 }
