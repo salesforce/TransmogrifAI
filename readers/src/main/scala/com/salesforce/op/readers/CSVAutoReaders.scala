@@ -35,7 +35,7 @@ import com.salesforce.op.OpParams
 import com.salesforce.op.utils.io.csv.{CSVInOut, CSVOptions, CSVToAvro}
 import org.apache.avro.generic.GenericRecord
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.execution.datasources.csv.CSVSchemaUtils
+import org.apache.spark.sql.catalyst.csv.CSVSchemaUtils
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.reflect.ClassTag

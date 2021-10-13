@@ -32,6 +32,7 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.features._
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.ColumnMetadata._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.{Metadata, StructType}
 
@@ -194,6 +195,7 @@ trait OpPipelineStageParams extends InputParams {
 
 object OpPipelineStageParamsNames {
   val OutputMetadata: String = "outputMetadata"
+  val ColumnMetadata: String = "columnMetadata"
   val InputSchema: String = "inputSchema"
   val InputFeatures: String = "inputFeatures"
 }

@@ -7,23 +7,23 @@ dependencies {
     testCompile("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
 
     // Spark Avro
-    compile "org.apache.spark:spark-avro_$scalaVersion:$sparkVersion"
+    compile "org.apache.spark:spark-avro_%%:$sparkVersion"
 
     // Jackson Yaml
     compile ("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion") { exclude group: "com.fasterxml.jackson.core" }
 
     // Algebird
-    compile "com.twitter:algebird-core_$scalaVersion:$algebirdVersion"
+    compile "com.twitter:algebird-core_%%:$algebirdVersion"
 
     // Twitter Chill
-    compile ("com.twitter:chill-avro_$scalaVersion:$chillVersion") { exclude group: "org.apache.avro", module: "avro" }
-    compile "com.twitter:chill-algebird_$scalaVersion:$chillVersion"
+    compile ("com.twitter:chill-avro_%%:$chillVersion") { exclude group: "org.apache.avro", module: "avro" }
+    compile "com.twitter:chill-algebird_%%:$chillVersion"
 
     // Lucene - (geo location)
     compile "org.apache.lucene:lucene-spatial3d:$luceneVersion"
 
     // Enumeratum
-    compile "com.beachape:enumeratum_$scalaVersion:$enumeratumVersion"
+    compile "com.beachape:enumeratum_%%:$enumeratumVersion"
 
     // Joda time & convert
     compile "joda-time:joda-time:$jodaTimeVersion"

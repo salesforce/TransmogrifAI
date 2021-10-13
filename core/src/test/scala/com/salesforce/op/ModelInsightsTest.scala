@@ -84,13 +84,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   lazy val xgbWorkflowModel = xgbWorkflow.train()
 
   val pred = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.2)),
       modelsAndParameters = models)
     .setInput(label, checked)
     .getOutput()
 
   val predWithMaps = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.2)),
       modelsAndParameters = models)
     .setInput(label, checkedWithMaps)
     .getOutput()
@@ -149,20 +149,24 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val standardizedLogpred = new OpLogisticRegression().setStandardization(true)
     .setInput(logRegDF._1, logRegDF._2).getOutput()
 
+  def getCoefficientByName(features: Seq[FeatureInsights], featureName: String): Double = {
+    features.filter(_.featureName == featureName).head
+      .derivedFeatures.head
+      .contribution.head
+  }
+
   def getFeatureImp(standardizedModel: FeatureLike[Prediction],
     unstandardizedModel: FeatureLike[Prediction], DF: DataFrame): Array[Double] = {
     lazy val workFlow = new OpWorkflow()
       .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
     lazy val model = workFlow.train()
-    val unstandardizedFtImp = model.modelInsights(unstandardizedModel)
-      .features.map(_.derivedFeatures.map(_.contribution))
-    val standardizedFtImp = model.modelInsights(standardizedModel)
-      .features.map(_.derivedFeatures.map(_.contribution))
-    val descaledsmallCoeff = standardizedFtImp.flatten.flatten.head
-    val originalsmallCoeff = unstandardizedFtImp.flatten.flatten.head
-    val descaledbigCoeff = standardizedFtImp.flatten.flatten.last
-    val orginalbigCoeff = unstandardizedFtImp.flatten.flatten.last
-    return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
+    val standardizedFeatures = model.modelInsights(standardizedModel).features
+    val unstandardizedFeatures = model.modelInsights(unstandardizedModel).features
+    val descaledSmallCoeff = getCoefficientByName(standardizedFeatures, "feature2")
+    val descaledBigCoeff = getCoefficientByName(standardizedFeatures, "feature1")
+    val originalSmallCoeff = getCoefficientByName(unstandardizedFeatures, "feature2")
+    val originalBigCoeff = getCoefficientByName(unstandardizedFeatures, "feature1")
+    Array(descaledSmallCoeff, originalSmallCoeff, descaledBigCoeff, originalBigCoeff)
   }
 
   def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],

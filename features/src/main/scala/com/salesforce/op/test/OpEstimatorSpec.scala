@@ -31,7 +31,6 @@
 package com.salesforce.op.test
 
 import java.io.File
-
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._
 import org.apache.spark.ml.{Estimator, Model}

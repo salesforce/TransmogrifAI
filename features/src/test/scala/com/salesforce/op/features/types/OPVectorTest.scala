@@ -61,7 +61,8 @@ class OPVectorTest extends FlatSpec with TestCommon {
       (v1, v2) <- vectors.zip(ones)
       res <- Seq(() => v1 + v2, () => v1 - v2, () => v1 dot v2)
     } intercept[IllegalArgumentException](res()).getMessage should {
-      startWith("requirement failed: Vectors must") and include("same length")
+      (startWith("requirement failed: Vectors must") and include("same length")) or
+        (startWith("requirement failed:") and include("Vectors with non-matching sizes"))
     }
   }
 

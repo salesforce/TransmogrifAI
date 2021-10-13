@@ -373,7 +373,7 @@ class OpXGBoostRegressionModel
   @transient private lazy val localPredict = localModel.map{ model =>
     features: Vector => {
       // Put data into correct format for XGBoostMleap
-      val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F))
+      val dm = new DMatrix(processMissingValues(Iterator(features.asXGB), 0.0F, allowNonZeroMissing = false))
       model.predict(data = dm)
     }
   }

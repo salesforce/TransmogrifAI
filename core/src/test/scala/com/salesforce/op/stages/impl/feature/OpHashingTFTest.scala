@@ -61,17 +61,20 @@ class OpHashingTFTest extends SwTransformerSpec[OPVector, HashingTF, OpHashingTF
   val transformer = hashed.originStage.asInstanceOf[OpHashingTF]
 
   val expectedResult: Seq[OPVector] = Seq(
-    Vectors.sparse(5, Array(0, 1, 2, 3, 4), Array(2.0, 4.0, 2.0, 3.0, 1.0)),
-    Vectors.sparse(5, Array(0, 1, 2, 3, 4), Array(4.0, 1.0, 3.0, 1.0, 1.0)),
-    Vectors.sparse(5, Array(0, 2, 3, 4), Array(2.0, 2.0, 2.0, 2.0)),
-    Vectors.sparse(5, Array(0, 1, 2, 4), Array(3.0, 5.0, 1.0, 2.0))
+    Vectors.sparse(5, Array(0, 1, 2, 3, 4), Array(4.0, 1.0, 3.0, 2.0, 2.0)),
+    Vectors.sparse(5, Array(0, 1, 2, 3), Array(1.0, 5.0, 3.0, 1.0)),
+    Vectors.sparse(5, Array(0, 1, 2, 3), Array(1.0, 2.0, 3.0, 2.0)),
+    Vectors.sparse(5, Array(0, 2, 3, 4), Array(1.0, 4.0, 2.0, 4.0))
   ).map(_.toOPVector)
 
   def hash(
     s: String,
     numOfFeatures: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
     binary: Boolean = false
-  ): Int = new org.apache.spark.mllib.feature.HashingTF(numOfFeatures).setBinary(binary).indexOf(s)
+  ): Int = {
+    val hashingTF = new org.apache.spark.ml.feature.HashingTF
+    hashingTF.setNumFeatures(numOfFeatures).setBinary(binary).indexOf(s)
+  }
 
   it should "hash categorical data" in {
     val hashed = f1.tf()

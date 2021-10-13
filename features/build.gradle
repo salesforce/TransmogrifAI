@@ -3,11 +3,11 @@ dependencies {
     testCompile project(':testkit')
 
     // Scala graph
-    compile "org.scala-graph:graph-core_$scalaVersion:$scalaGraphVersion"
+    compile "org.scala-graph:graph-core_%%:$scalaGraphVersion"
 
 
     // Sourcecode macros
-    compile "com.lihaoyi:sourcecode_$scalaVersion:$sourceCodeVersion"
+    compile "com.lihaoyi:sourcecode_%%:$sourceCodeVersion"
 
     // Needed for Url validation
     compile "commons-validator:commons-validator:$commonsValidatorVersion"
@@ -16,11 +16,12 @@ dependencies {
     compile "commons-io:commons-io:$commonsIOVersion"
 
     // Json4s extensions (needed for Joda time)
-    compile "org.json4s:json4s-ext_$scalaVersion:$json4sVersion"
+    compile "org.json4s:json4s-ext_%%:$json4sVersion"
 
     // MLeap serialization & runtime for Spark models
-    compile "ml.combust.mleap:mleap-spark_$scalaVersion:$mleapVersion"
-    compile "ml.combust.mleap:mleap-runtime_$scalaVersion:$mleapVersion"
-    compile "ml.combust.mleap:mleap-xgboost-spark_$scalaVersion:$mleapVersion"
-    compile "ml.combust.mleap:mleap-xgboost-runtime_$scalaVersion:$mleapVersion"
+    // TODO: upgrade 2.11 to %% when 0.17 is out: https://github.com/combust/mleap/issues/727
+    compile "ml.combust.mleap:mleap-spark_2.11:$mleapVersion"
+    compile "ml.combust.mleap:mleap-runtime_2.11:$mleapVersion"
+    compile "ml.combust.mleap:mleap-xgboost-spark_2.11:$mleapVersion"
+    compile "ml.combust.mleap:mleap-xgboost-runtime_2.11:$mleapVersion"
 }

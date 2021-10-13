@@ -94,6 +94,7 @@ case class AutomaticSchema(recordClassName: String)(dataFile: File) extends Sche
     .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getName)
     .set("spark.kryo.registrator", classOf[OpKryoRegistrator].getName)
     .set("spark.ui.enabled", false.toString)
+    .set("spark.sql.legacy.parquet.int96RebaseModeInRead", "LEGACY") // See SPARK-31404
 
   implicit lazy val spark: SparkSession = SparkSession.builder.config(conf).getOrCreate()
   implicit lazy val sc: SparkContext = spark.sparkContext

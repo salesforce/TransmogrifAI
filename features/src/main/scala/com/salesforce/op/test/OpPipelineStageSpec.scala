@@ -152,6 +152,7 @@ trait OpPipelineStageAsserts extends AppendedClues {
     }
     clue("Input schemas don't match:") {
       stage.getInputSchema().fields.size shouldEqual expected.getInputSchema().fields.size
+
       stage.getInputSchema().fields.zip(expected.getInputSchema().fields).foreach{
         case (sf, ef) =>
           sf.name shouldBe ef.name

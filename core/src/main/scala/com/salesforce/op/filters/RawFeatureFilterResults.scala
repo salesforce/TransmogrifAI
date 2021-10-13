@@ -33,6 +33,7 @@ package com.salesforce.op.filters
 import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
+import com.twitter.algebird.MomentsSerializer
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
@@ -59,7 +60,9 @@ trait RawFeatureFilterFormats {
   implicit val jsonFormats: Formats = DefaultFormats +
     new SpecialDoubleSerializer +
     EnumEntrySerializer.json4s[CorrelationType](CorrelationType) +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
+    FeatureDistribution.fieldSerializer ++
+    FeatureDistribution.serializers
+
 }
 
 object RawFeatureFilterResults extends RawFeatureFilterFormats {
