@@ -81,6 +81,23 @@ object Binary {
 }
 
 /**
+ * Integer value representation
+ *
+ * A base class for all the integer Feature Types
+ *
+ * @param value integer
+ */
+class Integer(val value: Option[Int]) extends OPNumeric[Int] {
+  def this(value: Int) = this(Option(value))
+  final def toDouble: Option[Double] = value.map(_.toDouble)
+}
+object Integer {
+  def apply(value: Option[Int]): Integer = new Integer(value)
+  def apply(value: Int): Integer = new Integer(value)
+  def empty: Integer = FeatureTypeDefaults.Integer
+}
+
+/**
  * Integral value representation
  *
  * A base class for all the integral Feature Types

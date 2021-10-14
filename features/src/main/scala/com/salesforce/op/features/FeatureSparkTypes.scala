@@ -34,13 +34,13 @@ import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter}
 import com.salesforce.op.features.{types => t}
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataType._
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.expressions._
 import org.apache.spark.sql.functions.column
 import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.sql.{Column, Encoder, Row, TypedColumn}
-import com.salesforce.op.utils.spark.RichMetadata._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe._
@@ -59,6 +59,7 @@ case object FeatureSparkTypes {
   val DateTime = Integral
   val Currency = Real
   val Percent = Real
+  val Integer = IntegerType
 
   // Text
   val Text = StringType
@@ -99,6 +100,7 @@ case object FeatureSparkTypes {
   val DateTimeMap = mapType(DateTime)
   val EmailMap = mapType(Email)
   val IDMap = mapType(ID)
+  val IntegerMap = mapType(Integer)
   val IntegralMap = mapType(Integral)
   val MultiPickListMap = mapType(MultiPickList)
   val PercentMap = mapType(Percent)
@@ -142,6 +144,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.DateTimeMap] => DateTimeMap
     case wt if wt =:= weakTypeOf[t.EmailMap] => EmailMap
     case wt if wt =:= weakTypeOf[t.IDMap] => IDMap
+    case wt if wt =:= weakTypeOf[t.IntegerMap] => IntegerMap
     case wt if wt =:= weakTypeOf[t.IntegralMap] => IntegralMap
     case wt if wt =:= weakTypeOf[t.MultiPickListMap] => MultiPickListMap
     case wt if wt =:= weakTypeOf[t.PercentMap] => PercentMap
@@ -165,6 +168,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.Currency] => Currency
     case wt if wt =:= weakTypeOf[t.Date] => Date
     case wt if wt =:= weakTypeOf[t.DateTime] => DateTime
+    case wt if wt =:= weakTypeOf[t.Integer] => Integer
     case wt if wt =:= weakTypeOf[t.Integral] => Integral
     case wt if wt =:= weakTypeOf[t.Percent] => Percent
     case wt if wt =:= weakTypeOf[t.Real] => Real
@@ -218,6 +222,7 @@ case object FeatureSparkTypes {
     case ArrayType(DoubleType, _) => weakTypeTag[types.Geolocation]
     case MapType(StringType, StringType, _) => weakTypeTag[types.TextMap]
     case MapType(StringType, DoubleType, _) => weakTypeTag[types.RealMap]
+    case MapType(StringType, IntegerType, _) => weakTypeTag[types.IntegerMap]
     case MapType(StringType, LongType, _) => weakTypeTag[types.IntegralMap]
     case MapType(StringType, BooleanType, _) => weakTypeTag[types.BinaryMap]
     case MapType(StringType, ArrayType(StringType, _), _) => weakTypeTag[types.MultiPickListMap]
@@ -264,10 +269,9 @@ case object FeatureSparkTypes {
   def udf1[I <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: I => O
   ): UserDefinedFunction = {
-    val inputTypes = Some(FeatureSparkTypes.sparkTypeOf[I] :: Nil)
     val outputType = FeatureSparkTypes.sparkTypeOf[O]
     val func = transform1[I, O](f)
-    UserDefinedFunction(func, outputType, inputTypes)
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
@@ -301,10 +305,9 @@ case object FeatureSparkTypes {
   def udf2[I1 <: FeatureType : TypeTag, I2 <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: (I1, I2) => O
   ): UserDefinedFunction = {
-    val inputTypes = Some(FeatureSparkTypes.sparkTypeOf[I1] :: FeatureSparkTypes.sparkTypeOf[I2] :: Nil)
     val outputType = FeatureSparkTypes.sparkTypeOf[O]
     val func = transform2[I1, I2, O](f)
-    UserDefinedFunction(func, outputType, inputTypes)
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
@@ -343,13 +346,9 @@ case object FeatureSparkTypes {
   O <: FeatureType : TypeTag](
     f: (I1, I2, I3) => O
   ): UserDefinedFunction = {
-    val inputTypes = Some(
-      FeatureSparkTypes.sparkTypeOf[I1] :: FeatureSparkTypes.sparkTypeOf[I2] ::
-        FeatureSparkTypes.sparkTypeOf[I3] :: Nil
-    )
     val outputType = FeatureSparkTypes.sparkTypeOf[O]
     val func = transform3[I1, I2, I3, O](f)
-    UserDefinedFunction(func, outputType, inputTypes)
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
@@ -393,13 +392,9 @@ case object FeatureSparkTypes {
   I4 <: FeatureType : TypeTag, O <: FeatureType : TypeTag](
     f: (I1, I2, I3, I4) => O
   ): UserDefinedFunction = {
-    val inputTypes = Some(
-      FeatureSparkTypes.sparkTypeOf[I1] :: FeatureSparkTypes.sparkTypeOf[I2] ::
-        FeatureSparkTypes.sparkTypeOf[I3] :: FeatureSparkTypes.sparkTypeOf[I4] :: Nil
-    )
     val outputType = FeatureSparkTypes.sparkTypeOf[O]
     val func = transform4[I1, I2, I3, I4, O](f)
-    UserDefinedFunction(func, outputType, inputTypes)
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
@@ -454,7 +449,7 @@ case object FeatureSparkTypes {
       }
       FeatureTypeSparkConverter.toSpark(f(arr))
     }
-    UserDefinedFunction(func, outputType, inputTypes = None)
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**
@@ -508,7 +503,7 @@ case object FeatureSparkTypes {
       }
       FeatureTypeSparkConverter.toSpark(f(i1, arr))
     }
-    UserDefinedFunction(func, outputType, inputTypes = None)
+    SparkUDFFactory.create(func, outputType)
   }
 
   /**

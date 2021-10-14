@@ -30,15 +30,16 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import java.lang.{Integer => JavaInt}
+
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, PivotColNoInd}
+import com.salesforce.op.test.TestOpVectorColumnType.PivotColNoInd
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.sql.Dataset
+import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.apache.spark.ml.linalg.Vectors
 
 @RunWith(classOf[JUnitRunner])
 class OPCollectionHashingVectorizerTest extends OpTransformerSpec[OPVector, OPCollectionHashingVectorizer[TextList]]
@@ -109,8 +110,8 @@ class OPCollectionHashingVectorizerTest extends OpTransformerSpec[OPVector, OPCo
 
     assertThrows[IllegalArgumentException](vectorizer.setNumFeatures(-1))
     assertThrows[IllegalArgumentException](vectorizer.setNumFeatures(0))
-    assertThrows[IllegalArgumentException](vectorizer.setNumFeatures(Integer.MAX_VALUE))
-    assertThrows[IllegalArgumentException](vectorizer.setNumFeatures(Integer.MIN_VALUE))
+    assertThrows[IllegalArgumentException](vectorizer.setNumFeatures(JavaInt.MAX_VALUE))
+    assertThrows[IllegalArgumentException](vectorizer.setNumFeatures(JavaInt.MIN_VALUE))
   }
 
   it should "be able to vectorize several columns of MultiPickList features" in {

@@ -28,25 +28,48 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op.testkit
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
+import scala.reflect.runtime.universe.WeakTypeTag
 
-@RunWith(classOf[JUnitRunner])
-class OpTransformerTernaryReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  override val expectedFeaturesLength = 3
-  override val hasOutputName = false
+/**
+ * Generator of data as integer numbers
+ *
+ * @param numbers the stream of longs used as the source
+ * @tparam DataType the feature type of the data generated
+ */
+case class RandomInteger[DataType <: Integer : WeakTypeTag]
+(
+  numbers: RandomStream[Int]
+) extends StandardRandomData[DataType](
+  numbers map (Option(_))
+) with ProbabilityOfEmpty
 
-  val stage =
-    new  TernaryLambdaTransformer[Real, Integer, Real, Real](
-      operationName = "test",
-      transformFn = new Lambdas.FncTernaryInt,
-      uid = "uid_1234"
-    ).setInput(weight, age, weight).setMetadata(meta)
+/**
+ * Generator of data as integral numbers
+ */
+object RandomInteger {
 
-  val expected = Array(8772.toReal, 201.toReal, Real.empty, 2652.toReal, Real.empty, 2211.toReal)
+  /**
+   * Generator of random integral values
+   *
+   * @return generator of integrals
+   */
+  def integers: RandomInteger[Integer] =
+    RandomInteger[Integer](RandomStream.ofInts)
+
+  /**
+   * Generator of random integral values in a given range
+   *
+   * @param from minimum value to produce (inclusive)
+   * @param to   maximum value to produce (exclusive)
+   * @return the generator of integrals
+   */
+  def integers(from: Int, to: Int): RandomInteger[Integer] =
+    RandomInteger[Integer](RandomStream.ofInts(from, to))
+
 }
+
+
