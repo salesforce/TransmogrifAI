@@ -15,8 +15,6 @@ val age: Feature[RealNN] = FeatureBuilder.RealNN[Passenger].extract(_.age.toReal
 
 The above lines of code define two ```Features``` of type ```Text``` and ```RealNN``` called ```name``` and ```age``` that are extracted from data of type ```Passenger``` by applying the stated extract methods. 
 
-One can also define Features that are the result of complex time-series aggregates. Take a look at this [example](../examples/Time-Series-Aggregates-and-Joins.html) and this [page](../developer-guide#aggregate-data-readers) for more advanced reading on FeatureBuilders.
-
 Features can then be manipulated using Stages to produce new Features. In TransmogrifAI, as in SparkML, there are two types of Stages -- Transformers and Estimators.
 
 ## Stages
@@ -73,7 +71,7 @@ The workflowModel now has a prepped DAG of Transformers. By calling the ```score
 val dataFrame = workflowModel.setReader(OtherPassengerReader).score()
 ```
 
-Workflow models can be saved and loaded. For more advanced reading on topics like stacking workflows, aggregate DataReaders for time-series data, or joins for DataReaders, follow our links to [Workflows](../developer-guide#workflows) and [Readers](../developer-guide#datareaders).
+Workflow models can be saved and loaded. For more advanced reading on topics like stacking workflows, aggregate DataReaders for time-series data, follow our links to [Workflows](../developer-guide#workflows) and [Readers](../developer-guide#datareaders).
 
 
 

@@ -55,22 +55,22 @@ class OpDecisionTreeClassifier(uid: String = UID[OpDecisionTreeClassifier])
   }
 
   /** @group setParam */
-  override def setMaxDepth(value: Int): this.type = set(maxDepth, value)
+  def setMaxDepth(value: Int): this.type = set(maxDepth, value)
 
   /** @group setParam */
-  override def setMaxBins(value: Int): this.type = set(maxBins, value)
+  def setMaxBins(value: Int): this.type = set(maxBins, value)
 
   /** @group setParam */
-  override def setMinInstancesPerNode(value: Int): this.type = set(minInstancesPerNode, value)
+  def setMinInstancesPerNode(value: Int): this.type = set(minInstancesPerNode, value)
 
   /** @group setParam */
-  override def setMinInfoGain(value: Double): this.type = set(minInfoGain, value)
+  def setMinInfoGain(value: Double): this.type = set(minInfoGain, value)
 
   /** @group expertSetParam */
-  override def setMaxMemoryInMB(value: Int): this.type = set(maxMemoryInMB, value)
+  def setMaxMemoryInMB(value: Int): this.type = set(maxMemoryInMB, value)
 
   /** @group expertSetParam */
-  override def setCacheNodeIds(value: Boolean): this.type = set(cacheNodeIds, value)
+  def setCacheNodeIds(value: Boolean): this.type = set(cacheNodeIds, value)
 
   /**
    * Specifies how often to checkpoint the cached node IDs.
@@ -81,13 +81,13 @@ class OpDecisionTreeClassifier(uid: String = UID[OpDecisionTreeClassifier])
    * (default = 10)
    * @group setParam
    */
-  override def setCheckpointInterval(value: Int): this.type = set(checkpointInterval, value)
+  def setCheckpointInterval(value: Int): this.type = set(checkpointInterval, value)
 
   /** @group setParam */
-  override def setImpurity(value: String): this.type = set(impurity, value)
+  def setImpurity(value: String): this.type = set(impurity, value)
 
   /** @group setParam */
-  override def setSeed(value: Long): this.type = set(seed, value)
+  def setSeed(value: Long): this.type = set(seed, value)
 
 }
 

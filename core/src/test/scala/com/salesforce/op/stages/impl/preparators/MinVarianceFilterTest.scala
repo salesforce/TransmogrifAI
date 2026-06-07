@@ -35,6 +35,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import com.salesforce.op.stages.ColumnMetadata._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
@@ -102,8 +103,9 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
   val expectedNamesFeatsDropped = Seq(featureNames(0), featureNames(3), featureNames(4))
   val expectedNamesFeatsKept = Seq(featureNames(1), featureNames(2))
 
-  val testData = testDataNoMeta.select(
-    testDataNoMeta(featureVector.name).as(featureVector.name, testMetadata.toMetadata)
+  val testData = spark.createDataFrame(
+    testDataNoMeta.toJavaRDD,
+    schema = testDataNoMeta.schema.insertColumnMetadata(featureVector.name -> testMetadata.toMetadata)
   )
 
   val inputData = testData

@@ -39,12 +39,11 @@ import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
-import org.apache.spark.ml.{Estimator, Transformer}
+import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable.{MutableList => MList}
@@ -91,7 +90,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     val featuresArr = features.toArray
     resultFeatures = featuresArr
     rawFeatures = featuresArr.flatMap(_.rawFeatures).distinct.sortBy(_.name)
-    checkUnmatchedFeatures()
     setStagesDAG(features = featuresArr)
     validateStages()
 
@@ -238,7 +236,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         case (None, None) => throw new IllegalArgumentException(
           "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
         case (Some(r), None) =>
-          checkReadersAndFeatures()
+          checkFeatures()
           r.generateDataFrame(rawFeatures, parameters).persist()
         case (rd, Some(rf)) =>
           rd match {
@@ -247,7 +245,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
               "Workflow data reader and RawFeatureFilter training reader do not match! " +
                 "The RawFeatureFilter training reader will be used to generate the data for training")
           }
-          checkReadersAndFeatures()
+          checkFeatures()
 
           val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
             rf.generateFilteredRaw(rawFeatures, parameters)

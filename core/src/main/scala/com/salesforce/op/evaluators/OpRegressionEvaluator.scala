@@ -67,7 +67,9 @@ private[op] class OpRegressionEvaluator
     isValid = l => l.nonEmpty && (l sameElements l.sorted)
   )
   setDefault(signedPercentageErrorHistogramBins,
-    Array(Double.NegativeInfinity) ++ (-100.0 to 100.0 by 10) ++ Array(Double.PositiveInfinity)
+    Array(Double.NegativeInfinity)
+      ++ (Range.BigDecimal(-100, 100, 10)).map(_.toDouble)
+      ++ Array(Double.PositiveInfinity)
   )
 
   def setPercentageErrorHistogramBins(v: Array[Double]): this.type = set(signedPercentageErrorHistogramBins, v)

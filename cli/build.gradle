@@ -1,14 +1,14 @@
 dependencies {
     // scopt
-    compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
+    compile "com.github.scopt:scopt_%%:$scoptVersion"
 
     // scalafmt
-    compile "com.geirsson:scalafmt-core_$scalaVersion:$scalafmtVersion"
+    compile "com.geirsson:scalafmt-core_%%:$scalafmtVersion"
 
     // Reflections
     compile "org.reflections:reflections:$reflectionsVersion"
 
-    compile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+    compile "org.apache.spark:spark-sql_%%:$sparkVersion"
 
     testCompile project(':utils')
 
@@ -71,7 +71,6 @@ task copyTemplates(type: Copy) {
     expand([
             version: scalaVersion,
             scalaVersion: scalaVersion,
-            scalaVersionRevision: scalaVersionRevision,
             scalaTestVersion: scalaTestVersion,
             junitVersion: junitVersion,
             sparkVersion: sparkVersion,

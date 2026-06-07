@@ -20,7 +20,6 @@ package com.fasterxml.jackson.module.scala
 
 import com.fasterxml.jackson.module.scala.deser._
 import com.fasterxml.jackson.module.scala.introspect.ScalaAnnotationIntrospectorModule
-import com.fasterxml.jackson.module.scala.modifiers.EitherModule
 import com.fasterxml.jackson.module.scala.ser.MapSerializerModule
 
 // scalastyle:off

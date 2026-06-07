@@ -78,7 +78,7 @@ class DecisionTreeNumericBucketizer[N, I2 <: OPNumeric[N]]
 
     val data: Dataset[(Double, Double)] =
       dataset
-        .filter(_._2.isDefined) // drop the missing feature values
+        .filter { x: (Option[Double], Option[N]) => x._2.isDefined } // drop the missing feature values
         .map { case (l, v) => l.get -> nev.toDouble(v.get) }
 
     val Splits(shouldSplit, finalSplits, bucketLabels) = computeSplits(data, featureName = in2.name)

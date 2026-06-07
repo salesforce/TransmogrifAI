@@ -67,7 +67,7 @@ private class UnsortedMapDeserializer(
 
   private val instantiator =
     new ValueInstantiator {
-      def getValueTypeDesc = collectionType.getRawClass.getCanonicalName
+      override def getValueTypeDesc = collectionType.getRawClass.getCanonicalName
       override def canCreateUsingDefault = true
       override def createUsingDefault(ctxt: DeserializationContext) =
         new MapBuilderWrapper[AnyRef,AnyRef](UnsortedMapDeserializer.builderFor(collectionType.getRawClass))

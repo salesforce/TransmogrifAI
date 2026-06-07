@@ -410,15 +410,14 @@ case object ModelInsights {
         { case x: EvalMetric => JString(x.entryName) }
       )
     )
-    val featureDistributionSerializer = FieldSerializer[FeatureDistribution](
-      FieldSerializer.ignore("cardEstimate")
-    )
     Serialization.formats(typeHints) +
       EnumEntrySerializer.json4s[ValidationType](ValidationType) +
       EnumEntrySerializer.json4s[ProblemType](ProblemType) +
       new SpecialDoubleSerializer +
       evalMetricsSerializer +
-      featureDistributionSerializer
+      FeatureDistribution.fieldSerializer ++
+      FeatureDistribution.serializers
+
   }
 
   /**
@@ -453,7 +452,7 @@ case object ModelInsights {
   ): ModelInsights = {
 
     // TODO support other model types?
-    val models = stages.collect{
+    val models: Array[OPStage with Model[_]] = stages.collect{
       case s: SelectedModel => s
       case s: OpPredictorWrapperModel[_] => s
       case s: SelectedCombinerModel => s

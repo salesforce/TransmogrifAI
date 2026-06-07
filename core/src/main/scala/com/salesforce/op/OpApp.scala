@@ -96,6 +96,7 @@ abstract class OpApp {
       .setAppName(conf.get("spark.app.name", defaultAppName))
       .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getName)
       .set("spark.kryo.registrator", kryoRegistrator.getName)
+      .set("spark.sql.legacy.parquet.int96RebaseModeInRead", "LEGACY") // See SPARK-31404
   }
 
   /**

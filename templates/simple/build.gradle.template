@@ -6,7 +6,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.16.0'
-    //  classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
+    //  classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.12:1.0.1'
     }
 }
 
@@ -35,7 +35,6 @@ mainClassName = "com.salesforce.app.Simple" /* << MAIN_CLASS */
 
 ext {
     scalaVersion = '$scalaVersion'
-    scalaVersionRevision = '$scalaVersionRevision'
     junitVersion = '$junitVersion'
     sparkVersion = '$sparkVersion'
     scalaTestVersion = '$scalaTestVersion'
@@ -51,26 +50,26 @@ configurations {
 dependencies {
     // Scala
     zinc 'com.typesafe.zinc:zinc:0.3.15'
-    scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
-    scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
-    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+    scalaLibrary "org.scala-lang:scala-library:%scala-version%"
+    scalaCompiler "org.scala-lang:scala-compiler:%scala-version%"
+    compile "org.scala-lang:scala-library:%scala-version%"
 
     // Spark
-    compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+    compileOnly "org.apache.spark:spark-core_%%:$sparkVersion"
+    testCompile "org.apache.spark:spark-core_%%:$sparkVersion"
+    compileOnly "org.apache.spark:spark-mllib_%%:$sparkVersion"
+    testCompile "org.apache.spark:spark-mllib_%%:$sparkVersion"
+    compileOnly "org.apache.spark:spark-sql_%%:$sparkVersion"
+    testCompile "org.apache.spark:spark-sql_%%:$sparkVersion"
 
     // TransmogrifAI
-    compile "com.salesforce.transmogrifai:transmogrifai-core_$scalaVersion:$transmogrifaiVersion"
+    compile "com.salesforce.transmogrifai:transmogrifai-core_%%:$transmogrifaiVersion"
 
     // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce.transmogrifai:transmogrifai-models_$scalaVersion:$transmogrifaiVersion"
+    // compile "com.salesforce.transmogrifai:transmogrifai-models_%%:$transmogrifaiVersion"
 
     // Test
-    testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
+    testCompile "org.scalatest:scalatest_%%:$scalaTestVersion"
     testCompile "junit:junit:$junitVersion"
 
     // Avro
@@ -80,15 +79,15 @@ dependencies {
     testCompile("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
 
     // Spark Avro
-    compile "org.apache.spark:spark-avro_$scalaVersion:$sparkVersion"
+    compile "org.apache.spark:spark-avro_%%:$sparkVersion"
 }
 
 configurations.all {
     resolutionStrategy {
         cacheChangingModulesFor 0, 'seconds'
         force "commons-collections:commons-collections:$collectionsVersion",
-                "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
-                "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+                "org.scala-lang:scala-library:%scala-version%",
+                "org.scala-lang:scala-reflect:%scala-version%"
     }
 }
 configurations.zinc {

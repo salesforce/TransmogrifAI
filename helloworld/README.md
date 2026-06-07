@@ -6,9 +6,8 @@ There are four example workflows in this project:
 3) A simple classifier for multiclass labels on the Iris dataset - `com.salesforce.hw.iris.OpIris`
 4) A simple regression based on boston housing data - `com.salesforce.hw.boston.OpBoston`
 
-In addition, there are two examples of more complex kinds of data preparation that can be done using OP Readers and FeatureBuilders:
-1) An example that computes time series aggregations and joins `com.salesforce.hw.dataprep.JoinsAndAggregates`
-2) An example that computes conditional aggregations `com.salesforce.hw.dataprep.ConditionalAggregation`
+In addition, there is an examples of more complex kinds of data preparation that can be done using OP Readers and FeatureBuilders:
+1) An example that computes conditional aggregations `com.salesforce.hw.dataprep.ConditionalAggregation`
 
 Each project can be either be run with the gradle task, `sparkSubmit` (**recommended**) or with the standard `spark-submit` command. We show examples of running the Titanic case with both gradle and spark-submit for completeness, but the rest of the instructions are for gradle only since that is the recommended submission method (it defines many other useful spark parameters). You should not mix submission methods (eg. don't train with the gradle task and score with spark-submit), as you may get class serialization errors.
 
@@ -147,9 +146,6 @@ First, build project with `./gradlew installDist`.
 First, build project with `./gradlew installDist`. Then run:
 
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates -Dargs="\
-`pwd`/src/main/resources/EmailDataset/Clicks.csv `pwd`/src/main/resources/EmailDataset/Sends.csv"
-
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation -Dargs="\
 `pwd`/src/main/resources/WebVisitsDataset/WebVisits.csv"
 ```

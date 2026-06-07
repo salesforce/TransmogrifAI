@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.selector
 
 import com.salesforce.op.OpWorkflow
-import com.salesforce.op.evaluators.{BinaryClassEvalMetrics, Evaluators, OpBinScoreEvaluator}
+import com.salesforce.op.evaluators.{BinaryClassEvalMetrics, Evaluators}
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.PredictionEquality

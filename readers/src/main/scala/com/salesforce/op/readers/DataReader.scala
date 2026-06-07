@@ -64,16 +64,10 @@ trait DataReader[T] extends Reader[T] with ReaderKey[T] {
   def readPath: Option[String]
 
   /**
-   * All the reader's sub readers (used in joins)
-   * @return sub readers
-   */
-  final def subReaders: Seq[DataReader[_]] = Seq(this)
-
-  /**
    * Function which reads raw data from specified location to use in Dataframe creation, i.e. [[generateDataFrame]] fun.
    * This function returns either RDD or Dataset of the type specified by this reader.
    * It can be overwritten to carry out any special logic required for the reader
-   * (ie filters or joins needed to produce the specified reader type).
+   * (ie filters needed to produce the specified reader type).
    *
    * @param params parameters used to carry out specialized logic in reader (passed in from workflow)
    * @param spark  spark instance to do the reading and conversion from RDD to Dataframe
@@ -184,16 +178,16 @@ trait DataReader[T] extends Reader[T] with ReaderKey[T] {
         spark.createDataFrame(d, schema)
       case Right(ds) =>
         val inputSchema = ds.schema.fields
-         if (schema.forall(fn => inputSchema.exists( // check if features to be extracted already exist in dataframe
-           fi => fn.name == fi.name && fn.dataType == fi.dataType && fn.nullable == fi.nullable)
-         )) {
-           val names = schema.fields.map(_.name).toSeq
-           ds.select(names.head, names.tail: _*)
-         } else {
-           implicit val rowEnc = RowEncoder(schema)
-           val df = ds.flatMap(record => generateRow(key(record), record, rawFeatures, schema))
-           spark.createDataFrame(df.rdd, schema) // because the spark row encoder does not preserve metadata
-         }
+        if (schema.forall(fn => inputSchema.exists( // check if features to be extracted already exist in dataframe
+          fi => fn.name == fi.name && fn.dataType == fi.dataType && fn.nullable == fi.nullable)
+        )) {
+          val names = schema.fields.map(_.name).toSeq
+          ds.select(names.head, names.tail: _*)
+        } else {
+          implicit val rowEnc = RowEncoder(schema)
+          val df = ds.flatMap(record => generateRow(key(record), record, rawFeatures, schema))
+          spark.createDataFrame(df.rdd, schema) // because the spark row encoder does not preserve metadata
+        }
     }
   }
 
@@ -245,7 +239,7 @@ trait AggregatedReader[T] extends DataReader[T] {
         implicit val rowEnc = RowEncoder(schema)
         ds.map(record => (key(record), Seq(record)))
           .groupByKey(_._1)
-          .reduceGroups((l, r) => (l._1, l._2 ++ r._2))
+          .reduceGroups((l: (String, Seq[T]), r: (String, Seq[T])) => (l._1, l._2 ++ r._2))
           .flatMap { case (key, (_, records)) => generateRow(key, records, rawFeatures, schema) }
     }
   }

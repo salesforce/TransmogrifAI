@@ -32,7 +32,6 @@ package com.salesforce.op.utils.json
 
 
 import java.io.File
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.PropertyAccessor
@@ -40,7 +39,7 @@ import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind._
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.scala.OpDefaultScalaModule
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.commons.io.FilenameUtils
 
 import scala.reflect._
@@ -135,6 +134,7 @@ object JsonUtils {
       .configure(JsonParser.Feature.ALLOW_COMMENTS, true)
       .configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true)
       .configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
+      .registerModule(DefaultScalaModule)
   }
 
   private def yamlMapper(serdes: Seq[SerDes[_]]): ObjectMapper = configureMapper(serdes) {
@@ -156,7 +156,7 @@ object JsonUtils {
       .setSerializationInclusion(Include.NON_NULL)
       .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
       .setVisibility(PropertyAccessor.FIELD, Visibility.ANY)
-      .registerModule(OpDefaultScalaModule)
+      .registerModule(DefaultScalaModule)
   }
 
 }

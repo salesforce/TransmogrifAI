@@ -40,7 +40,7 @@ import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorize
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.SparkException
+import com.salesforce.op.stages.ColumnMetadata._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, Row}
@@ -134,9 +134,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   val expectedCorrFeatNames = featureNames.tail
   val expectedCorrFeatNamesIsNan = Seq(featureNames(0))
 
-  val testData = testDataNoMeta.select(
-    testDataNoMeta(targetLabelNoResponse.name),
-    testDataNoMeta(featureVector.name).as(featureVector.name, testMetadata.toMetadata)
+  val testData = spark.createDataFrame(
+    testDataNoMeta.toJavaRDD,
+    schema = testDataNoMeta.schema.insertColumnMetadata(featureVector.name -> testMetadata.toMetadata)
   )
 
   val targetLabel = targetLabelNoResponse.copy(isResponse = true)
@@ -304,7 +304,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   it should "compute higher spearman correlation for monotonic, nonlinear functions than pearson" in {
-    val x = 1.0 to 20.0 by 1.0
+    val x = Range.BigDecimal(1.0, 20.0, 1.0).map(_.doubleValue())
     val xSquare = x.map(Math.pow(_, 5))
     val (data, labelNoResponse, feature) = TestFeatureBuilder[RealNN, RealNN]("label", "feature",
       x.map(_.toRealNN).zip(xSquare.map(_.toRealNN))

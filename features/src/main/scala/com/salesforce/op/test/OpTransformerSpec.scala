@@ -37,8 +37,10 @@ import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.ml.Transformer
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+
+import collection.JavaConverters._
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
@@ -154,7 +156,7 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
     res shouldEqual expectedResult
   }
   it should "transform empty data" in {
-    val empty = spark.emptyDataset(RowEncoder(inputData.schema))
+    val empty = spark.createDataFrame(List.empty[Row].asJava, inputData.schema)
     val transformed = transformer.transform(empty)
     val output = transformer.getOutput()
     val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
