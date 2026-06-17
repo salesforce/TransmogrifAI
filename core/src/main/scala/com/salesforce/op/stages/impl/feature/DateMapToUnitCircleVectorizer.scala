@@ -125,7 +125,7 @@ final class DateMapToUnitCircleVectorizerModel[T <: DateMap] private[op]
         val cleanedMap = cleanMap(map, shouldClean, shouldCleanValue = false)
         keys.map(k => {
           val vOpt = cleanedMap.get(k)
-          DateToUnitCircle.convertToRandians(vOpt, timePeriod)
+          DateToUnitCircle.convertToRadians(vOpt, timePeriod)
         })
       }.toArray
     Vectors.dense(eachPivoted.flatten).compressed.toOPVector
