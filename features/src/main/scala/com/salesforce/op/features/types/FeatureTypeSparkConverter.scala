@@ -179,6 +179,18 @@ case object FeatureTypeSparkConverter {
           case v: Number => Some(v.doubleValue())
           case v => throw new IllegalArgumentException(s"Real type mapping is not defined for ${v.getClass}")
         }
+      case wt if wt <:< weakTypeOf[t.Integer] => (value: Any) =>
+        value match {
+          case null => FeatureTypeDefaults.Integer.value
+          case v: Int => Some(v)
+          case v: Byte => Some(v.toInt)
+          case v: Short => Some(v.toInt)
+          case v: Long => Some(v.toLong)
+          case v: Float => Some(v.toInt)
+          case v: Double => Some(v.toInt)
+          case v: Char => Some(v.toInt)
+          case v => throw new IllegalArgumentException(s"Integer type mapping is not defined for ${v.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Integral] => (value: Any) =>
         value match {
           case null => FeatureTypeDefaults.Integral.value
@@ -213,6 +225,7 @@ case object FeatureTypeSparkConverter {
 trait FeatureTypeSparkConverters {
   // Numerics
   implicit val BinaryConverter = FeatureTypeSparkConverter[Binary]()
+  implicit val IntegerConverter = FeatureTypeSparkConverter[Integer]()
   implicit val IntegralConverter = FeatureTypeSparkConverter[Integral]()
   implicit val RealConverter = FeatureTypeSparkConverter[Real]()
   implicit val RealNNConverter = FeatureTypeSparkConverter[RealNN]()
@@ -258,6 +271,7 @@ trait FeatureTypeSparkConverters {
   implicit val DateTimeMapConverter = FeatureTypeSparkConverter[DateTimeMap]()
   implicit val EmailMapConverter = FeatureTypeSparkConverter[EmailMap]()
   implicit val IDMapConverter = FeatureTypeSparkConverter[IDMap]()
+  implicit val IntegerMapConverter = FeatureTypeSparkConverter[IntegerMap]()
   implicit val IntegralMapConverter = FeatureTypeSparkConverter[IntegralMap]()
   implicit val MultiPickListMapConverter = FeatureTypeSparkConverter[MultiPickListMap]()
   implicit val PercentMapConverter = FeatureTypeSparkConverter[PercentMap]()

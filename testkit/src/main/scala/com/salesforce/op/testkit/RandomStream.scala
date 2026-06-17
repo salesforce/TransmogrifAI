@@ -157,7 +157,33 @@ object RandomStream {
   def ofLongs(from: Long, to: Long): RandomStream[Long] =
     RandomStream(rng => trim(rng.nextLong, from, to))
 
-  private def trim(value: Long, from: Long, to: Long) = {
+  /**
+   * Random stream of ints
+   * The stream should be passed an RNG to produce values
+   *
+   * @return the random stream of longs
+   */
+  def ofInts: RandomStream[Int] = RandomStream(_.nextInt)
+
+  /**
+   * Random stream of ints
+   * The stream should be passed an RNG to produce values in a given range
+   *
+   * @param from minimum value to produce (inclusive)
+   * @param to   maximum value to produce (exclusive)
+   *
+   * @return the random stream of longs between from and to
+   */
+  def ofInts(from: Int, to: Int): RandomStream[Int] =
+    RandomStream(rng => trimInt(rng.nextInt, from, to))
+
+  private def trimInt(value: Int, from: Int, to: Int): Int = {
+    val d = to - from
+    val candidate = value % d
+    (candidate + d) % d + from
+  }
+
+  private def trim(value: Long, from: Long, to: Long): Long = {
     val d = to - from
     val candidate = value % d
     (candidate + d) % d + from

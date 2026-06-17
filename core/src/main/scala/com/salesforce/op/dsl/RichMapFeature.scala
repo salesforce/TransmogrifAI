@@ -632,6 +632,94 @@ trait RichMapFeature {
    *
    * @param f FeatureLike
    */
+  implicit class RichIntegerMapFeature[T <: OPMap[Int] : TypeTag](val f: FeatureLike[T])
+    (implicit val ttiv: TypeTag[T#Value]) {
+
+    /**
+     * Apply a smart bucketizer transformer
+     *
+     * @param label         label feature
+     * @param trackNulls    option to keep track of values that were missing
+     * @param trackInvalid  option to keep track of invalid values,
+     *                      eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
+     * @param cleanKeys     clean text before pivoting
+     * @param allowListKeys keys to allowlist
+     * @param blockListKeys keys to blocklist
+     */
+    def autoBucketize(
+       label: FeatureLike[RealNN],
+       trackNulls: Boolean,
+       trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+       minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain,
+       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+       allowListKeys: Array[String] = Array.empty,
+       blockListKeys: Array[String] = Array.empty
+     ): FeatureLike[OPVector] = {
+      new DecisionTreeNumericMapBucketizer[Int, T]()
+        .setInput(label, f)
+        .setTrackInvalid(trackInvalid)
+        .setTrackNulls(trackNulls)
+        .setMinInfoGain(minInfoGain)
+        .setCleanKeys(cleanKeys)
+        .setAllowListKeys(allowListKeys)
+        .setBlockListKeys(blockListKeys).getOutput()
+    }
+
+
+    /**
+     * Apply IntegerMapVectorizer or auto bucketizer (when label is present) on any OPMap that has int values
+     *
+     * @param others        other features of the same type
+     * @param defaultValue  value to give missing keys on pivot
+     * @param cleanKeys     clean text before pivoting
+     * @param allowListKeys keys to allowlist
+     * @param blockListKeys keys to blocklist
+     * @param trackNulls    option to keep track of values that were missing
+     * @param label         optional label column to be passed into autoBucketizer if present
+     * @param trackInvalid  option to keep track of invalid values,
+     *                      eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
+     * @return an OPVector feature
+     */
+    def vectorize(
+     defaultValue: Int,
+     fillWithMean: Boolean = TransmogrifierDefaults.FillWithMean,
+     cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+     allowListKeys: Array[String] = Array.empty,
+     blockListKeys: Array[String] = Array.empty,
+     others: Array[FeatureLike[T]] = Array.empty,
+     trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+     trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+     minInfoGain: Double = TransmogrifierDefaults.MinInfoGain,
+     label: Option[FeatureLike[RealNN]] = None
+   ): FeatureLike[OPVector] = {
+      label match {
+        case None =>
+          new IntegerMapVectorizer[T]()
+            .setInput(f +: others)
+            .setFillWithMean(fillWithMean)
+            .setDefaultValue(defaultValue)
+            .setCleanKeys(cleanKeys)
+            .setAllowListKeys(allowListKeys)
+            .setBlockListKeys(blockListKeys)
+            .setTrackNulls(trackNulls)
+            .getOutput()
+        case Some(lbl) =>
+          autoBucketize(
+            label = lbl, trackNulls = trackNulls, trackInvalid = trackInvalid,
+            minInfoGain = minInfoGain, cleanKeys = cleanKeys,
+            allowListKeys = allowListKeys, blockListKeys = blockListKeys
+          )
+      }
+    }
+  }
+
+  /**
+   * Enrichment functions for OPMap Features with Long values
+   *
+   * @param f FeatureLike
+   */
   implicit class RichIntegralMapFeature[T <: OPMap[Long] : TypeTag](val f: FeatureLike[T])
     (implicit val ttiv: TypeTag[T#Value]) {
 

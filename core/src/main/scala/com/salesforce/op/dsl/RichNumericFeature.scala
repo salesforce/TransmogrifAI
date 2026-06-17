@@ -457,7 +457,7 @@ trait RichNumericFeature {
      * @param minRequiredRuleSupport  Categoricals can be removed if an association rule is found between one of the
      *                                choices and a categorical label where the confidence of that rule is above
      *                                maxRuleConfidence and the support fraction of that choice is above minRuleSupport.
-     * @param featureLabelCorrOnly    If true, then only calculate correlations between features and label instead of
+     * @param featureFeatureCorrLevel    If true, then only calculate correlations between features and label instead of
      *                                the entire correlation matrix which includes all feature-feature correlations
      * @param correlationExclusion    Setting for what categories of feature vector columns to exclude from the
      *                                correlation calculation (eg. hashed text features)
@@ -654,6 +654,86 @@ trait RichNumericFeature {
     ): FeatureLike[OPVector] = {
       val features = f +: others
       val stage = new IntegralVectorizer[T]().setInput(features).setTrackNulls(trackNulls)
+      if (fillWithMode) stage.setFillWithMode else stage.setFillWithConstant(fillValue)
+      val filledValues = stage.getOutput()
+      label match {
+        case None =>
+          filledValues
+        case Some(lbl) =>
+          val bucketized = features.map(
+            _.autoBucketize(label = lbl, trackNulls = false, trackInvalid = trackInvalid, minInfoGain = minInfoGain)
+          )
+          new VectorsCombiner().setInput(filledValues +: bucketized).getOutput()
+      }
+    }
+  }
+
+  /**
+   * Enrichment functions for Integer Feature
+   *
+   * @param f FeatureLike
+   */
+  implicit class RichIntegerFeature[T <: Integer : TypeTag](val f: FeatureLike[T])
+    (implicit val ttiv: TypeTag[T#Value]) {
+
+    /**
+     * Fill missing values with mean
+     *
+     * @param default default value is the whole feature is filled with missing values
+     * @return transformed feature of type RealNN
+     */
+    def fillMissingWithMean(default: Double = 0.0): FeatureLike[RealNN] = {
+      f.transformWith(new FillMissingWithMean[Int, T]().setDefaultValue(default))
+    }
+
+    /**
+     * Apply a smart bucketizer transformer
+     *
+     * @param label        label feature
+     * @param trackNulls   option to keep track of values that were missing
+     * @param trackInvalid option to keep track of invalid values,
+     *                     eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree
+     */
+    def autoBucketize(
+      label: FeatureLike[RealNN],
+      trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
+    ): FeatureLike[OPVector] = {
+      new DecisionTreeNumericBucketizer[Int, T]()
+        .setInput(label, f)
+        .setTrackInvalid(trackInvalid)
+        .setTrackNulls(trackNulls)
+        .setMinInfoGain(minInfoGain).getOutput()
+    }
+
+    /**
+     * Apply integer vectorizer: Converts a sequence of Integer features into a vector feature.
+     *
+     * @param others       other features of same type
+     * @param fillValue    value to pull in place of nulls
+     * @param trackNulls   keep tract of when nulls occur by adding a second column to the vector with a null indicator
+     * @param fillWithMode replace missing values with mode (as apposed to constant provided in fillValue)
+     * @param trackInvalid option to keep track of invalid values,
+     *                     eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
+     * @param label        optional label column to be passed into autoBucketizer if present
+     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
+     *                     features if a label argument is passed
+     */
+    def vectorize
+    (
+      fillValue: Int,
+      fillWithMode: Boolean,
+      trackNulls: Boolean,
+      others: Array[FeatureLike[T]] = Array.empty,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = TransmogrifierDefaults.MinInfoGain,
+      label: Option[FeatureLike[RealNN]] = None
+    ): FeatureLike[OPVector] = {
+      val features = f +: others
+      val stage = new IntegerVectorizer[T]().setInput(features).setTrackNulls(trackNulls)
       if (fillWithMode) stage.setFillWithMode else stage.setFillWithConstant(fillValue)
       val filledValues = stage.getOutput()
       label match {

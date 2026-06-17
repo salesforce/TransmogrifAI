@@ -154,8 +154,8 @@ class TransformersTest extends FlatSpec with Matchers with PassengerFeaturesTest
     heightRes.originStage shouldBe a[Transformer]
   }
   it should "allow applying generic feature quaternary transformations" in {
-    val heightRes: FeatureLike[RealNN] = height.map[RealNN, RealNN, Real, RealNN](height, height, age,
-      (h1, h2, h3, a) => (h1.value.get * h2.value.get + h3.value.get - a.value.getOrElse(0.0)).toRealNN
+    val heightRes: FeatureLike[RealNN] = height.map[RealNN, RealNN, Integer, RealNN](height, height, age,
+      (h1, h2, h3, a) => (h1.value.get * h2.value.get + h3.value.get - a.value.getOrElse(0)).toRealNN
     )
     heightRes.parents shouldBe Array(height, height, height, age)
     heightRes.originStage shouldBe a[Transformer]

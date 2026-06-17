@@ -50,6 +50,7 @@ abstract class UnionSumNumericMap[N: Numeric, T <: OPMap[N]](implicit val ttag: 
 }
 case object UnionCurrencyMap extends UnionSumNumericMap[Double, CurrencyMap]
 case object UnionRealMap extends UnionSumNumericMap[Double, RealMap]
+case object UnionIntegerMap extends UnionSumNumericMap[Int, IntegerMap]
 case object UnionIntegralMap extends UnionSumNumericMap[Long, IntegralMap]
 
 /**
@@ -116,11 +117,13 @@ abstract class UnionMinMaxNumericMap[N, T <: OPMap[N]]
 }
 case object UnionMaxRealMap extends UnionMinMaxNumericMap[Double, RealMap](isMin = false)
 case object UnionMaxCurrencyMap extends UnionMinMaxNumericMap[Double, CurrencyMap](isMin = false)
+case object UnionMaxIntegerMap extends UnionMinMaxNumericMap[Int, IntegerMap](isMin = false)
 case object UnionMaxIntegralMap extends UnionMinMaxNumericMap[Long, IntegralMap](isMin = false)
 case object UnionMaxDateMap extends UnionMinMaxNumericMap[Long, DateMap](isMin = false)
 case object UnionMaxDateTimeMap extends UnionMinMaxNumericMap[Long, DateTimeMap](isMin = false)
 case object UnionMinRealMap extends UnionMinMaxNumericMap[Double, RealMap](isMin = true)
 case object UnionMinCurrencyMap extends UnionMinMaxNumericMap[Double, CurrencyMap](isMin = true)
+case object UnionMinIntegerMap extends UnionMinMaxNumericMap[Int, IntegerMap](isMin = true)
 case object UnionMinIntegralMap extends UnionMinMaxNumericMap[Long, IntegralMap](isMin = true)
 case object UnionMinDateMap extends UnionMinMaxNumericMap[Long, DateMap](isMin = true)
 case object UnionMinDateTimeMap extends UnionMinMaxNumericMap[Long, DateTimeMap](isMin = true)

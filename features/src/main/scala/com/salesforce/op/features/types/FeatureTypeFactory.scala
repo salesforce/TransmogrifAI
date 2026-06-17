@@ -108,6 +108,8 @@ case object FeatureTypeFactory {
         if (value == null) FeatureTypeDefaults.EmailMap else new EmailMap(value.asInstanceOf[Map[String, String]])
       case t if t =:= weakTypeOf[IDMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.IDMap else new IDMap(value.asInstanceOf[Map[String, String]])
+      case t if t =:= weakTypeOf[IntegerMap] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.IntegerMap else new IntegerMap(value.asInstanceOf[Map[String, Int]])
       case t if t =:= weakTypeOf[IntegralMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.IntegralMap else new IntegralMap(value.asInstanceOf[Map[String, Long]])
       case t if t =:= weakTypeOf[NameStats] => (value: Any) =>
@@ -156,6 +158,8 @@ case object FeatureTypeFactory {
         if (value == null) FeatureTypeDefaults.Date else new Date(value.asInstanceOf[Option[Long]])
       case t if t =:= weakTypeOf[DateTime] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.DateTime else new DateTime(value.asInstanceOf[Option[Long]])
+      case t if t =:= weakTypeOf[Integer] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.Integer else new Integer(value.asInstanceOf[Option[Int]])
       case t if t =:= weakTypeOf[Integral] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Integral else new Integral(value.asInstanceOf[Option[Long]])
       case t if t =:= weakTypeOf[Percent] => (value: Any) =>

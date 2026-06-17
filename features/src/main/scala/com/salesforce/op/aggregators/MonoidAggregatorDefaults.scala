@@ -70,6 +70,7 @@ object MonoidAggregatorDefaults {
       case wt if wt =:= weakTypeOf[DateTimeMap] => UnionMaxDateTimeMap
       case wt if wt =:= weakTypeOf[EmailMap] => UnionConcatEmailMap
       case wt if wt =:= weakTypeOf[IDMap] => UnionConcatIDMap
+      case wt if wt =:= weakTypeOf[IntegerMap] => UnionIntegerMap
       case wt if wt =:= weakTypeOf[IntegralMap] => UnionIntegralMap
       case wt if wt =:= weakTypeOf[MultiPickListMap] => UnionMultiPickListMap
       case wt if wt =:= weakTypeOf[PercentMap] => UnionMeanPercentMap
@@ -93,6 +94,7 @@ object MonoidAggregatorDefaults {
       case wt if wt =:= weakTypeOf[Currency] => SumCurrency
       case wt if wt =:= weakTypeOf[Date] => MaxDate
       case wt if wt =:= weakTypeOf[DateTime] => MaxDateTime
+      case wt if wt =:= weakTypeOf[Integer] => SumInteger
       case wt if wt =:= weakTypeOf[Integral] => SumIntegral
       case wt if wt =:= weakTypeOf[Percent] => MeanPercent
       case wt if wt =:= weakTypeOf[Real] => SumReal

@@ -84,13 +84,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   lazy val xgbWorkflowModel = xgbWorkflow.train()
 
   val pred = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.2)),
       modelsAndParameters = models)
     .setInput(label, checked)
     .getOutput()
 
   val predWithMaps = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.2)),
       modelsAndParameters = models)
     .setInput(label, checkedWithMaps)
     .getOutput()
@@ -149,20 +149,24 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val standardizedLogpred = new OpLogisticRegression().setStandardization(true)
     .setInput(logRegDF._1, logRegDF._2).getOutput()
 
+  def getCoefficientByName(features: Seq[FeatureInsights], featureName: String): Double = {
+    features.filter(_.featureName == featureName).head
+      .derivedFeatures.head
+      .contribution.head
+  }
+
   def getFeatureImp(standardizedModel: FeatureLike[Prediction],
     unstandardizedModel: FeatureLike[Prediction], DF: DataFrame): Array[Double] = {
     lazy val workFlow = new OpWorkflow()
       .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
     lazy val model = workFlow.train()
-    val unstandardizedFtImp = model.modelInsights(unstandardizedModel)
-      .features.map(_.derivedFeatures.map(_.contribution))
-    val standardizedFtImp = model.modelInsights(standardizedModel)
-      .features.map(_.derivedFeatures.map(_.contribution))
-    val descaledsmallCoeff = standardizedFtImp.flatten.flatten.head
-    val originalsmallCoeff = unstandardizedFtImp.flatten.flatten.head
-    val descaledbigCoeff = standardizedFtImp.flatten.flatten.last
-    val orginalbigCoeff = unstandardizedFtImp.flatten.flatten.last
-    return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
+    val standardizedFeatures = model.modelInsights(standardizedModel).features
+    val unstandardizedFeatures = model.modelInsights(unstandardizedModel).features
+    val descaledSmallCoeff = getCoefficientByName(standardizedFeatures, "feature2")
+    val descaledBigCoeff = getCoefficientByName(standardizedFeatures, "feature1")
+    val originalSmallCoeff = getCoefficientByName(unstandardizedFeatures, "feature2")
+    val originalBigCoeff = getCoefficientByName(unstandardizedFeatures, "feature1")
+    Array(descaledSmallCoeff, originalSmallCoeff, descaledBigCoeff, originalBigCoeff)
   }
 
   def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
@@ -226,7 +230,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     genderInsights.derivedFeatures.size shouldBe 4
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 9
+    insights.stageInfo.keys.size shouldEqual 10
   }
 
   it should "return model insights even when correlation is turned off for some features" in {
@@ -275,7 +279,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 11
+    insights.stageInfo.keys.size shouldEqual 12
   }
 
   it should "find the sanity checker metadata even if the model has been serialized" in {
@@ -328,7 +332,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
     insights.selectedModelInfo.get.validationType shouldBe CrossValidation
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 12
+    insights.stageInfo.keys.size shouldEqual 13
   }
 
   it should "return feature insights with label info and model info even when no sanity checker is found" in {
@@ -359,7 +363,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
     insights.selectedModelInfo.get.validationType shouldBe TrainValidationSplit
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 11
+    insights.stageInfo.keys.size shouldEqual 12
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {

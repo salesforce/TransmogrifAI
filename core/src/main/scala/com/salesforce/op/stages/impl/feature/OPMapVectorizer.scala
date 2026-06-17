@@ -117,6 +117,35 @@ class BinaryMapVectorizer[T <: OPMap[Boolean]](uid: String = UID[BinaryMapVector
  * @param tti type tag for input
  * @tparam T input feature type to vectorize into an OPVector
  */
+class IntegerMapVectorizer[T <: OPMap[Int]](uid: String = UID[IntegerMapVectorizer[T]])(implicit tti: TypeTag[T])
+  extends OPMapVectorizer[Int, T](uid = uid, operationName = "vecIntegerMap", convertFn = integerMapToRealMap) {
+
+  def setFillWithMean(shouldFill: Boolean): this.type = set(withConstant, !shouldFill)
+
+  override def fillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = {
+    if ($(withConstant)) Seq.empty
+    else {
+      val size = getInputFeatures().length
+      val meanAggr = SequenceAggregators.MeanSeqMapInteger(size = size)
+      val shouldCleanKeys = $(cleanKeys)
+      val cleanedData = dataset.map(_.map(
+        cleanMap(_, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
+      ))
+      cleanedData.select(meanAggr.toColumn).first()
+      }.map(convertFn)
+  }
+
+  def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[Int, T] =
+    new IntegerMapVectorizerModel(args, operationName = operationName, uid = uid)
+}
+
+/**
+ * Class for vectorizing IntegralMap features. Fills missing keys with the mode for that key.
+ *
+ * @param uid uid for instance
+ * @param tti type tag for input
+ * @tparam T input feature type to vectorize into an OPVector
+ */
 class IntegralMapVectorizer[T <: OPMap[Long]](uid: String = UID[IntegralMapVectorizer[T]])(implicit tti: TypeTag[T])
   extends OPMapVectorizer[Long, T](uid = uid, operationName = "vecIntMap", convertFn = intMapToRealMap) {
 
@@ -375,6 +404,16 @@ final class BinaryMapVectorizerModel[T <: OPMap[Boolean]] private[op]
 )(implicit tti: TypeTag[T])
   extends OPMapVectorizerModel[Boolean, T](args, operationName = operationName, uid = uid) {
   def convertFn: Map[String, Boolean] => Map[String, Double] = booleanToRealMap
+}
+
+final class IntegerMapVectorizerModel[T <: OPMap[Int]] private[op]
+(
+  args: OPMapVectorizerModelArgs,
+  operationName: String,
+  uid: String
+)(implicit tti: TypeTag[T])
+  extends OPMapVectorizerModel[Int, T](args = args, operationName = operationName, uid = uid) {
+  def convertFn: Map[String, Int] => Map[String, Double] = integerMapToRealMap
 }
 
 final class IntegralMapVectorizerModel[T <: OPMap[Long]] private[op]

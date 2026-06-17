@@ -170,6 +170,10 @@ private[op] case object Transmogrifier {
           val (f, other) = castAs[IDMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
+        case t if t =:= weakTypeOf[IntegerMap] =>
+          val (f, other) = castAs[IntegerMap](g)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
+            trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[IntegralMap] =>
           val (f, other) = castAs[IntegralMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMode = FillWithMode, cleanKeys = CleanKeys, others = other,
@@ -255,6 +259,10 @@ private[op] case object Transmogrifier {
           val (f, other) = castAs[DateTime](g)
           f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
             circularDateReps = CircularDateRepresentations, others = other)
+        case t if t =:= weakTypeOf[Integer] =>
+          val (f, other) = castAs[Integer](g)
+          f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,
+            trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Integral] =>
           val (f, other) = castAs[Integral](g)
           f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,
@@ -368,6 +376,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
   self: PipelineStage =>
 
   implicit def booleanToDouble(v: Boolean): Double = if (v) 1.0 else 0.0
+  implicit def booleanToInteger(v: Boolean): Int = if (v) 1 else 0
 
   // TODO once track nulls is everywhere put track nulls param here and avoid making the metadata twice
   abstract override def onSetInput(): Unit = {

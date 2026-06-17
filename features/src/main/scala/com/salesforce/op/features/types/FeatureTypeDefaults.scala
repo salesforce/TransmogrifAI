@@ -42,6 +42,7 @@ case object FeatureTypeDefaults {
 
   // Numerics
   val Binary = new t.Binary(None)
+  val Integer = new t.Integer(None)
   val Integral = new t.Integral(None)
   val Real = new t.Real(None)
   val Date = new t.Date(None)
@@ -86,6 +87,7 @@ case object FeatureTypeDefaults {
   val DateTimeMap = new t.DateTimeMap(Map.empty)
   val EmailMap = new t.EmailMap(Map.empty)
   val IDMap = new t.IDMap(Map.empty)
+  val IntegerMap = new t.IntegerMap(Map.empty)
   val IntegralMap = new t.IntegralMap(Map.empty)
   val MultiPickListMap = new t.MultiPickListMap(Map.empty)
   val PercentMap = new t.PercentMap(Map.empty)

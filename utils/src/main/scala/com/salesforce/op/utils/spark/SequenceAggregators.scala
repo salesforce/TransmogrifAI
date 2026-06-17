@@ -87,6 +87,30 @@ object SequenceAggregators {
     }
   }
 
+  type SeqInt = Seq[Int]
+  type SeqOptInt = Seq[Option[Int]]
+  type SeqTupInt = Seq[(Int, Int)]
+
+  /**
+   * Creates aggregator that computes mean on a Dataset column of type Seq[Option[Int]]
+   *
+   * @param size the size of the Sequence
+   * @return spark aggregator
+   */
+  def MeanSeqNullInteger(size: Int): Aggregator[SeqOptInt, SeqTupInt, SeqInt] = {
+    new Aggregator[SeqOptInt, SeqTupInt, SeqInt] {
+      val zero: SeqTupInt = Seq.fill(size)((0, 0))
+      def reduce(b: SeqTupInt, a: SeqOptInt): SeqTupInt = b.zip(a).map {
+        case ((s, c), Some(v)) => (s + v, c + 1)
+        case (sc, None) => sc
+      }
+      def merge(b1: SeqTupInt, b2: SeqTupInt): SeqTupInt = b1.zip(b2).map { case (cs1, cs2) => cs1 + cs2 }
+      def finish(reduction: SeqTupInt): SeqInt = reduction.map { case (s, c) => if (c > 0) s / c else s }
+      def bufferEncoder: Encoder[SeqTupInt] = ExpressionEncoder()
+      def outputEncoder: Encoder[SeqInt] = ExpressionEncoder()
+    }
+  }
+
   type SeqL = Seq[Long]
   type SeqOptL = Seq[Option[Long]]
   type SeqMapLL = Seq[Map[Long, Long]]
@@ -197,6 +221,33 @@ object SequenceAggregators {
     }
   }
 
+  type SeqMapInt = Seq[Map[String, Int]]
+  type SeqMapMapInt = Seq[Map[String, Map[Long, Int]]]
+  type SeqMapTupleInt = Seq[Map[String, (Int, Int)]]
+
+  /**
+   * Creates aggregator that computes the means by key of a Dataset column of type Seq[Map[String, Int]].
+   * Each map has a separate mean by key computed.
+   * Because each map does not have to have all the possible keys,
+   * the element counts for each map's keys can all be different.
+   *
+   * @param size the size of the Sequence
+   * @return spark aggregator
+   */
+  def MeanSeqMapInteger(size: Int): Aggregator[SeqMapInt, SeqMapTupleInt, SeqMapInt] = {
+    new Aggregator[SeqMapInt, SeqMapTupleInt, SeqMapInt] {
+      val zero: SeqMapTupleInt = Seq.fill(size)(Map.empty)
+      def reduce(b: SeqMapTupleInt, a: SeqMapInt): SeqMapTupleInt =
+        merge(b, a.map(_.map { case (k, v) => k -> (v, 1) }))
+      def merge(b1: SeqMapTupleInt, b2: SeqMapTupleInt): SeqMapTupleInt = b1.zip(b2).map { case (m1, m2) => m1 + m2 }
+      def finish(r: SeqMapTupleInt): SeqMapInt = r.map(m =>
+        m.map { case (k, (s, c)) => (k, if (c > 0) s / c else s) }
+      )
+      // Seq of Map of Tuple is too complicated for Spark's encoder, so need to use Kryo's
+      def bufferEncoder: Encoder[SeqMapTupleInt] = Encoders.kryo[SeqMapTupleInt]
+      def outputEncoder: Encoder[SeqMapInt] = ExpressionEncoder()
+    }
+  }
   type SeqMapLong = Seq[Map[String, Long]]
   type SeqMapMapLong = Seq[Map[String, Map[Long, Long]]]
 

@@ -227,8 +227,8 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   }
 
   /* Thresholds are defined on the probability piece of the prediction (specifically, the probability to be positive
-     which is the second element of the probability array here), so we manually create a dataset where whenever
-     records classified as positive (threshold <= probability) the label is negative for certain threshold ranges. */
+  which is the second element of the probability array here), so we manually create a dataset where whenever
+  records classified as positive (threshold <= probability) the label is negative for certain threshold ranges. */
   it should "produce correct thresholded metrics when there are no positive labels" in {
     val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
       (0 to numRecs).map(x =>
@@ -283,9 +283,9 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     checkThresholdMetrics(metrics)
   }
 
-  /* TP/TN/FP/FN all reflect predicted value at default threshold of 0.5.
-  * Threshold metrics, like auPR and auROC, are calculated based on the score values,
-  * which are used as thresholds for curve calculation */
+  /* TN/TN/FP/FN all reflect predicted value at default threshold of 0.5.
+  Threshold metrics, like auPR and auROC, are calculated based on the score values,
+  which are used as thresholds for curve calculation */
   it should "produce auROC and auPR of 1 when all positive labels are scored higher than negative labels" in {
     val doesNotMatter = 123.4
     val (dsSynth, rawLabelSynth, predictionSynth) = TestFeatureBuilder[RealNN, Prediction](
@@ -402,6 +402,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     (tp, tn, fp, fn, precision, recall, f1)
 
   }
+
 
   // TODO: move this to OpWorkFlowTest
   //  it should "evaluate  a  workflow" in {

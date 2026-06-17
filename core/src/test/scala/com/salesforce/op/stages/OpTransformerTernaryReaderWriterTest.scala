@@ -42,9 +42,9 @@ class OpTransformerTernaryReaderWriterTest extends OpPipelineStageReaderWriterTe
   override val hasOutputName = false
 
   val stage =
-    new  TernaryLambdaTransformer[Real, Real, Real, Real](
+    new  TernaryLambdaTransformer[Real, Integer, Real, Real](
       operationName = "test",
-      transformFn = new Lambdas.FncTernary,
+      transformFn = new Lambdas.FncTernaryInt,
       uid = "uid_1234"
     ).setInput(weight, age, weight).setMetadata(meta)
 

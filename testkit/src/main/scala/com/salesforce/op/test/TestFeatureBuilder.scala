@@ -50,7 +50,7 @@ import scala.reflect.runtime.universe._
 case object TestFeatureBuilder {
 
   case object DefaultFeatureNames {
-    val (f1, f2, f3, f4, f5) = ("f1", "f2", "f3", "f4", "f5")
+    val (f1, f2, f3, f4, f5, f6) = ("f1", "f2", "f3", "f4", "f5", "f6")
   }
 
   /**
@@ -253,6 +253,67 @@ case object TestFeatureBuilder {
       f1name = DefaultFeatureNames.f1, f2name = DefaultFeatureNames.f2,
       f3name = DefaultFeatureNames.f3, f4name = DefaultFeatureNames.f4,
       f5name = DefaultFeatureNames.f5, data)
+  }
+
+    /**
+   * Build a dataset with six features of specified types
+   *
+   * @param f1name 1st feature name
+   * @param f2name 2nd feature name
+   * @param f3name 3rd feature name
+   * @param f4name 4th feature name
+   * @param f5name 5th feature name
+   * @param f6name 6th feature name
+   * @param data   data
+   * @param spark  spark session
+   * @tparam F1 1st feature type
+   * @tparam F2 2nd feature type
+   * @tparam F3 3rd feature type
+   * @tparam F4 4th feature type
+   * @tparam F5 5th feature type
+   * @tparam F6 6th feature type
+   * @return dataset with five features of specified types
+   */
+  def apply[F1 <: FeatureType : TypeTag,
+  F2 <: FeatureType : TypeTag,
+  F3 <: FeatureType : TypeTag,
+  F4 <: FeatureType : TypeTag,
+  F5 <: FeatureType : TypeTag,
+  F6 <: FeatureType : TypeTag]
+  (f1name: String, f2name: String, f3name: String, f4name: String, f5name: String, f6name: String,
+  data: Seq[(F1, F2, F3, F4, F5, F6)])(implicit spark: SparkSession):
+  (DataFrame, Feature[F1], Feature[F2], Feature[F3], Feature[F4], Feature[F5], Feature[F6]) = {
+    val (f1, f2, f3, f4, f5, f6) =
+      (feature[F1](f1name), feature[F2](f2name), feature[F3](f3name), feature[F4](f4name), feature[F5](f5name),
+        feature[F6](f6name))
+    val schema = FeatureSparkTypes.toStructType(f1, f2, f3, f4, f5, f6)
+    (dataframe(schema, data), f1, f2, f3, f4, f5, f6)
+  }
+
+  /**
+   * Build a dataset with six features of specified types
+   *
+   * @param data  data
+   * @param spark spark session
+   * @tparam F1 1st feature type
+   * @tparam F2 2nd feature type
+   * @tparam F3 3rd feature type
+   * @tparam F4 4th feature type
+   * @tparam F5 5th feature type
+   * @tparam F6 6th feature type*
+   * @return dataset with six features of specified types
+   */
+  def apply[F1 <: FeatureType : TypeTag,
+  F2 <: FeatureType : TypeTag,
+  F3 <: FeatureType : TypeTag,
+  F4 <: FeatureType : TypeTag,
+  F5 <: FeatureType : TypeTag,
+  F6 <: FeatureType : TypeTag](data: Seq[(F1, F2, F3, F4, F5, F6)])(implicit spark: SparkSession):
+  (DataFrame, Feature[F1], Feature[F2], Feature[F3], Feature[F4], Feature[F5], Feature[F6]) = {
+    apply[F1, F2, F3, F4, F5, F6](
+      f1name = DefaultFeatureNames.f1, f2name = DefaultFeatureNames.f2,
+      f3name = DefaultFeatureNames.f3, f4name = DefaultFeatureNames.f4,
+      f5name = DefaultFeatureNames.f5, f6name = DefaultFeatureNames.f6, data)
   }
 
   /**
